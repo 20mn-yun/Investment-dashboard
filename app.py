@@ -5,6 +5,7 @@ import requests
 import feedparser
 import anthropic
 import json
+import os
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -275,6 +276,43 @@ def get_news():
             results.append({"group": name, "articles": articles[:3]})
 
     return jsonify(results)
+
+
+KEYWORDS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keywords.json")
+
+DEFAULT_GROUPS = [
+    {"name": "미국 금리/Fed", "terms": ["Fed interest rate", "FOMC", "Federal Reserve policy"]},
+    {"name": "반도체 산업", "terms": ["semiconductor", "Nvidia earnings", "chip export"]},
+    {"name": "국제 유가", "terms": ["crude oil price", "OPEC production", "WTI Brent"]},
+]
+
+
+def load_keywords():
+    try:
+        with open(KEYWORDS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        save_keywords(DEFAULT_GROUPS)
+        return DEFAULT_GROUPS
+
+
+def save_keywords(groups):
+    with open(KEYWORDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(groups, f, ensure_ascii=False, indent=2)
+
+
+@app.route("/api/keywords", methods=["GET"])
+def get_keywords():
+    return jsonify(load_keywords())
+
+
+@app.route("/api/keywords", methods=["POST"])
+def set_keywords():
+    groups = request.get_json()
+    if not isinstance(groups, list):
+        return jsonify({"error": "groups must be a list"}), 400
+    save_keywords(groups)
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

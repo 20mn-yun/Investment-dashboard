@@ -413,6 +413,66 @@
             text-align: center;
             padding: 20px;
         }
+
+        /* 모바일 반응형 */
+        @media (max-width: 768px) {
+            .header { padding: 12px 16px; }
+            .header h1 { font-size: 16px; }
+            .header .date { font-size: 11px; }
+
+            .tabs { padding: 0 12px; }
+            .tab { padding: 10px 14px; font-size: 13px; }
+
+            .tab-content { padding: 16px; }
+
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+                margin-bottom: 16px;
+            }
+
+            .metric-card { padding: 12px; }
+            .metric-card .label { font-size: 11px; margin-bottom: 4px; }
+            .metric-card .value { font-size: 18px; }
+            .metric-card .change { font-size: 11px; }
+
+            .two-column {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+
+            .section-title { font-size: 14px; margin-bottom: 8px; }
+
+            .fear-greed-container { padding: 12px; }
+            .gauge-value { font-size: 20px; }
+
+            .data-table { padding: 12px; }
+            .data-row { font-size: 12px; padding: 6px 0; }
+
+            .sector-name { width: 80px; font-size: 12px; }
+            .sector-value { width: 55px; font-size: 12px; }
+
+            .news-section { padding: 12px; margin-bottom: 16px; }
+            .news-group-title { font-size: 14px; padding: 10px 12px 6px; }
+            .news-item .news-title { font-size: 13px; }
+            .news-item .news-meta { font-size: 11px; }
+
+            .group-card { padding: 10px; }
+            .group-name { font-size: 13px; }
+            .group-add-term { flex-wrap: wrap; }
+            .group-add-term input { width: 100%; }
+
+            .keyword-input { font-size: 12px; width: 100%; }
+            .btn { font-size: 12px; padding: 6px 12px; white-space: nowrap; }
+        }
+
+        @media (max-width: 480px) {
+            .metrics-grid { gap: 6px; }
+            .metric-card .value { font-size: 16px; }
+            .metric-card .change { font-size: 10px; }
+            .header h1 { font-size: 14px; }
+        }
     </style>
 </head>
 <body>
@@ -545,9 +605,9 @@
     <div class="news-section" style="margin-bottom:16px;">
         <div style="margin-bottom:12px; font-size:13px; color:#8b949e;">키워드 그룹 관리</div>
         <div id="groups-container"></div>
-        <div style="margin-top:12px; display:flex; gap:8px;">
-            <input class="keyword-input" id="group-name-input" type="text" placeholder="그룹 이름 (예: 이란-이스라엘 전쟁)" style="flex:1;">
-            <input class="keyword-input" id="group-term-input" type="text" placeholder="첫 번째 검색어 (예: Iran Israel war)" style="flex:1;">
+        <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;">
+            <input class="keyword-input" id="group-name-input" type="text" placeholder="그룹 이름 (예: 이란-이스라엘 전쟁)" style="flex:1; min-width:140px;">
+            <input class="keyword-input" id="group-term-input" type="text" placeholder="첫 번째 검색어 (예: Iran Israel war)" style="flex:1; min-width:140px;">
             <button class="btn" onclick="addGroup()">그룹 추가</button>
         </div>
     </div>
@@ -586,16 +646,30 @@
         document.getElementById('tab-' + tabName).classList.add('active');
     }
 
-    // 그룹 관리
-    const DEFAULT_GROUPS = [
-        { name: "미국 금리/Fed", terms: ["Fed interest rate", "FOMC", "Federal Reserve policy"] },
-        { name: "반도체 산업", terms: ["semiconductor", "Nvidia earnings", "chip export"] },
-        { name: "국제 유가", terms: ["crude oil price", "OPEC production", "WTI Brent"] },
-    ];
-    let groups = JSON.parse(localStorage.getItem('news-groups') || 'null') || DEFAULT_GROUPS;
+    // 그룹 관리 (서버 저장)
+    let groups = [];
 
-    function saveGroups() {
-        localStorage.setItem('news-groups', JSON.stringify(groups));
+    async function loadGroups() {
+        try {
+            const res = await fetch(API_BASE + '/api/keywords');
+            groups = await res.json();
+        } catch (e) {
+            console.error('Failed to load groups:', e);
+            groups = [];
+        }
+        renderGroups();
+    }
+
+    async function saveGroups() {
+        try {
+            await fetch(API_BASE + '/api/keywords', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(groups),
+            });
+        } catch (e) {
+            console.error('Failed to save groups:', e);
+        }
     }
 
     function renderGroups() {
@@ -623,38 +697,38 @@
         `).join('');
     }
 
-    function addGroup() {
+    async function addGroup() {
         const nameInput = document.getElementById('group-name-input');
         const termInput = document.getElementById('group-term-input');
         const name = nameInput.value.trim();
         const term = termInput.value.trim();
         if (!name) return;
         groups.push({ name, terms: term ? [term] : [] });
-        saveGroups();
+        await saveGroups();
         renderGroups();
         nameInput.value = '';
         termInput.value = '';
     }
 
-    function deleteGroup(gi) {
+    async function deleteGroup(gi) {
         groups.splice(gi, 1);
-        saveGroups();
+        await saveGroups();
         renderGroups();
     }
 
-    function addTerm(gi) {
+    async function addTerm(gi) {
         const input = document.getElementById('term-input-' + gi);
         const val = input.value.trim();
         if (val && !groups[gi].terms.includes(val)) {
             groups[gi].terms.push(val);
-            saveGroups();
+            await saveGroups();
             renderGroups();
         }
     }
 
-    function removeTerm(gi, ti) {
+    async function removeTerm(gi, ti) {
         groups[gi].terms.splice(ti, 1);
-        saveGroups();
+        await saveGroups();
         renderGroups();
     }
 
@@ -874,7 +948,7 @@
     }
 
     // 초기 렌더링
-    renderGroups();
+    loadGroups();
     fetchAllData();
 
     // 30초마다 자동 새로고침
