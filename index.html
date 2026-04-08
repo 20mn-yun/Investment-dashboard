@@ -330,6 +330,82 @@
         .data-row .data-label { color: #8b949e; }
         .data-row .data-value { font-weight: bold; }
 
+        /* 그룹 카드 */
+        .group-card {
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .group-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+
+        .group-delete {
+            cursor: pointer;
+            color: #8b949e;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .group-delete:hover { color: #f85149; }
+
+        .group-terms {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .group-add-term {
+            display: flex;
+            gap: 6px;
+        }
+
+        .group-add-term input {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #e6edf3;
+            font-size: 12px;
+            outline: none;
+            width: 200px;
+        }
+
+        .group-add-term input:focus { border-color: #58a6ff; }
+
+        .group-add-term button {
+            background-color: #238636;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* 뉴스 그룹 결과 */
+        .news-group-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #58a6ff;
+            padding: 12px 16px 8px;
+            border-bottom: 1px solid #30363d;
+        }
+
         /* 로딩 */
         .loading {
             color: #8b949e;
@@ -456,19 +532,30 @@
     </div>
 
     <!-- 글로벌 뉴스 -->
-    <div class="section-title">📰 글로벌 주요 뉴스</div>
-    <div class="news-section">
-        <!-- 키워드 관리 -->
-        <div style="margin-bottom: 12px; font-size: 13px; color: #8b949e;">키워드 관리</div>
-        <div class="news-keywords" id="keywords-container"></div>
-        <div class="keyword-input-area">
-            <input class="keyword-input" id="keyword-input" type="text" placeholder="키워드 추가 (예: Fed, 반도체)">
-            <button class="btn" onclick="addKeyword()">추가</button>
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="section-title" style="margin-bottom:0; border-bottom:none;">📰 글로벌 주요 뉴스 (AI 선별)</div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span id="news-updated" style="font-size:12px; color:#8b949e;"></span>
+            <button class="btn" onclick="fetchNews()" id="news-refresh-btn">새로고침</button>
         </div>
+    </div>
+    <div style="border-bottom:1px solid #30363d; margin-bottom:12px;"></div>
 
-        <!-- 뉴스 목록 -->
-        <div class="news-list" id="news-list">
-            <div class="loading">키워드를 추가하면 뉴스를 검색해요</div>
+    <!-- 그룹 관리 -->
+    <div class="news-section" style="margin-bottom:16px;">
+        <div style="margin-bottom:12px; font-size:13px; color:#8b949e;">키워드 그룹 관리</div>
+        <div id="groups-container"></div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+            <input class="keyword-input" id="group-name-input" type="text" placeholder="그룹 이름 (예: 이란-이스라엘 전쟁)" style="flex:1;">
+            <input class="keyword-input" id="group-term-input" type="text" placeholder="첫 번째 검색어 (예: Iran Israel war)" style="flex:1;">
+            <button class="btn" onclick="addGroup()">그룹 추가</button>
+        </div>
+    </div>
+
+    <!-- 뉴스 목록 -->
+    <div id="news-list">
+        <div class="news-section">
+            <div class="loading">새로고침 버튼을 눌러 뉴스를 검색하세요</div>
         </div>
     </div>
 
@@ -480,6 +567,8 @@
 </div>
 
 <script>
+    const API_BASE = 'http://192.168.0.17:8000';
+
     // 날짜 표시
     function updateDate() {
         const now = new Date();
@@ -497,60 +586,164 @@
         document.getElementById('tab-' + tabName).classList.add('active');
     }
 
-    // 키워드 관리
-    let keywords = JSON.parse(localStorage.getItem('news-keywords') || '["Fed", "반도체", "S&P500", "환율"]');
+    // 그룹 관리
+    const DEFAULT_GROUPS = [
+        { name: "미국 금리/Fed", terms: ["Fed interest rate", "FOMC", "Federal Reserve policy"] },
+        { name: "반도체 산업", terms: ["semiconductor", "Nvidia earnings", "chip export"] },
+        { name: "국제 유가", terms: ["crude oil price", "OPEC production", "WTI Brent"] },
+    ];
+    let groups = JSON.parse(localStorage.getItem('news-groups') || 'null') || DEFAULT_GROUPS;
 
-    function renderKeywords() {
-        const container = document.getElementById('keywords-container');
-        container.innerHTML = '';
-        keywords.forEach((kw, index) => {
-            const tag = document.createElement('div');
-            tag.className = 'keyword-tag';
-            tag.innerHTML = `${kw} <span class="remove" onclick="removeKeyword(${index})">×</span>`;
-            container.appendChild(tag);
-        });
+    function saveGroups() {
+        localStorage.setItem('news-groups', JSON.stringify(groups));
     }
 
-    function addKeyword() {
-        const input = document.getElementById('keyword-input');
-        const value = input.value.trim();
-        if (value && !keywords.includes(value)) {
-            keywords.push(value);
-            localStorage.setItem('news-keywords', JSON.stringify(keywords));
-            renderKeywords();
-            input.value = '';
+    function renderGroups() {
+        const container = document.getElementById('groups-container');
+        container.innerHTML = groups.map((g, gi) => `
+            <div class="group-card">
+                <div class="group-header">
+                    <span class="group-name">${g.name}</span>
+                    <span class="group-delete" onclick="deleteGroup(${gi})">삭제</span>
+                </div>
+                <div class="group-terms">
+                    ${g.terms.map((t, ti) => `
+                        <div class="keyword-tag">
+                            ${t}
+                            <span class="remove" onclick="removeTerm(${gi},${ti})">×</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="group-add-term">
+                    <input type="text" id="term-input-${gi}" placeholder="검색어 추가..."
+                           onkeypress="if(event.key==='Enter')addTerm(${gi})">
+                    <button onclick="addTerm(${gi})">추가</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function addGroup() {
+        const nameInput = document.getElementById('group-name-input');
+        const termInput = document.getElementById('group-term-input');
+        const name = nameInput.value.trim();
+        const term = termInput.value.trim();
+        if (!name) return;
+        groups.push({ name, terms: term ? [term] : [] });
+        saveGroups();
+        renderGroups();
+        nameInput.value = '';
+        termInput.value = '';
+    }
+
+    function deleteGroup(gi) {
+        groups.splice(gi, 1);
+        saveGroups();
+        renderGroups();
+    }
+
+    function addTerm(gi) {
+        const input = document.getElementById('term-input-' + gi);
+        const val = input.value.trim();
+        if (val && !groups[gi].terms.includes(val)) {
+            groups[gi].terms.push(val);
+            saveGroups();
+            renderGroups();
         }
     }
 
-    function removeKeyword(index) {
-        keywords.splice(index, 1);
-        localStorage.setItem('news-keywords', JSON.stringify(keywords));
-        renderKeywords();
+    function removeTerm(gi, ti) {
+        groups[gi].terms.splice(ti, 1);
+        saveGroups();
+        renderGroups();
     }
 
-    document.getElementById('keyword-input').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') addKeyword();
+    document.getElementById('group-name-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') addGroup();
     });
 
-    // 섹터 데이터 (임시)
-    const sectors = [
-        { name: '에너지', value: 4.2 },
-        { name: '헬스케어', value: 0.8 },
-        { name: '부동산', value: 0.5 },
-        { name: '필수소비재', value: 0.2 },
-        { name: '금융', value: -0.8 },
-        { name: '통신서비스', value: -1.2 },
-        { name: '산업재', value: -1.8 },
-        { name: '정보기술', value: -3.1 },
-    ];
+    // 색상 클래스 결정
+    function colorClass(value) {
+        if (value > 0) return 'positive';
+        if (value < 0) return 'negative';
+        return 'neutral';
+    }
 
-    function renderSectors() {
+    // 숫자 포맷
+    function formatPrice(price) {
+        if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return price.toFixed(2);
+    }
+
+    function formatChange(change, changePct) {
+        const sign = change >= 0 ? '+' : '';
+        return `${sign}${change.toFixed(2)} (${sign}${changePct.toFixed(2)}%)`;
+    }
+
+    // 핵심 지표 업데이트
+    function updateMetricCard(id, data) {
+        const valueEl = document.getElementById(id + '-value');
+        const changeEl = document.getElementById(id + '-change');
+        const cls = colorClass(data.change_pct);
+        valueEl.textContent = formatPrice(data.price);
+        valueEl.className = 'value ' + cls;
+        changeEl.textContent = formatChange(data.change, data.change_pct);
+        changeEl.className = 'change ' + cls;
+    }
+
+    async function fetchMarketData() {
+        try {
+            const res = await fetch(API_BASE + '/api/market');
+            const data = await res.json();
+            updateMetricCard('sp500', data.sp500);
+            updateMetricCard('nasdaq', data.nasdaq);
+            updateMetricCard('vix', data.vix);
+            updateMetricCard('usdkrw', data.usdkrw);
+            updateMetricCard('wti', data.wti);
+            updateMetricCard('gold', data.gold);
+        } catch (e) {
+            console.error('Market data fetch failed:', e);
+        }
+    }
+
+    // 채권/환율/원자재 업데이트
+    async function fetchExtraData() {
+        try {
+            const res = await fetch(API_BASE + '/api/extra');
+            const data = await res.json();
+            const mapping = {
+                us10y: 'us10y',
+                us2y: 'us2y',
+                dxy: 'dxy',
+                usdkrw: 'usdkrw-detail',
+                brent: 'brent',
+                bitcoin: 'bitcoin',
+            };
+            for (const [key, elId] of Object.entries(mapping)) {
+                const d = data[key];
+                if (!d) continue;
+                const el = document.getElementById(elId);
+                const cls = colorClass(d.change_pct);
+                el.textContent = `${formatPrice(d.price)}  ${formatChange(d.change, d.change_pct)}`;
+                el.className = 'data-value ' + cls;
+            }
+        } catch (e) {
+            console.error('Extra data fetch failed:', e);
+        }
+    }
+
+    // 섹터별 등락 업데이트
+    function renderSectors(sectors) {
         const container = document.getElementById('sector-chart');
-        const maxVal = Math.max(...sectors.map(s => Math.abs(s.value)));
+        if (!sectors || sectors.length === 0) {
+            container.innerHTML = '<div class="loading">데이터 없음</div>';
+            return;
+        }
+        const maxVal = Math.max(...sectors.map(s => Math.abs(s.value)), 0.1);
         container.innerHTML = sectors.map(s => {
             const width = (Math.abs(s.value) / maxVal) * 45;
             const isPositive = s.value >= 0;
-            const colorClass = isPositive ? 'positive' : 'negative';
+            const cls = isPositive ? 'positive' : 'negative';
             const barClass = isPositive ? 'positive-bar' : 'negative-bar';
             return `
                 <div class="sector-item">
@@ -559,31 +752,133 @@
                         <div class="sector-center-line"></div>
                         <div class="sector-bar ${barClass}" style="width: ${width}%"></div>
                     </div>
-                    <div class="sector-value ${colorClass}">${s.value > 0 ? '+' : ''}${s.value}%</div>
+                    <div class="sector-value ${cls}">${s.value > 0 ? '+' : ''}${s.value.toFixed(2)}%</div>
                 </div>
             `;
         }).join('');
     }
 
-    // 공포탐욕 지수 (임시)
+    async function fetchSectorData() {
+        try {
+            const res = await fetch(API_BASE + '/api/sectors');
+            const data = await res.json();
+            renderSectors(data);
+        } catch (e) {
+            console.error('Sector data fetch failed:', e);
+        }
+    }
+
+    // 공포탐욕 지수 업데이트
     function renderFearGreed(value) {
         document.getElementById('fear-greed-value').textContent = value;
         document.getElementById('gauge-pointer').style.left = value + '%';
         let text = '';
-        let colorClass = '';
-        if (value <= 25) { text = '극단적 공포'; colorClass = 'negative'; }
-        else if (value <= 45) { text = '공포'; colorClass = 'negative'; }
-        else if (value <= 55) { text = '중립'; colorClass = 'neutral'; }
-        else if (value <= 75) { text = '탐욕'; colorClass = 'positive'; }
-        else { text = '극단적 탐욕'; colorClass = 'positive'; }
+        let cls = '';
+        if (value <= 25) { text = '극단적 공포'; cls = 'negative'; }
+        else if (value <= 45) { text = '공포'; cls = 'negative'; }
+        else if (value <= 55) { text = '중립'; cls = 'neutral'; }
+        else if (value <= 75) { text = '탐욕'; cls = 'positive'; }
+        else { text = '극단적 탐욕'; cls = 'positive'; }
         document.getElementById('fear-greed-text').textContent = text;
-        document.getElementById('fear-greed-value').className = 'gauge-value ' + colorClass;
+        document.getElementById('fear-greed-value').className = 'gauge-value ' + cls;
+    }
+
+    async function fetchFearGreed() {
+        try {
+            const res = await fetch(API_BASE + '/api/fear-greed');
+            const data = await res.json();
+            renderFearGreed(data.value);
+        } catch (e) {
+            console.error('Fear & Greed fetch failed:', e);
+        }
+    }
+
+    // 뉴스 데이터 로드 (버튼 클릭 시에만)
+    async function fetchNews() {
+        const activeGroups = groups.filter(g => g.terms.length > 0);
+        if (activeGroups.length === 0) {
+            document.getElementById('news-list').innerHTML =
+                '<div class="news-section"><div class="loading">그룹에 검색어를 추가한 뒤 새로고침 버튼을 눌러주세요</div></div>';
+            return;
+        }
+        const btn = document.getElementById('news-refresh-btn');
+        btn.disabled = true;
+        btn.textContent = 'AI 분석 중...';
+        document.getElementById('news-list').innerHTML =
+            '<div class="news-section"><div class="loading">구글 뉴스 검색 + Claude AI 선별 중... (그룹 ' + activeGroups.length + '개)</div></div>';
+        try {
+            const res = await fetch(API_BASE + '/api/news', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ groups: activeGroups }),
+            });
+            const data = await res.json();
+            if (!data.length) {
+                document.getElementById('news-list').innerHTML =
+                    '<div class="news-section"><div class="loading">검색 결과가 없습니다</div></div>';
+                return;
+            }
+            document.getElementById('news-list').innerHTML = data.map(g => {
+                if (!g.articles || g.articles.length === 0) {
+                    return `<div class="news-section">
+                        <div class="news-group-title">${g.group}</div>
+                        <div class="loading">관련 뉴스가 없습니다</div>
+                    </div>`;
+                }
+                const articlesHtml = g.articles.map((a, i) => {
+                    const date = a.publishedAt ? new Date(a.publishedAt).toLocaleString('ko-KR') : '';
+                    const summaryHtml = (a.summary && a.summary.length)
+                        ? `<div style="margin-top:6px; padding:8px 12px; background:#161b22; border-radius:6px; border-left:3px solid #58a6ff;">
+                            ${a.summary.map(s => `<div style="font-size:12px; color:#c9d1d9; line-height:1.6;">${s}</div>`).join('')}
+                           </div>`
+                        : '';
+                    return `
+                        <div class="news-item">
+                            <div class="news-title">
+                                <span style="color:#8b949e; margin-right:8px; font-weight:bold;">${i+1}.</span>
+                                <a href="${a.url}" target="_blank" style="color:#e6edf3; text-decoration:none;">
+                                    ${a.title}
+                                </a>
+                            </div>
+                            ${summaryHtml}
+                            <div class="news-meta" style="margin-top:6px;">
+                                <span class="news-keyword-badge">${a.source}</span> ${date}
+                            </div>
+                        </div>`;
+                }).join('');
+                return `<div class="news-section">
+                    <div class="news-group-title">${g.group}</div>
+                    <div class="news-list">${articlesHtml}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('news-updated').textContent =
+                '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+        } catch (e) {
+            console.error('News fetch failed:', e);
+            document.getElementById('news-list').innerHTML =
+                '<div class="news-section"><div class="loading">뉴스를 불러올 수 없습니다</div></div>';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '새로고침';
+        }
+    }
+
+    // 전체 데이터 로드 (뉴스 제외 — 뉴스는 버튼 클릭 시에만)
+    async function fetchAllData() {
+        await Promise.all([
+            fetchMarketData(),
+            fetchExtraData(),
+            fetchSectorData(),
+            fetchFearGreed(),
+        ]);
     }
 
     // 초기 렌더링
-    renderKeywords();
-    renderSectors();
-    renderFearGreed(25);
+    renderGroups();
+    fetchAllData();
+
+    // 30초마다 자동 새로고침
+    setInterval(fetchAllData, 30000);
 </script>
 
 </body>
