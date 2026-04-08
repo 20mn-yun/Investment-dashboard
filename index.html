@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: #0d1117;
+            color: #e6edf3;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 14px;
+        }
+
+        /* 헤더 */
+        .header {
+            background-color: #161b22;
+            padding: 16px 24px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: #58a6ff;
+        }
+
+        .header .date {
+            color: #8b949e;
+            font-size: 13px;
+        }
+
+        /* 탭 */
+        .tabs {
+            background-color: #161b22;
+            padding: 0 24px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            gap: 4px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            color: #8b949e;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #58a6ff;
+            border-bottom: 2px solid #58a6ff;
+        }
+
+        .tab:hover { color: #e6edf3; }
+
+        /* 탭 콘텐츠 */
+        .tab-content { display: none; padding: 24px; }
+        .tab-content.active { display: block; }
+
+        /* 핵심 지표 카드 */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .metric-card .label {
+            color: #8b949e;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .metric-card .value {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .metric-card .change {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .positive { color: #3fb950; }
+        .negative { color: #f85149; }
+        .neutral { color: #e6edf3; }
+
+        /* 섹션 제목 */
+        .section-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #58a6ff;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        /* 2단 레이아웃 */
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        /* 섹터 차트 */
+        .sector-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 12px;
+        }
+
+        .sector-name {
+            width: 100px;
+            font-size: 13px;
+            color: #8b949e;
+            text-align: right;
+        }
+
+        .sector-bar-container {
+            flex: 1;
+            height: 20px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .sector-bar {
+            height: 14px;
+            border-radius: 2px;
+            position: absolute;
+        }
+
+        .sector-bar.positive-bar {
+            background-color: #3fb950;
+            left: 50%;
+        }
+
+        .sector-bar.negative-bar {
+            background-color: #f85149;
+            right: 50%;
+        }
+
+        .sector-center-line {
+            position: absolute;
+            left: 50%;
+            width: 1px;
+            height: 20px;
+            background-color: #30363d;
+        }
+
+        .sector-value {
+            width: 60px;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        /* 뉴스 */
+        .news-section {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .news-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+
+        .keyword-tag {
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 12px;
+            color: #58a6ff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .keyword-tag .remove {
+            cursor: pointer;
+            color: #8b949e;
+            font-size: 14px;
+        }
+
+        .keyword-tag .remove:hover { color: #f85149; }
+
+        .keyword-input-area {
+            display: flex;
+            gap: 8px;
+        }
+
+        .keyword-input {
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: #e6edf3;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .keyword-input:focus { border-color: #58a6ff; }
+
+        .btn {
+            background-color: #238636;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn:hover { background-color: #2ea043; }
+
+        .news-list { margin-top: 12px; }
+
+        .news-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .news-item:last-child { border-bottom: none; }
+
+        .news-item .news-title {
+            font-size: 14px;
+            color: #e6edf3;
+            margin-bottom: 4px;
+        }
+
+        .news-item .news-meta {
+            font-size: 12px;
+            color: #8b949e;
+        }
+
+        .news-keyword-badge {
+            background-color: #1f3a5f;
+            color: #58a6ff;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 6px;
+        }
+
+        /* 공포탐욕 게이지 */
+        .fear-greed-container {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .gauge-label {
+            text-align: center;
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 8px;
+        }
+
+        .gauge-bar {
+            height: 12px;
+            border-radius: 6px;
+            background: linear-gradient(to right, #f85149, #e3b341, #3fb950);
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .gauge-pointer {
+            position: absolute;
+            top: -4px;
+            width: 4px;
+            height: 20px;
+            background-color: white;
+            border-radius: 2px;
+            transform: translateX(-50%);
+        }
+
+        .gauge-value {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .gauge-text {
+            text-align: center;
+            font-size: 13px;
+            color: #8b949e;
+        }
+
+        /* 채권·환율·원자재 테이블 */
+        .data-table {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #21262d;
+            font-size: 13px;
+        }
+
+        .data-row:last-child { border-bottom: none; }
+
+        .data-row .data-label { color: #8b949e; }
+        .data-row .data-value { font-weight: bold; }
+
+        /* 로딩 */
+        .loading {
+            color: #8b949e;
+            font-size: 13px;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+    <h1>📈 Investment Dashboard</h1>
+    <div class="date" id="current-date"></div>
+</div>
+
+<!-- 탭 -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
+    <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
+</div>
+
+<!-- 글로벌 마켓 탭 -->
+<div class="tab-content active" id="tab-market">
+
+    <!-- 핵심 지표 -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="label">S&P 500</div>
+            <div class="value negative" id="sp500-value">-</div>
+            <div class="change negative" id="sp500-change">-</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">NASDAQ</div>
+            <div class="value negative" id="nasdaq-value">-</div>
+            <div class="change negative" id="nasdaq-change">-</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">VIX (공포지수)</div>
+            <div class="value neutral" id="vix-value">-</div>
+            <div class="change neutral" id="vix-change">-</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">USD/KRW</div>
+            <div class="value neutral" id="usdkrw-value">-</div>
+            <div class="change neutral" id="usdkrw-change">-</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">WTI 원유</div>
+            <div class="value neutral" id="wti-value">-</div>
+            <div class="change neutral" id="wti-change">-</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">금 (Gold)</div>
+            <div class="value positive" id="gold-value">-</div>
+            <div class="change positive" id="gold-change">-</div>
+        </div>
+    </div>
+
+    <!-- 공포탐욕 + 채권·환율 -->
+    <div class="two-column">
+
+        <!-- 공포탐욕 지수 -->
+        <div>
+            <div class="section-title">😨 공포·탐욕 지수</div>
+            <div class="fear-greed-container">
+                <div class="gauge-label">시장 심리</div>
+                <div class="gauge-bar">
+                    <div class="gauge-pointer" id="gauge-pointer" style="left: 25%"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#8b949e; margin-bottom:8px;">
+                    <span>극단적 공포</span>
+                    <span>공포</span>
+                    <span>중립</span>
+                    <span>탐욕</span>
+                    <span>극단적 탐욕</span>
+                </div>
+                <div class="gauge-value negative" id="fear-greed-value">-</div>
+                <div class="gauge-text" id="fear-greed-text">데이터 로딩 중...</div>
+            </div>
+        </div>
+
+        <!-- 채권·환율 -->
+        <div>
+            <div class="section-title">📊 채권·환율</div>
+            <div class="data-table">
+                <div class="data-row">
+                    <span class="data-label">미 국채 10년물</span>
+                    <span class="data-value" id="us10y">-</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">미 국채 2년물</span>
+                    <span class="data-value" id="us2y">-</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">달러인덱스 (DXY)</span>
+                    <span class="data-value" id="dxy">-</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">USD/KRW</span>
+                    <span class="data-value" id="usdkrw-detail">-</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">브렌트유</span>
+                    <span class="data-value" id="brent">-</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">비트코인</span>
+                    <span class="data-value" id="bitcoin">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 섹터별 등락 -->
+    <div style="margin-bottom: 24px;">
+        <div class="section-title">📉 섹터별 등락</div>
+        <div class="data-table">
+            <div id="sector-chart">
+                <div class="loading">데이터 로딩 중...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 글로벌 뉴스 -->
+    <div class="section-title">📰 글로벌 주요 뉴스</div>
+    <div class="news-section">
+        <!-- 키워드 관리 -->
+        <div style="margin-bottom: 12px; font-size: 13px; color: #8b949e;">키워드 관리</div>
+        <div class="news-keywords" id="keywords-container"></div>
+        <div class="keyword-input-area">
+            <input class="keyword-input" id="keyword-input" type="text" placeholder="키워드 추가 (예: Fed, 반도체)">
+            <button class="btn" onclick="addKeyword()">추가</button>
+        </div>
+
+        <!-- 뉴스 목록 -->
+        <div class="news-list" id="news-list">
+            <div class="loading">키워드를 추가하면 뉴스를 검색해요</div>
+        </div>
+    </div>
+
+</div>
+
+<!-- DART 공시 탭 -->
+<div class="tab-content" id="tab-dart">
+    <div class="loading">🚧 DART 공시 기능은 곧 추가될 예정이에요</div>
+</div>
+
+<script>
+    // 날짜 표시
+    function updateDate() {
+        const now = new Date();
+        const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit' };
+        document.getElementById('current-date').textContent = now.toLocaleDateString('ko-KR', options);
+    }
+    updateDate();
+    setInterval(updateDate, 60000);
+
+    // 탭 전환
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('tab-' + tabName).classList.add('active');
+    }
+
+    // 키워드 관리
+    let keywords = JSON.parse(localStorage.getItem('news-keywords') || '["Fed", "반도체", "S&P500", "환율"]');
+
+    function renderKeywords() {
+        const container = document.getElementById('keywords-container');
+        container.innerHTML = '';
+        keywords.forEach((kw, index) => {
+            const tag = document.createElement('div');
+            tag.className = 'keyword-tag';
+            tag.innerHTML = `${kw} <span class="remove" onclick="removeKeyword(${index})">×</span>`;
+            container.appendChild(tag);
+        });
+    }
+
+    function addKeyword() {
+        const input = document.getElementById('keyword-input');
+        const value = input.value.trim();
+        if (value && !keywords.includes(value)) {
+            keywords.push(value);
+            localStorage.setItem('news-keywords', JSON.stringify(keywords));
+            renderKeywords();
+            input.value = '';
+        }
+    }
+
+    function removeKeyword(index) {
+        keywords.splice(index, 1);
+        localStorage.setItem('news-keywords', JSON.stringify(keywords));
+        renderKeywords();
+    }
+
+    document.getElementById('keyword-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') addKeyword();
+    });
+
+    // 섹터 데이터 (임시)
+    const sectors = [
+        { name: '에너지', value: 4.2 },
+        { name: '헬스케어', value: 0.8 },
+        { name: '부동산', value: 0.5 },
+        { name: '필수소비재', value: 0.2 },
+        { name: '금융', value: -0.8 },
+        { name: '통신서비스', value: -1.2 },
+        { name: '산업재', value: -1.8 },
+        { name: '정보기술', value: -3.1 },
+    ];
+
+    function renderSectors() {
+        const container = document.getElementById('sector-chart');
+        const maxVal = Math.max(...sectors.map(s => Math.abs(s.value)));
+        container.innerHTML = sectors.map(s => {
+            const width = (Math.abs(s.value) / maxVal) * 45;
+            const isPositive = s.value >= 0;
+            const colorClass = isPositive ? 'positive' : 'negative';
+            const barClass = isPositive ? 'positive-bar' : 'negative-bar';
+            return `
+                <div class="sector-item">
+                    <div class="sector-name">${s.name}</div>
+                    <div class="sector-bar-container">
+                        <div class="sector-center-line"></div>
+                        <div class="sector-bar ${barClass}" style="width: ${width}%"></div>
+                    </div>
+                    <div class="sector-value ${colorClass}">${s.value > 0 ? '+' : ''}${s.value}%</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 공포탐욕 지수 (임시)
+    function renderFearGreed(value) {
+        document.getElementById('fear-greed-value').textContent = value;
+        document.getElementById('gauge-pointer').style.left = value + '%';
+        let text = '';
+        let colorClass = '';
+        if (value <= 25) { text = '극단적 공포'; colorClass = 'negative'; }
+        else if (value <= 45) { text = '공포'; colorClass = 'negative'; }
+        else if (value <= 55) { text = '중립'; colorClass = 'neutral'; }
+        else if (value <= 75) { text = '탐욕'; colorClass = 'positive'; }
+        else { text = '극단적 탐욕'; colorClass = 'positive'; }
+        document.getElementById('fear-greed-text').textContent = text;
+        document.getElementById('fear-greed-value').className = 'gauge-value ' + colorClass;
+    }
+
+    // 초기 렌더링
+    renderKeywords();
+    renderSectors();
+    renderFearGreed(25);
+</script>
+
+</body>
+</html>
