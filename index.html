@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Investment Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -406,6 +407,34 @@
             border-bottom: 1px solid #30363d;
         }
 
+        /* 차트 모달 */
+        .chart-overlay {
+            display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.75); z-index:1000; justify-content:center; align-items:center;
+        }
+        .chart-overlay.active { display:flex; }
+        .chart-modal {
+            background:#161b22; border:1px solid #30363d; border-radius:12px;
+            padding:24px; width:90%; max-width:800px;
+        }
+        .chart-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+        .chart-title { font-size:18px; font-weight:bold; color:#58a6ff; }
+        .chart-close { cursor:pointer; color:#8b949e; font-size:24px; }
+        .chart-close:hover { color:#f85149; }
+        .chart-periods { display:flex; gap:8px; margin-bottom:16px; }
+
+        /* 기간/시장 선택 버튼 */
+        .period-btn {
+            background:#21262d; border:1px solid #30363d; border-radius:6px;
+            padding:6px 14px; color:#8b949e; cursor:pointer; font-size:13px;
+        }
+        .period-btn.active { background:#1f3a5f; color:#58a6ff; border-color:#58a6ff; }
+        .period-btn:hover { color:#e6edf3; }
+
+        /* 클릭 가능 표시 */
+        .clickable { cursor:pointer; transition:border-color 0.2s; }
+        .clickable:hover { border-color:#58a6ff !important; }
+
         /* 로딩 */
         .loading {
             color: #8b949e;
@@ -413,6 +442,232 @@
             text-align: center;
             padding: 20px;
         }
+
+        /* ===== 캘린더 ===== */
+        .cal-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .cal-nav button {
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 8px 14px; color: #e6edf3; cursor: pointer; font-size: 14px;
+        }
+        .cal-nav button:hover { border-color: #58a6ff; color: #58a6ff; }
+        .cal-month-label {
+            font-size: 18px; font-weight: bold; color: #e6edf3;
+            min-width: 140px; text-align: center;
+        }
+        .cal-layout {
+            display: grid;
+            grid-template-columns: 1fr 260px;
+            gap: 20px;
+        }
+        .cal-grid-container {
+            background: #161b22; border: 1px solid #30363d;
+            border-radius: 8px; padding: 12px;
+        }
+        .cal-header-row, .cal-week-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        .cal-day-header {
+            text-align: center; font-size: 12px; color: #8b949e;
+            padding: 8px 0; font-weight: bold;
+        }
+        .cal-day-header.cal-sun { color: #f85149; }
+        .cal-day-header.cal-sat { color: #58a6ff; }
+        .cal-cell {
+            min-height: 85px; border: 1px solid #21262d; border-radius: 4px;
+            padding: 4px; cursor: pointer; transition: border-color 0.2s;
+        }
+        .cal-cell:hover:not(.empty) { border-color: #58a6ff; }
+        .cal-cell.empty { border-color: transparent; cursor: default; }
+        .cal-cell.today { border-color: #58a6ff; background: rgba(88,166,255,0.06); }
+        .cal-cell.selected { border-color: #58a6ff; background: rgba(88,166,255,0.12); }
+        .cal-day-num { font-size: 13px; font-weight: bold; margin-bottom: 3px; color: #e6edf3; }
+        .cal-sun .cal-day-num { color: #f85149; }
+        .cal-sat .cal-day-num { color: #58a6ff; }
+        .cal-event-dot {
+            font-size: 10px; padding: 1px 4px; border-radius: 3px;
+            margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis;
+            white-space: nowrap; color: #fff; opacity: 0.9;
+        }
+        .cal-event-more { font-size: 10px; color: #8b949e; text-align: center; }
+        .cal-sidebar-section {
+            background: #161b22; border: 1px solid #30363d;
+            border-radius: 8px; padding: 14px; margin-bottom: 14px;
+        }
+        .cal-category-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 0; cursor: pointer; font-size: 13px; color: #e6edf3;
+        }
+        .cal-category-item input[type="checkbox"] { accent-color: #58a6ff; }
+        .cal-cat-dot {
+            width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+        }
+        .cal-wl-group { margin-bottom: 12px; }
+        .cal-wl-title { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+        .cal-wl-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+        .cal-wl-tag {
+            background: #21262d; border: 1px solid #30363d; border-radius: 12px;
+            padding: 2px 8px; font-size: 11px; color: #58a6ff;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .cal-wl-tag .remove { cursor: pointer; color: #8b949e; font-size: 13px; }
+        .cal-wl-tag .remove:hover { color: #f85149; }
+        .cal-wl-add { display: flex; gap: 4px; position: relative; }
+        .cal-wl-add input {
+            background: #0d1117; border: 1px solid #30363d; border-radius: 4px;
+            padding: 3px 8px; color: #e6edf3; font-size: 12px; outline: none; flex: 1;
+        }
+        .cal-wl-add input:focus { border-color: #58a6ff; }
+        .cal-wl-add button {
+            background: #238636; color: white; border: none; border-radius: 4px;
+            padding: 3px 10px; cursor: pointer; font-size: 11px;
+        }
+        .cal-day-detail {
+            background: #161b22; border: 1px solid #30363d;
+            border-radius: 8px; padding: 16px; margin-top: 16px;
+        }
+        .cal-detail-date {
+            font-size: 15px; font-weight: bold; color: #58a6ff;
+            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #30363d;
+        }
+        .cal-detail-event {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 8px 0; border-bottom: 1px solid #21262d;
+        }
+        .cal-detail-event:last-child { border-bottom: none; }
+        .cal-detail-cat-badge {
+            font-size: 11px; padding: 2px 8px; border-radius: 10px;
+            white-space: nowrap; color: #fff;
+        }
+        .cal-detail-title { font-size: 14px; color: #e6edf3; }
+        .cal-detail-desc { font-size: 12px; color: #8b949e; margin-top: 2px; }
+        .cal-dropdown {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            max-height: 220px; overflow-y: auto; z-index: 100;
+            display: none; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        .cal-dropdown-item {
+            padding: 8px 10px; cursor: pointer; display: flex;
+            align-items: center; gap: 8px; font-size: 12px;
+            border-bottom: 1px solid #21262d;
+        }
+        .cal-dropdown-item:last-child { border-bottom: none; }
+        .cal-dropdown-item:hover { background: #21262d; }
+        .cal-dropdown-code { color: #58a6ff; font-weight: bold; min-width: 75px; }
+        .cal-dropdown-name { color: #e6edf3; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cal-dropdown-market {
+            font-size: 10px; padding: 1px 6px; border-radius: 8px;
+            background: #21262d; border: 1px solid #30363d; color: #8b949e;
+        }
+
+        /* ===== DART 공시 탭 ===== */
+        .dart-status-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            padding: 14px 18px; margin-bottom: 20px;
+        }
+        .dart-status-left { display: flex; align-items: center; gap: 10px; }
+        .dart-status-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+        }
+        .dart-status-dot.running { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+        .dart-status-dot.stopped { background: #f85149; }
+        .dart-status-text { font-size: 14px; color: #e6edf3; }
+        .dart-toggle-btn {
+            background: #238636; color: white; border: none; border-radius: 6px;
+            padding: 8px 18px; cursor: pointer; font-size: 13px;
+        }
+        .dart-toggle-btn:hover { background: #2ea043; }
+        .dart-toggle-btn.stop { background: #da3633; }
+        .dart-toggle-btn.stop:hover { background: #f85149; }
+        .dart-sections {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;
+        }
+        .dart-section {
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px;
+        }
+        .dart-section-title {
+            font-size: 14px; font-weight: bold; color: #58a6ff;
+            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #30363d;
+        }
+        .dart-wl-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .dart-wl-tag {
+            background: #21262d; border: 1px solid #30363d; border-radius: 14px;
+            padding: 4px 10px; font-size: 12px; color: #58a6ff;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .dart-wl-tag .remove { cursor: pointer; color: #8b949e; font-size: 14px; }
+        .dart-wl-tag .remove:hover { color: #f85149; }
+        .dart-wl-add { display: flex; gap: 6px; position: relative; }
+        .dart-wl-add input {
+            background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+            padding: 6px 10px; color: #e6edf3; font-size: 12px; outline: none; flex: 1;
+        }
+        .dart-wl-add input:focus { border-color: #58a6ff; }
+        .dart-cond-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 0; font-size: 13px; color: #e6edf3;
+        }
+        .dart-cond-row input[type="checkbox"] { accent-color: #58a6ff; }
+        .dart-cond-toggle {
+            display: flex; gap: 4px; margin-top: 10px;
+        }
+        .dart-cond-toggle button {
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 5px 14px; color: #8b949e; cursor: pointer; font-size: 12px;
+        }
+        .dart-cond-toggle button.active { background: #1f3a5f; color: #58a6ff; border-color: #58a6ff; }
+        .dart-tg-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 0; border-bottom: 1px solid #21262d;
+        }
+        .dart-tg-row:last-child { border-bottom: none; }
+        .dart-tg-label { font-size: 13px; color: #e6edf3; }
+        .dart-tg-status { font-size: 12px; margin-left: 8px; }
+        .dart-tg-status.connected { color: #3fb950; }
+        .dart-tg-status.disconnected { color: #8b949e; }
+        .dart-tg-btn {
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 5px 12px; color: #e6edf3; cursor: pointer; font-size: 12px;
+        }
+        .dart-tg-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+        .dart-log-section {
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px;
+        }
+        .dart-log-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #30363d;
+        }
+        .dart-log-title { font-size: 14px; font-weight: bold; color: #58a6ff; }
+        .dart-log-refresh {
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 4px 10px; color: #8b949e; cursor: pointer; font-size: 12px;
+        }
+        .dart-log-refresh:hover { border-color: #58a6ff; color: #58a6ff; }
+        .dart-log-list { max-height: 400px; overflow-y: auto; }
+        .dart-log-item {
+            padding: 8px 0; border-bottom: 1px solid #21262d; font-size: 13px;
+        }
+        .dart-log-item:last-child { border-bottom: none; }
+        .dart-log-time { color: #8b949e; font-size: 11px; margin-right: 8px; }
+        .dart-log-type {
+            font-size: 11px; padding: 2px 8px; border-radius: 10px;
+            margin-right: 8px; color: #fff;
+        }
+        .dart-log-type.종목 { background: #1f6feb; }
+        .dart-log-type.잠정 { background: #8957e5; }
+        .dart-log-type.주요 { background: #da3633; }
+        .dart-log-type.일일 { background: #238636; }
+        .dart-log-type.엑셀 { background: #8b949e; }
+        .dart-log-empty { color: #8b949e; text-align: center; padding: 20px; font-size: 13px; }
 
         /* 모바일 반응형 */
         @media (max-width: 768px) {
@@ -465,6 +720,22 @@
 
             .keyword-input { font-size: 12px; width: 100%; }
             .btn { font-size: 12px; padding: 6px 12px; white-space: nowrap; }
+
+            .chart-modal { padding: 16px; width: 95%; }
+            .chart-title { font-size: 15px; }
+            .chart-periods { flex-wrap: wrap; }
+            .period-btn { padding: 5px 10px; font-size: 12px; }
+
+            .cal-layout { grid-template-columns: 1fr; }
+            .cal-cell { min-height: 55px; }
+            .cal-event-dot { font-size: 9px; padding: 1px 3px; }
+            .cal-month-label { font-size: 15px; min-width: 110px; }
+            .cal-nav button { padding: 6px 10px; font-size: 13px; }
+            .cal-day-num { font-size: 12px; }
+
+            .dart-sections { grid-template-columns: 1fr; }
+            .dart-status-bar { padding: 10px 14px; }
+            .dart-section { padding: 12px; }
         }
 
         @media (max-width: 480px) {
@@ -486,6 +757,7 @@
 <!-- 탭 -->
 <div class="tabs">
     <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
+    <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
     <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
 </div>
 
@@ -494,32 +766,32 @@
 
     <!-- 핵심 지표 -->
     <div class="metrics-grid">
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="openChart('^GSPC','S&P 500')">
             <div class="label">S&P 500</div>
             <div class="value negative" id="sp500-value">-</div>
             <div class="change negative" id="sp500-change">-</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="openChart('^IXIC','NASDAQ')">
             <div class="label">NASDAQ</div>
             <div class="value negative" id="nasdaq-value">-</div>
             <div class="change negative" id="nasdaq-change">-</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="openChart('^VIX','VIX 공포지수')">
             <div class="label">VIX (공포지수)</div>
             <div class="value neutral" id="vix-value">-</div>
             <div class="change neutral" id="vix-change">-</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="openChart('KRW=X','USD/KRW')">
             <div class="label">USD/KRW</div>
             <div class="value neutral" id="usdkrw-value">-</div>
             <div class="change neutral" id="usdkrw-change">-</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="openChart('CL=F','WTI 원유')">
             <div class="label">WTI 원유</div>
             <div class="value neutral" id="wti-value">-</div>
             <div class="change neutral" id="wti-change">-</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" onclick="openChart('GC=F','금 (Gold)')">
             <div class="label">금 (Gold)</div>
             <div class="value positive" id="gold-value">-</div>
             <div class="change positive" id="gold-change">-</div>
@@ -532,7 +804,7 @@
         <!-- 공포탐욕 지수 -->
         <div>
             <div class="section-title">😨 공포·탐욕 지수</div>
-            <div class="fear-greed-container">
+            <div class="fear-greed-container clickable" onclick="openChart('^VIX','VIX 공포지수')">
                 <div class="gauge-label">시장 심리</div>
                 <div class="gauge-bar">
                     <div class="gauge-pointer" id="gauge-pointer" style="left: 25%"></div>
@@ -553,27 +825,23 @@
         <div>
             <div class="section-title">📊 채권·환율</div>
             <div class="data-table">
-                <div class="data-row">
+                <div class="data-row clickable" onclick="openChart('^TNX','미 국채 10년물')">
                     <span class="data-label">미 국채 10년물</span>
                     <span class="data-value" id="us10y">-</span>
                 </div>
-                <div class="data-row">
+                <div class="data-row clickable" onclick="openChart('^IRX','미 국채 2년물')">
                     <span class="data-label">미 국채 2년물</span>
                     <span class="data-value" id="us2y">-</span>
                 </div>
-                <div class="data-row">
+                <div class="data-row clickable" onclick="openChart('DX-Y.NYB','달러인덱스 (DXY)')">
                     <span class="data-label">달러인덱스 (DXY)</span>
                     <span class="data-value" id="dxy">-</span>
                 </div>
-                <div class="data-row">
-                    <span class="data-label">USD/KRW</span>
-                    <span class="data-value" id="usdkrw-detail">-</span>
-                </div>
-                <div class="data-row">
+                <div class="data-row clickable" onclick="openChart('BZ=F','브렌트유')">
                     <span class="data-label">브렌트유</span>
                     <span class="data-value" id="brent">-</span>
                 </div>
-                <div class="data-row">
+                <div class="data-row clickable" onclick="openChart('BTC-USD','비트코인')">
                     <span class="data-label">비트코인</span>
                     <span class="data-value" id="bitcoin">-</span>
                 </div>
@@ -588,6 +856,23 @@
             <div id="sector-chart">
                 <div class="loading">데이터 로딩 중...</div>
             </div>
+        </div>
+    </div>
+
+    <!-- 시장별 상승률 TOP 10 -->
+    <div style="margin-bottom:24px;">
+        <div class="section-title">🚀 시장별 상승률 TOP 10</div>
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+            <button class="period-btn active" data-market="us" onclick="switchGainerMarket('us')">미장</button>
+            <button class="period-btn" data-market="kr" onclick="switchGainerMarket('kr')">국장</button>
+            <button class="period-btn" data-market="jp" onclick="switchGainerMarket('jp')">일장</button>
+            <button class="period-btn" data-market="eu" onclick="switchGainerMarket('eu')">유럽</button>
+            <span style="width:16px"></span>
+            <button class="period-btn active" data-gperiod="1w" onclick="switchGainerPeriod('1w')">1주일</button>
+            <button class="period-btn" data-gperiod="1mo" onclick="switchGainerPeriod('1mo')">1개월</button>
+        </div>
+        <div class="data-table" id="top-gainers-table">
+            <div class="loading">시장과 기간을 선택하면 데이터를 불러옵니다</div>
         </div>
     </div>
 
@@ -621,13 +906,138 @@
 
 </div>
 
+<!-- 차트 모달 -->
+<div class="chart-overlay" id="chart-overlay" onclick="if(event.target===this)closeChart()">
+    <div class="chart-modal">
+        <div class="chart-header">
+            <span class="chart-title" id="chart-title"></span>
+            <span class="chart-close" onclick="closeChart()">x</span>
+        </div>
+        <div class="chart-periods">
+            <button class="period-btn" data-cperiod="5y" onclick="loadChart('5y')">5Y</button>
+            <button class="period-btn" data-cperiod="2y" onclick="loadChart('2y')">2Y</button>
+            <button class="period-btn active" data-cperiod="1y" onclick="loadChart('1y')">1Y</button>
+            <button class="period-btn" data-cperiod="6mo" onclick="loadChart('6mo')">6M</button>
+            <button class="period-btn" data-cperiod="ytd" onclick="loadChart('ytd')">YTD</button>
+        </div>
+        <div style="height:400px;">
+            <canvas id="price-chart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- 캘린더 탭 -->
+<div class="tab-content" id="tab-calendar">
+    <div class="cal-nav">
+        <button onclick="calPrevMonth()">◀</button>
+        <span class="cal-month-label" id="cal-month-label"></span>
+        <button onclick="calNextMonth()">▶</button>
+        <button onclick="calGoToday()" style="margin-left:8px">오늘</button>
+    </div>
+    <div class="cal-layout">
+        <div class="cal-grid-container">
+            <div id="cal-grid"><div class="loading">캘린더 로딩 중...</div></div>
+        </div>
+        <div class="cal-sidebar">
+            <div class="cal-sidebar-section">
+                <div class="section-title">카테고리 필터</div>
+                <div id="cal-categories"></div>
+            </div>
+            <div class="cal-sidebar-section">
+                <div class="section-title">종목 관리</div>
+                <div id="cal-watchlist"></div>
+            </div>
+        </div>
+    </div>
+    <div id="cal-day-detail" class="cal-day-detail" style="display:none"></div>
+</div>
+
 <!-- DART 공시 탭 -->
 <div class="tab-content" id="tab-dart">
-    <div class="loading">🚧 DART 공시 기능은 곧 추가될 예정이에요</div>
+    <!-- 상태 바 -->
+    <div class="dart-status-bar">
+        <div class="dart-status-left">
+            <div class="dart-status-dot stopped" id="dart-status-dot"></div>
+            <span class="dart-status-text" id="dart-status-text">확인 중...</span>
+        </div>
+        <button class="dart-toggle-btn" id="dart-toggle-btn" onclick="toggleDartMonitor()">시작</button>
+    </div>
+
+    <div class="dart-sections">
+        <!-- 종목 감시 목록 -->
+        <div class="dart-section">
+            <div class="dart-section-title">📌 종목 감시 목록</div>
+            <div class="dart-wl-tags" id="dart-wl-tags"></div>
+            <div class="dart-wl-add">
+                <input type="text" id="dart-wl-input" data-cal-search="dart_watchlist" placeholder="종목명 또는 종목코드 검색" autocomplete="off">
+            </div>
+        </div>
+
+        <!-- 잠정실적 조건 -->
+        <div class="dart-section">
+            <div class="dart-section-title">📊 잠정실적 필터 조건</div>
+            <div class="dart-cond-row">
+                <input type="checkbox" id="dart-cond-rev" onchange="saveDartConditions()">
+                <label for="dart-cond-rev">매출액 증가</label>
+            </div>
+            <div class="dart-cond-row">
+                <input type="checkbox" id="dart-cond-op" onchange="saveDartConditions()">
+                <label for="dart-cond-op">영업이익 증가</label>
+            </div>
+            <div class="dart-cond-toggle">
+                <button id="dart-cond-or" onclick="setDartCondType('or')">OR (하나만 충족)</button>
+                <button id="dart-cond-and" onclick="setDartCondType('and')">AND (모두 충족)</button>
+            </div>
+        </div>
+
+        <!-- 텔레그램 연동 -->
+        <div class="dart-section">
+            <div class="dart-section-title">📬 텔레그램 연동</div>
+            <div class="dart-tg-row">
+                <div>
+                    <span class="dart-tg-label">일반 공시 봇</span>
+                    <span class="dart-tg-status disconnected" id="dart-tg-general-status">미연결</span>
+                </div>
+                <button class="dart-tg-btn" onclick="testDartTg('general')">연결 테스트</button>
+            </div>
+            <div class="dart-tg-row">
+                <div>
+                    <span class="dart-tg-label">잠정실적 봇</span>
+                    <span class="dart-tg-status disconnected" id="dart-tg-earnings-status">미연결</span>
+                </div>
+                <button class="dart-tg-btn" onclick="testDartTg('earnings')">연결 테스트</button>
+            </div>
+        </div>
+
+        <!-- 주요 공시 안내 -->
+        <div class="dart-section">
+            <div class="dart-section-title">📋 주요 공시 모니터링</div>
+            <div style="font-size:13px;color:#8b949e;line-height:1.6">
+                <p>매일 자동으로 다음 공시를 감시합니다:</p>
+                <p style="margin-top:8px;">
+                    · 30% 이상 매출/이익 변동<br>
+                    · 주문/수주 공시<br>
+                    · 투자판단 관련 공시
+                </p>
+                <p style="margin-top:8px;">오후 6시에 일일 요약 + 엑셀 저장</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 알림 로그 -->
+    <div class="dart-log-section">
+        <div class="dart-log-header">
+            <span class="dart-log-title">🔔 알림 로그</span>
+            <button class="dart-log-refresh" onclick="loadDartLog()">새로고침</button>
+        </div>
+        <div class="dart-log-list" id="dart-log-list">
+            <div class="dart-log-empty">알림 로그가 없습니다</div>
+        </div>
+    </div>
 </div>
 
 <script>
-    const API_BASE = 'http://192.168.0.17:8000';
+    const API_BASE = '';
 
     // 날짜 표시
     function updateDate() {
@@ -639,11 +1049,21 @@
     setInterval(updateDate, 60000);
 
     // 탭 전환
+    let calLoaded = false;
+    let dartLoaded = false;
     function switchTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         event.target.classList.add('active');
         document.getElementById('tab-' + tabName).classList.add('active');
+        if (tabName === 'calendar' && !calLoaded) {
+            calLoaded = true;
+            initCalendar();
+        }
+        if (tabName === 'dart' && !dartLoaded) {
+            dartLoaded = true;
+            initDart();
+        }
     }
 
     // 그룹 관리 (서버 저장)
@@ -789,7 +1209,6 @@
                 us10y: 'us10y',
                 us2y: 'us2y',
                 dxy: 'dxy',
-                usdkrw: 'usdkrw-detail',
                 brent: 'brent',
                 bitcoin: 'bitcoin',
             };
@@ -806,6 +1225,64 @@
         }
     }
 
+    // 차트 팝업
+    let chartInstance = null;
+    let chartSymbol = '';
+
+    function openChart(symbol, title) {
+        chartSymbol = symbol;
+        document.getElementById('chart-title').textContent = title;
+        document.getElementById('chart-overlay').classList.add('active');
+        // display:none→flex 전환 후 canvas 크기 인식을 위해 딜레이
+        setTimeout(() => loadChart('1y'), 50);
+    }
+
+    function closeChart() {
+        document.getElementById('chart-overlay').classList.remove('active');
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    }
+
+    async function loadChart(period) {
+        document.querySelectorAll('[data-cperiod]').forEach(b =>
+            b.classList.toggle('active', b.dataset.cperiod === period));
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        try {
+            const res = await fetch(API_BASE + '/api/chart?symbol=' + encodeURIComponent(chartSymbol) + '&period=' + period);
+            const data = await res.json();
+            if (!data.dates.length) return;
+            const ctx = document.getElementById('price-chart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        data: data.prices,
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88,166,255,0.08)',
+                        fill: true, pointRadius: 0, borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#8b949e', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: '#21262d' } },
+                        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+                    }
+                }
+            });
+        } catch(e) { console.error('Chart load failed:', e); }
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChart(); });
+
+    // 섹터 ETF 매핑
+    const sectorSymbolMap = {
+        '에너지':'XLE','헬스케어':'XLV','부동산':'XLRE','필수소비재':'XLP','자유소비재':'XLY',
+        '금융':'XLF','통신서비스':'XLC','산업재':'XLI','정보기술':'XLK',
+        '소재':'XLB','유틸리티':'XLU','M7':'MAGS','반도체':'SMH',
+    };
+
     // 섹터별 등락 업데이트
     function renderSectors(sectors) {
         const container = document.getElementById('sector-chart');
@@ -815,12 +1292,14 @@
         }
         const maxVal = Math.max(...sectors.map(s => Math.abs(s.value)), 0.1);
         container.innerHTML = sectors.map(s => {
+            const sym = sectorSymbolMap[s.name] || '';
+            const onclick = sym ? `onclick="openChart('${sym}','${s.name} ETF (${sym}')"` : '';
             const width = (Math.abs(s.value) / maxVal) * 45;
             const isPositive = s.value >= 0;
             const cls = isPositive ? 'positive' : 'negative';
             const barClass = isPositive ? 'positive-bar' : 'negative-bar';
             return `
-                <div class="sector-item">
+                <div class="sector-item clickable" ${onclick}>
                     <div class="sector-name">${s.name}</div>
                     <div class="sector-bar-container">
                         <div class="sector-center-line"></div>
@@ -830,6 +1309,59 @@
                 </div>
             `;
         }).join('');
+    }
+
+    // 시장별 상승률 TOP 10
+    let gainerMarket = 'us', gainerPeriod = '1w';
+
+    function switchGainerMarket(m) {
+        gainerMarket = m;
+        document.querySelectorAll('[data-market]').forEach(b =>
+            b.classList.toggle('active', b.dataset.market === m));
+        loadTopGainers();
+    }
+
+    function switchGainerPeriod(p) {
+        gainerPeriod = p;
+        document.querySelectorAll('[data-gperiod]').forEach(b =>
+            b.classList.toggle('active', b.dataset.gperiod === p));
+        loadTopGainers();
+    }
+
+    async function loadTopGainers() {
+        const container = document.getElementById('top-gainers-table');
+        container.innerHTML = '<div class="loading">데이터 로딩 중... (30개 종목 분석)</div>';
+        try {
+            const res = await fetch(API_BASE + '/api/top-gainers?market=' + gainerMarket + '&period=' + gainerPeriod);
+            const data = await res.json();
+            if (!data.length) {
+                container.innerHTML = '<div class="loading">데이터 없음</div>';
+                return;
+            }
+            container.innerHTML = `
+                <div class="data-row" style="font-weight:bold; color:#58a6ff; border-bottom:1px solid #30363d;">
+                    <span style="flex:0.4">#</span>
+                    <span style="flex:2">종목명</span>
+                    <span style="flex:1.2">섹터</span>
+                    <span style="flex:1.2">업종</span>
+                    <span style="flex:1; text-align:right">상승률</span>
+                </div>
+                ${data.map((d, i) => `
+                    <div class="data-row clickable" onclick="openChart('${d.ticker}','${d.name}')">
+                        <span style="flex:0.4; color:#8b949e;">${i+1}</span>
+                        <span style="flex:2">${d.name}</span>
+                        <span style="flex:1.2; color:#8b949e;">${d.sector}</span>
+                        <span style="flex:1.2; color:#8b949e;">${d.industry}</span>
+                        <span style="flex:1; text-align:right" class="${d.change_pct >= 0 ? 'positive' : 'negative'}">
+                            ${d.change_pct >= 0 ? '+' : ''}${d.change_pct.toFixed(2)}%
+                        </span>
+                    </div>
+                `).join('')}
+            `;
+        } catch(e) {
+            console.error('Top gainers fetch failed:', e);
+            container.innerHTML = '<div class="loading">데이터를 불러올 수 없습니다</div>';
+        }
     }
 
     async function fetchSectorData() {
@@ -950,9 +1482,530 @@
     // 초기 렌더링
     loadGroups();
     fetchAllData();
+    loadTopGainers();
 
     // 30초마다 자동 새로고침
     setInterval(fetchAllData, 30000);
+
+    // ===== 캘린더 =====
+    let calYear, calMonth, calEvents = {}, calSelectedDate = null;
+    let calWatchlist = { us_earnings: [], kr_earnings: [], dividends: [] };
+    let krNameCache = {};
+
+    const CAL_CATS = {
+        us_earnings:  { name: '미국 실적발표',  color: '#58a6ff', checked: true },
+        kr_earnings:  { name: '국내 실적/IR',   color: '#d2a8ff', checked: true },
+        us_economic:  { name: '미국 경제지표',  color: '#f0883e', checked: true },
+        kr_economic:  { name: '한국 경제지표',  color: '#e3b341', checked: true },
+        central_bank: { name: '중앙은행',       color: '#f85149', checked: true },
+        dividend:     { name: '배당 이벤트',    color: '#3fb950', checked: true },
+        derivatives:  { name: '파생상품',       color: '#8b949e', checked: true },
+    };
+
+    function initCalendar() {
+        const now = new Date();
+        calYear = now.getFullYear();
+        calMonth = now.getMonth();
+        renderCalCategories();
+        loadCalWatchlist();
+        loadCalendar();
+    }
+
+    function renderCalCategories() {
+        document.getElementById('cal-categories').innerHTML = Object.entries(CAL_CATS).map(([k, c]) => `
+            <label class="cal-category-item">
+                <input type="checkbox" ${c.checked ? 'checked' : ''}
+                       onchange="toggleCalCat('${k}', this.checked)">
+                <span class="cal-cat-dot" style="background:${c.color}"></span>
+                ${c.name}
+            </label>
+        `).join('');
+    }
+
+    function toggleCalCat(key, checked) {
+        CAL_CATS[key].checked = checked;
+        renderCalGrid();
+        if (calSelectedDate) showDayEvents(calSelectedDate);
+    }
+
+    async function loadCalWatchlist() {
+        try {
+            const res = await fetch(API_BASE + '/api/calendar/watchlist');
+            calWatchlist = await res.json();
+        } catch(e) { console.error('Calendar watchlist load failed:', e); }
+        renderCalWatchlist();
+    }
+
+    async function saveCalWatchlist() {
+        try {
+            await fetch(API_BASE + '/api/calendar/watchlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(calWatchlist),
+            });
+        } catch(e) { console.error('Calendar watchlist save failed:', e); }
+    }
+
+    async function resolveKrName(code) {
+        if (krNameCache[code]) return krNameCache[code];
+        try {
+            const res = await fetch(API_BASE + '/api/dart/company?code=' + code);
+            if (res.ok) {
+                const d = await res.json();
+                if (d.name) { krNameCache[code] = d.name; return d.name; }
+            }
+        } catch(e) {}
+        return '';
+    }
+
+    async function renderCalWatchlist() {
+        // 한국 종목 이름 미리 조회
+        for (const code of (calWatchlist.kr_earnings || [])) {
+            if (!krNameCache[code]) await resolveKrName(code);
+        }
+
+        const sections = [
+            { key: 'us_earnings', label: '미국 실적 추적', placeholder: '티커 (예: AAPL)' },
+            { key: 'kr_earnings', label: '국내 실적/IR (DART)', placeholder: '종목코드 (예: 005930)' },
+            { key: 'dividends', label: '배당 추적', placeholder: '티커 (예: AAPL)' },
+        ];
+        document.getElementById('cal-watchlist').innerHTML = sections.map(s => {
+            const tickers = calWatchlist[s.key] || [];
+            return `<div class="cal-wl-group">
+                <div class="cal-wl-title">${s.label}</div>
+                <div class="cal-wl-tags">
+                    ${tickers.map((t, i) => {
+                        const label = s.key === 'kr_earnings' && krNameCache[t] ? `${t} ${krNameCache[t]}` : t;
+                        return `<span class="cal-wl-tag">${label}
+                            <span class="remove" onclick="removeCalTicker('${s.key}',${i})">×</span>
+                        </span>`;
+                    }).join('')}
+                </div>
+                <div class="cal-wl-add">
+                    <input type="text" id="cal-add-${s.key}" data-cal-search="${s.key}"
+                           placeholder="${s.placeholder}" autocomplete="off"
+                           onkeypress="if(event.key==='Enter'){event.preventDefault();addCalTicker('${s.key}')}">
+                    <button onclick="addCalTicker('${s.key}')">추가</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    async function addCalTicker(key) {
+        const input = document.getElementById('cal-add-' + key);
+        let val = input.value.trim();
+        if (key !== 'kr_earnings') val = val.toUpperCase();
+        if (val && !(calWatchlist[key] || []).includes(val)) {
+            if (!calWatchlist[key]) calWatchlist[key] = [];
+            calWatchlist[key].push(val);
+            if (key === 'kr_earnings') await resolveKrName(val);
+            await saveCalWatchlist();
+            renderCalWatchlist();
+            loadCalendar();
+        }
+        input.value = '';
+    }
+
+    async function removeCalTicker(key, idx) {
+        calWatchlist[key].splice(idx, 1);
+        await saveCalWatchlist();
+        renderCalWatchlist();
+        loadCalendar();
+    }
+
+    async function loadCalendar() {
+        document.getElementById('cal-grid').innerHTML = '<div class="loading">일정 로딩 중...</div>';
+        try {
+            const res = await fetch(API_BASE + `/api/calendar?year=${calYear}&month=${calMonth + 1}`);
+            calEvents = await res.json();
+        } catch(e) {
+            console.error('Calendar fetch failed:', e);
+            calEvents = {};
+        }
+        renderCalGrid();
+    }
+
+    function filteredEvents(dateStr) {
+        return (calEvents[dateStr] || []).filter(e => CAL_CATS[e.category]?.checked);
+    }
+
+    function renderCalGrid() {
+        const first = new Date(calYear, calMonth, 1);
+        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+        const startDow = first.getDay();
+        const mNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+        document.getElementById('cal-month-label').textContent = `${calYear}년 ${mNames[calMonth]}`;
+
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+        let html = '<div class="cal-header-row">';
+        ['일','월','화','수','목','금','토'].forEach((d, i) => {
+            html += `<div class="cal-day-header ${i===0?'cal-sun':i===6?'cal-sat':''}">${d}</div>`;
+        });
+        html += '</div>';
+
+        let day = 1;
+        for (let w = 0; w < 6 && day <= daysInMonth; w++) {
+            html += '<div class="cal-week-row">';
+            for (let dow = 0; dow < 7; dow++) {
+                if ((w === 0 && dow < startDow) || day > daysInMonth) {
+                    html += '<div class="cal-cell empty"></div>';
+                } else {
+                    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                    const evts = filteredEvents(ds);
+                    const cls = [
+                        ds === todayStr ? 'today' : '',
+                        calSelectedDate === ds ? 'selected' : '',
+                        dow === 0 ? 'cal-sun' : dow === 6 ? 'cal-sat' : '',
+                    ].filter(Boolean).join(' ');
+                    html += `<div class="cal-cell ${cls}" onclick="showDayEvents('${ds}')">
+                        <div class="cal-day-num">${day}</div>
+                        <div class="cal-events">
+                            ${evts.slice(0, 3).map(e =>
+                                `<div class="cal-event-dot" style="background:${CAL_CATS[e.category]?.color||'#8b949e'}"
+                                      title="${e.title}">${e.title}</div>`
+                            ).join('')}
+                            ${evts.length > 3 ? `<div class="cal-event-more">+${evts.length-3}건</div>` : ''}
+                        </div>
+                    </div>`;
+                    day++;
+                }
+            }
+            html += '</div>';
+        }
+        document.getElementById('cal-grid').innerHTML = html;
+    }
+
+    function showDayEvents(dateStr) {
+        calSelectedDate = dateStr;
+        renderCalGrid();
+        const evts = filteredEvents(dateStr);
+        const detail = document.getElementById('cal-day-detail');
+        if (!evts.length) { detail.style.display = 'none'; return; }
+        const d = new Date(dateStr + 'T00:00:00');
+        const dayNames = ['일','월','화','수','목','금','토'];
+        detail.style.display = 'block';
+        detail.innerHTML = `
+            <div class="cal-detail-date">${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${dayNames[d.getDay()]}요일</div>
+            ${evts.map(e => {
+                const cat = CAL_CATS[e.category] || {};
+                return `<div class="cal-detail-event">
+                    <span class="cal-detail-cat-badge" style="background:${cat.color||'#8b949e'}">${cat.name||e.category}</span>
+                    <div>
+                        <div class="cal-detail-title">${e.title}</div>
+                        <div class="cal-detail-desc">${e.detail||''}</div>
+                    </div>
+                </div>`;
+            }).join('')}
+        `;
+    }
+
+    function calPrevMonth() {
+        calMonth--;
+        if (calMonth < 0) { calMonth = 11; calYear--; }
+        calSelectedDate = null;
+        document.getElementById('cal-day-detail').style.display = 'none';
+        loadCalendar();
+    }
+    function calNextMonth() {
+        calMonth++;
+        if (calMonth > 11) { calMonth = 0; calYear++; }
+        calSelectedDate = null;
+        document.getElementById('cal-day-detail').style.display = 'none';
+        loadCalendar();
+    }
+    function calGoToday() {
+        const now = new Date();
+        calYear = now.getFullYear();
+        calMonth = now.getMonth();
+        calSelectedDate = null;
+        document.getElementById('cal-day-detail').style.display = 'none';
+        loadCalendar();
+    }
+
+    // ===== 종목 검색 자동완성 =====
+    let calSearchResults = [];
+    let calSearchKey = '';
+    let calSearchTimeout = null;
+
+    document.addEventListener('input', function(e) {
+        if (!e.target.dataset.calSearch) return;
+        clearTimeout(calSearchTimeout);
+        calSearchKey = e.target.dataset.calSearch;
+        const q = e.target.value.trim();
+        const inputId = e.target.id;
+        if (q.length < 1) { hideCalDd(inputId); return; }
+        calSearchTimeout = setTimeout(() => calDoSearch(inputId, q), 300);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.cal-wl-add')) {
+            document.querySelectorAll('.cal-dropdown').forEach(d => d.style.display = 'none');
+        }
+    });
+
+    async function calDoSearch(inputId, query) {
+        try {
+            const res = await fetch(API_BASE + '/api/stock/search?q=' + encodeURIComponent(query));
+            calSearchResults = await res.json();
+            showCalDd(inputId);
+        } catch(e) {}
+    }
+
+    function showCalDd(inputId) {
+        let dd = document.getElementById(inputId + '-dd');
+        if (!dd) {
+            dd = document.createElement('div');
+            dd.id = inputId + '-dd';
+            dd.className = 'cal-dropdown';
+            document.getElementById(inputId).parentElement.appendChild(dd);
+        }
+        if (!calSearchResults.length) {
+            dd.innerHTML = '<div style="padding:8px;color:#8b949e;font-size:12px;text-align:center">검색 결과 없음</div>';
+            dd.style.display = 'block';
+            return;
+        }
+        const ml = {us:'US', kr:'KR', jp:'JP', eu:'EU'};
+        dd.innerHTML = calSearchResults.map((r, i) =>
+            `<div class="cal-dropdown-item" onmousedown="calPickResult(${i})">
+                <span class="cal-dropdown-code">${r.code}</span>
+                <span class="cal-dropdown-name">${r.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/'/g,'&#39;')}</span>
+                <span class="cal-dropdown-market">${ml[r.market]||''}</span>
+            </div>`
+        ).join('');
+        dd.style.display = 'block';
+    }
+
+    function hideCalDd(inputId) {
+        const dd = document.getElementById(inputId + '-dd');
+        if (dd) dd.style.display = 'none';
+    }
+
+    async function calPickResult(idx) {
+        const r = calSearchResults[idx];
+        if (!r) return;
+
+        // DART 감시목록 처리
+        if (calSearchKey === 'dart_watchlist') {
+            const code = r.code.replace('.KS','').replace('.KQ','');
+            await addDartWl(code, r.name);
+            document.getElementById('dart-wl-input').value = '';
+            document.querySelectorAll('.cal-dropdown').forEach(d => d.style.display = 'none');
+            return;
+        }
+
+        let storeCode = r.code;
+        if (calSearchKey === 'kr_earnings') {
+            storeCode = r.code.replace('.KS','').replace('.KQ','');
+        } else if (r.market === 'kr' && !r.code.includes('.')) {
+            storeCode = r.code + '.KS';
+        }
+
+        if (!calWatchlist[calSearchKey]) calWatchlist[calSearchKey] = [];
+        if (!calWatchlist[calSearchKey].includes(storeCode)) {
+            calWatchlist[calSearchKey].push(storeCode);
+            if (calSearchKey === 'kr_earnings') {
+                krNameCache[storeCode.replace('.KS','').replace('.KQ','')] = r.name;
+            }
+            await saveCalWatchlist();
+            await renderCalWatchlist();
+            loadCalendar();
+        }
+        document.querySelectorAll('.cal-dropdown').forEach(d => d.style.display = 'none');
+    }
+
+    // ===== DART 공시 탭 =====
+    let dartConfig = null;
+    let dartNameCache = {};
+
+    async function initDart() {
+        await loadDartConfig();
+        loadDartStatus();
+        loadDartLog();
+    }
+
+    async function loadDartConfig() {
+        try {
+            const res = await fetch(API_BASE + '/api/dart/monitor/config');
+            dartConfig = await res.json();
+            renderDartConfig();
+        } catch(e) {}
+    }
+
+    async function renderDartConfig() {
+        if (!dartConfig) return;
+
+        // 종목 감시 목록 렌더링
+        const tags = document.getElementById('dart-wl-tags');
+        const wl = dartConfig.watchlist || [];
+        // 종목명 조회
+        const names = await Promise.all(wl.map(async code => {
+            if (dartNameCache[code]) return dartNameCache[code];
+            try {
+                const r = await fetch(API_BASE + '/api/dart/company?code=' + code);
+                const d = await r.json();
+                if (d.name) { dartNameCache[code] = d.name; return d.name; }
+            } catch(e) {}
+            return code;
+        }));
+        tags.innerHTML = wl.map((code, i) =>
+            `<div class="dart-wl-tag">
+                <span>${names[i]} (${code})</span>
+                <span class="remove" onclick="removeDartWl('${code}')">&times;</span>
+            </div>`
+        ).join('') || '<span style="color:#8b949e;font-size:12px">종목을 추가해주세요</span>';
+
+        // 잠정실적 조건 렌더링
+        const conds = dartConfig.earnings_conditions || {};
+        document.getElementById('dart-cond-rev').checked = conds.revenue_growth !== false;
+        document.getElementById('dart-cond-op').checked = conds.op_profit_growth !== false;
+        const ct = conds.condition_type || 'or';
+        document.getElementById('dart-cond-or').className = ct === 'or' ? 'active' : '';
+        document.getElementById('dart-cond-and').className = ct === 'and' ? 'active' : '';
+
+        // 텔레그램 상태 렌더링
+        const chatIds = dartConfig.telegram_chat_ids || {};
+        const gStatus = document.getElementById('dart-tg-general-status');
+        const eStatus = document.getElementById('dart-tg-earnings-status');
+        if (chatIds.general) {
+            gStatus.textContent = '연결됨';
+            gStatus.className = 'dart-tg-status connected';
+        } else {
+            gStatus.textContent = '미연결';
+            gStatus.className = 'dart-tg-status disconnected';
+        }
+        if (chatIds.earnings) {
+            eStatus.textContent = '연결됨';
+            eStatus.className = 'dart-tg-status connected';
+        } else {
+            eStatus.textContent = '미연결';
+            eStatus.className = 'dart-tg-status disconnected';
+        }
+    }
+
+    async function addDartWl(code, name) {
+        if (!dartConfig) await loadDartConfig();
+        if (!dartConfig.watchlist) dartConfig.watchlist = [];
+        if (dartConfig.watchlist.includes(code)) return;
+        dartConfig.watchlist.push(code);
+        if (name) dartNameCache[code] = name;
+        await fetch(API_BASE + '/api/dart/monitor/config', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(dartConfig)
+        });
+        renderDartConfig();
+    }
+
+    async function removeDartWl(code) {
+        if (!dartConfig) return;
+        dartConfig.watchlist = (dartConfig.watchlist || []).filter(c => c !== code);
+        await fetch(API_BASE + '/api/dart/monitor/config', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(dartConfig)
+        });
+        renderDartConfig();
+    }
+
+    async function saveDartConditions() {
+        if (!dartConfig) return;
+        dartConfig.earnings_conditions = {
+            revenue_growth: document.getElementById('dart-cond-rev').checked,
+            op_profit_growth: document.getElementById('dart-cond-op').checked,
+            condition_type: dartConfig.earnings_conditions?.condition_type || 'or',
+        };
+        await fetch(API_BASE + '/api/dart/monitor/config', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(dartConfig)
+        });
+    }
+
+    async function setDartCondType(type) {
+        if (!dartConfig) return;
+        if (!dartConfig.earnings_conditions) dartConfig.earnings_conditions = {};
+        dartConfig.earnings_conditions.condition_type = type;
+        document.getElementById('dart-cond-or').className = type === 'or' ? 'active' : '';
+        document.getElementById('dart-cond-and').className = type === 'and' ? 'active' : '';
+        await fetch(API_BASE + '/api/dart/monitor/config', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(dartConfig)
+        });
+    }
+
+    async function testDartTg(type) {
+        const btn = event.target;
+        btn.textContent = '테스트 중...';
+        btn.disabled = true;
+        try {
+            const res = await fetch(API_BASE + '/api/dart/telegram/test', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ type })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                btn.textContent = '성공!';
+                await loadDartConfig();
+            } else {
+                btn.textContent = '실패';
+                alert(data.error || '연결 실패');
+            }
+        } catch(e) {
+            btn.textContent = '오류';
+        }
+        setTimeout(() => { btn.textContent = '연결 테스트'; btn.disabled = false; }, 2000);
+    }
+
+    async function toggleDartMonitor() {
+        try {
+            const res = await fetch(API_BASE + '/api/dart/monitor/toggle', { method: 'POST' });
+            const data = await res.json();
+            updateDartStatus(true, data.enabled);
+        } catch(e) {}
+    }
+
+    function updateDartStatus(running, enabled) {
+        const dot = document.getElementById('dart-status-dot');
+        const text = document.getElementById('dart-status-text');
+        const btn = document.getElementById('dart-toggle-btn');
+        if (running && enabled) {
+            dot.className = 'dart-status-dot running';
+            text.textContent = '모니터링 실행 중 (5분 간격)';
+            btn.textContent = '중지';
+            btn.className = 'dart-toggle-btn stop';
+        } else {
+            dot.className = 'dart-status-dot stopped';
+            text.textContent = enabled ? '모니터링 대기 중' : '모니터링 중지됨';
+            btn.textContent = '시작';
+            btn.className = 'dart-toggle-btn';
+        }
+    }
+
+    async function loadDartStatus() {
+        try {
+            const res = await fetch(API_BASE + '/api/dart/monitor/status');
+            const data = await res.json();
+            updateDartStatus(data.running, data.enabled);
+        } catch(e) {}
+    }
+
+    async function loadDartLog() {
+        try {
+            const res = await fetch(API_BASE + '/api/dart/monitor/log');
+            const logs = await res.json();
+            const container = document.getElementById('dart-log-list');
+            if (!logs.length) {
+                container.innerHTML = '<div class="dart-log-empty">알림 로그가 없습니다</div>';
+                return;
+            }
+            container.innerHTML = logs.reverse().map(log =>
+                `<div class="dart-log-item">
+                    <span class="dart-log-time">${log.time || ''}</span>
+                    <span class="dart-log-type ${log.cat || ''}">${log.cat || ''}</span>
+                    <span>${(log.msg || '').replace(/</g,'&lt;')}</span>
+                </div>`
+            ).join('');
+        } catch(e) {}
+    }
 </script>
 
 </body>
