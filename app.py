@@ -123,8 +123,9 @@ def get_fear_greed():
         res = requests.get(
             "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
             headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": "https://edition.cnn.com/",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+                "Referer": "https://edition.cnn.com/markets/fear-and-greed",
                 "Origin": "https://edition.cnn.com",
             },
             timeout=10,
@@ -132,15 +133,25 @@ def get_fear_greed():
         data = res.json()
         score = round(data["fear_and_greed"]["score"])
         rating = data["fear_and_greed"]["rating"]
-        return jsonify({"value": score, "rating": rating})
+        rating_ko = {
+            "Extreme Fear": "극단적 공포",
+            "Fear": "공포",
+            "Neutral": "중립",
+            "Greed": "탐욕",
+            "Extreme Greed": "극단적 탐욕",
+        }.get(rating, rating)
+        return jsonify({"value": score, "rating": rating_ko})
     except Exception:
         # 폴백: VIX 기반 간이 계산
-        data = fetch_ticker_data("^VIX")
-        if data:
-            vix = data["price"]
-            score = max(0, min(100, int(100 - ((vix - 10) / 30) * 100)))
-            return jsonify({"value": score, "rating": "N/A"})
-        return jsonify({"value": 50, "rating": "N/A"})
+        try:
+            vix_data = fetch_batch_data({"vix": "^VIX"})
+            vix = vix_data.get("vix", {}).get("price", 0)
+            if vix > 0:
+                score = max(0, min(100, int(100 - ((vix - 10) / 30) * 100)))
+                return jsonify({"value": score, "rating": "VIX 기반 추정"})
+        except Exception:
+            pass
+        return jsonify({"value": 50, "rating": "데이터 없음"})
 
 
 @app.route("/api/chart", methods=["GET"])
@@ -270,42 +281,242 @@ MARKET_STOCKS = {
 }
 
 
+# ===== 확장 종목 리스트 (전체 시장 검색용) =====
+EXPANDED_STOCKS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "expanded_stocks.json")
+_expanded_cache = {}
+_expanded_time = 0
+_top_gainers_cache = {}
+
+
+def _fetch_us_all_tickers():
+    """미국 전체 상장 종목 (NASDAQ + NYSE)."""
+    us_map = load_us_stock_map()
+    return list(us_map.keys())
+
+
+def _fetch_kr_tickers():
+    """한국 상장 종목 (DART 기업 맵 기반, KOSPI .KS)."""
+    corp_map = load_dart_corp_map()
+    tickers = []
+    for code in corp_map:
+        if len(code) == 6 and code.isdigit():
+            tickers.append(code + ".KS")
+    return tickers[:500]
+
+
+def _fetch_nikkei225_tickers():
+    """Nikkei 225 종목 (Wikipedia)."""
+    tables = pd.read_html("https://en.wikipedia.org/wiki/Nikkei_225")
+    for table in tables:
+        for col in table.columns:
+            try:
+                vals = table[col].astype(str).tolist()
+                codes = [v.strip() + ".T" for v in vals
+                         if v.strip().isdigit() and len(v.strip()) == 4]
+                if len(codes) >= 50:
+                    return codes
+            except Exception:
+                continue
+    return []
+
+
+def _fetch_eu_tickers():
+    """유럽 주요 종목 (FTSE 100 + DAX 40 + 기존 목록)."""
+    tickers = set()
+    for s in MARKET_STOCKS.get("eu", []):
+        tickers.add(s[0])
+    # FTSE 100
+    try:
+        tables = pd.read_html("https://en.wikipedia.org/wiki/FTSE_100_Index")
+        for table in tables:
+            for col in table.columns:
+                if "ticker" in str(col).lower() or "epic" in str(col).lower():
+                    for v in table[col]:
+                        t = str(v).strip()
+                        if t and t != "nan" and len(t) <= 5:
+                            tickers.add(t + ".L" if "." not in t else t)
+                    break
+    except Exception:
+        pass
+    # DAX 40
+    try:
+        tables = pd.read_html("https://en.wikipedia.org/wiki/DAX")
+        for table in tables:
+            for col in table.columns:
+                if "ticker" in str(col).lower() or "symbol" in str(col).lower():
+                    for v in table[col]:
+                        t = str(v).strip()
+                        if t and t != "nan" and len(t) <= 6:
+                            tickers.add(t + ".DE" if "." not in t else t)
+                    break
+    except Exception:
+        pass
+    return list(tickers)
+
+
+def load_expanded_tickers(market):
+    """시장별 확장 종목 리스트 로드 (디스크 캐시 7일)."""
+    global _expanded_cache, _expanded_time
+
+    now = time.time()
+    if market in _expanded_cache and now - _expanded_time < 86400:
+        return _expanded_cache[market]
+
+    # 디스크 캐시
+    try:
+        mod_time = os.path.getmtime(EXPANDED_STOCKS_FILE)
+        if now - mod_time < 86400 * 7:
+            with open(EXPANDED_STOCKS_FILE, "r", encoding="utf-8") as f:
+                _expanded_cache = json.load(f)
+                _expanded_time = now
+                if market in _expanded_cache and _expanded_cache[market]:
+                    return _expanded_cache[market]
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+
+    # 새로 가져오기
+    fetchers = {
+        "us": _fetch_us_all_tickers,
+        "kr": _fetch_kr_tickers,
+        "jp": _fetch_nikkei225_tickers,
+        "eu": _fetch_eu_tickers,
+    }
+    fetcher = fetchers.get(market)
+    if fetcher:
+        try:
+            result = fetcher()
+            if result:
+                _expanded_cache[market] = result
+        except Exception as e:
+            print(f"[Expanded] {market} fetch failed: {e}")
+
+    # 폴백: MARKET_STOCKS
+    if market not in _expanded_cache or not _expanded_cache[market]:
+        _expanded_cache[market] = [s[0] for s in MARKET_STOCKS.get(market, [])]
+
+    _expanded_time = now
+    try:
+        with open(EXPANDED_STOCKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(_expanded_cache, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+    return _expanded_cache.get(market, [])
+
+
+def _download_closes_chunked(tickers, yf_period, chunk_size=500):
+    """대량 종목 Close 가격을 청크 단위로 다운로드."""
+    all_closes = None
+    for i in range(0, len(tickers), chunk_size):
+        chunk = tickers[i:i + chunk_size]
+        try:
+            data = yf.download(chunk, period=yf_period, progress=False, threads=False)
+            if data.empty:
+                continue
+            closes = data["Close"]
+            if isinstance(closes, pd.Series):
+                closes = closes.to_frame(name=chunk[0])
+            if all_closes is None:
+                all_closes = closes
+            else:
+                all_closes = pd.concat([all_closes, closes], axis=1)
+        except Exception:
+            continue
+    return all_closes
+
+
+def _calc_change(series, period):
+    """기간에 맞는 변동률 계산."""
+    if period == "1d":
+        # 직전 1거래일 변동: 전일 종가 → 당일 종가
+        return (series.iloc[-1] - series.iloc[-2]) / series.iloc[-2] * 100
+    else:
+        # 전체 기간 변동: 시작 → 현재
+        return (series.iloc[-1] - series.iloc[0]) / series.iloc[0] * 100
+
+
 @app.route("/api/top-gainers", methods=["GET"])
 def get_top_gainers():
-    """시장별 상승률 TOP 10"""
+    """시장별 상승률 TOP 10 (확장 종목 대상)"""
     market = request.args.get("market", "us")
     period = request.args.get("period", "1w")
 
-    stocks = MARKET_STOCKS.get(market, [])
-    if not stocks:
+    # 결과 캐시 (5분)
+    cache_key = f"{market}_{period}"
+    now = time.time()
+    if cache_key in _top_gainers_cache:
+        cached_time, cached_data = _top_gainers_cache[cache_key]
+        if now - cached_time < 300:
+            return jsonify(cached_data)
+
+    tickers = load_expanded_tickers(market)
+    if not tickers:
         return jsonify([])
 
-    tickers = [s[0] for s in stocks]
-    yf_period = "5d" if period == "1w" else "1mo"
+    # 1d/1w 모두 5d 데이터로 충분, 1mo는 1mo
+    yf_period = "1mo" if period == "1mo" else "5d"
 
     try:
-        data = yf.download(tickers, period=yf_period, progress=False, threads=False)
-        if data.empty:
+        closes = _download_closes_chunked(tickers, yf_period)
+        if closes is None or closes.empty:
             return jsonify([])
 
-        closes = data["Close"]
-        results = []
-        for s in stocks:
-            try:
-                series = closes[s[0]].dropna()
-                if len(series) < 2:
-                    continue
-                change_pct = (series.iloc[-1] - series.iloc[0]) / series.iloc[0] * 100
-                results.append({
-                    "ticker": s[0], "name": s[1], "sector": s[2], "industry": s[3],
-                    "change_pct": round(float(change_pct), 2),
-                    "price": round(float(series.iloc[-1]), 2),
-                })
-            except Exception:
-                continue
+        changes = []
 
-        results.sort(key=lambda x: x["change_pct"], reverse=True)
-        return jsonify(results[:10])
+        if isinstance(closes, pd.Series):
+            series = closes.dropna()
+            if len(series) >= 2:
+                pct = _calc_change(series, period)
+                changes.append((tickers[0], float(pct), float(series.iloc[-1])))
+        else:
+            for ticker in closes.columns:
+                try:
+                    series = closes[ticker].dropna()
+                    if len(series) < 2:
+                        continue
+                    pct = _calc_change(series, period)
+                    changes.append((ticker, float(pct), float(series.iloc[-1])))
+                except Exception:
+                    continue
+
+        changes.sort(key=lambda x: x[1], reverse=True)
+        top = changes[:10]
+
+        # MARKET_STOCKS + US stock map 에서 메타데이터 조회
+        stock_info = {}
+        for s in MARKET_STOCKS.get(market, []):
+            stock_info[s[0]] = {"name": s[1], "sector": s[2], "industry": s[3]}
+
+        results = []
+        for ticker, pct, price in top:
+            if ticker in stock_info:
+                info = stock_info[ticker]
+                results.append({
+                    "ticker": ticker, "name": info["name"],
+                    "sector": info["sector"], "industry": info["industry"],
+                    "change_pct": round(pct, 2), "price": round(price, 2),
+                })
+            else:
+                name, sector, industry = ticker, "-", "-"
+                try:
+                    yf_info = yf.Ticker(ticker).info
+                    name = yf_info.get("shortName") or yf_info.get("longName") or ticker
+                    sector = yf_info.get("sector") or "-"
+                    industry = yf_info.get("industry") or "-"
+                except Exception:
+                    # US stock map 폴백 (이름만)
+                    if market == "us":
+                        us_map = load_us_stock_map()
+                        if ticker in us_map:
+                            name = us_map[ticker]["name"]
+                results.append({
+                    "ticker": ticker, "name": name,
+                    "sector": sector, "industry": industry,
+                    "change_pct": round(pct, 2), "price": round(price, 2),
+                })
+
+        _top_gainers_cache[cache_key] = (now, results)
+        return jsonify(results)
     except Exception:
         return jsonify([])
 
@@ -957,8 +1168,9 @@ DART_MON_CFG_FILE = os.path.join(_BD, "dart_monitor_config.json")
 DART_SEEN_FILE = os.path.join(_BD, "dart_seen.json")
 DART_DAILY_FILE = os.path.join(_BD, "dart_daily.json")
 EXCEL_PATH = os.path.expanduser(
-    "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/My Drive/DART_공시_누적.xlsx"
+    "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/내 드라이브/공시정리/DART_공시_누적.xlsx"
 )
+EXCEL_PATH_LOCAL = os.path.join(_BD, "DART_공시_누적.xlsx")
 
 DEFAULT_DART_MON_CFG = {
     "watchlist": ["005930", "000660", "035420"],
@@ -1003,7 +1215,12 @@ def _load_seen():
 
 
 def _save_seen(seen):
-    _sj(DART_SEEN_FILE, list(seen)[-2000:])
+    # 기존 순서를 유지하면서 최근 항목만 보관 (set은 순서 미보장이므로 리스트 기반)
+    existing = _lj(DART_SEEN_FILE, [])
+    existing_set = set(existing)
+    new_items = [x for x in seen if x not in existing_set]
+    ordered = existing + new_items
+    _sj(DART_SEEN_FILE, ordered[-3000:])
 
 
 def _load_daily():
@@ -1115,33 +1332,43 @@ def _ck_watchlist():
         if not info:
             continue
         try:
-            res = requests.get(
-                "https://opendart.fss.or.kr/api/list.json",
-                params={"crtfc_key": DART_API_KEY, "corp_code": info["corp_code"],
-                        "bgn_de": td, "end_de": td, "page_count": 100},
-                timeout=10,
-            )
-            data = res.json()
-            if data.get("status") != "000":
-                continue
-            for it in data.get("list", []):
-                rno = it.get("rcept_no", "")
-                if rno in seen:
-                    continue
-                seen.add(rno)
-                chg = True
-                title = it.get("report_nm", "")
-                doc = _dart_doc(rno)
-                summary = _gemini(
-                    f"다음 DART 공시의 핵심 내용을 3줄 이내로 간결하게 한국어로 요약해줘:\n\n{doc[:4000]}"
-                ) if doc else ""
-                msg = (f"📢 <b>{info['name']}</b> 새 공시\n\n"
-                       f"📋 {title}\n📅 {it.get('rcept_dt', '')}\n")
-                if summary:
-                    msg += f"\n📝 {summary}\n"
-                msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>공시 원문</a>"
-                _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg)
-                _alog("종목", f"{info['name']} - {title}")
+            page_no = 1
+            while True:
+                res = requests.get(
+                    "https://opendart.fss.or.kr/api/list.json",
+                    params={"crtfc_key": DART_API_KEY, "corp_code": info["corp_code"],
+                            "bgn_de": td, "end_de": td, "page_no": page_no, "page_count": 100},
+                    timeout=10,
+                )
+                data = res.json()
+                if data.get("status") != "000":
+                    break
+                items = data.get("list", [])
+                if not items:
+                    break
+                for it in items:
+                    rno = it.get("rcept_no", "")
+                    if rno in seen:
+                        continue
+                    seen.add(rno)
+                    chg = True
+                    title = it.get("report_nm", "")
+                    doc = _dart_doc(rno)
+                    summary = _gemini(
+                        f"다음 DART 공시의 핵심 내용을 3줄 이내로 간결하게 한국어로 요약해줘:\n\n{doc[:4000]}"
+                    ) if doc else ""
+                    msg = (f"📢 <b>{info['name']}</b> 새 공시\n\n"
+                           f"📋 {title}\n📅 {it.get('rcept_dt', '')}\n")
+                    if summary:
+                        msg += f"\n📝 {summary}\n"
+                    msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>공시 원문</a>"
+                    _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg)
+                    _alog("종목", f"{info['name']} - {title}")
+                total_page = int(data.get("total_page", 1))
+                if page_no >= total_page:
+                    break
+                page_no += 1
+                time.sleep(0.2)
         except Exception:
             continue
     if chg:
@@ -1160,81 +1387,91 @@ def _ck_earnings():
 
     chg = False
     try:
-        res = requests.get(
-            "https://opendart.fss.or.kr/api/list.json",
-            params={"crtfc_key": DART_API_KEY, "bgn_de": td, "end_de": td,
-                    "pblntf_ty": "B", "page_count": 100},
-            timeout=10,
-        )
-        data = res.json()
-        if data.get("status") != "000":
-            return
-        for it in data.get("list", []):
-            title = it.get("report_nm", "")
-            if "잠정실적" not in title and "영업(잠정)" not in title:
-                continue
-            rno = it.get("rcept_no", "")
-            key = f"e_{rno}"
-            if key in seen:
-                continue
-            seen.add(key)
-            chg = True
-
-            corp_name = it.get("corp_name", "")
-            stock_code = it.get("stock_code", "")
-
-            doc = _dart_doc(rno)
-            extract = _gemini(
-                "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
-                '{"fs_type":"연결 또는 별도",'
-                '"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
-                '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)},'
-                '"net_income":{"current":당기순이익(억원),"prev":전기순이익(억원)},'
-                '"reason":"변동요인 2줄 요약"}\n'
-                f"숫자는 억원 단위, 없으면 null.\n\n{doc[:5000]}"
+        page_no = 1
+        while True:
+            res = requests.get(
+                "https://opendart.fss.or.kr/api/list.json",
+                params={"crtfc_key": DART_API_KEY, "bgn_de": td, "end_de": td,
+                        "pblntf_ty": "B", "page_no": page_no, "page_count": 100},
+                timeout=10,
             )
-
-            fd = None
-            try:
-                m = re.search(r"\{[\s\S]*\}", extract)
-                if m:
-                    fd = json.loads(m.group())
-            except Exception:
-                pass
-
-            if fd:
-                rev = fd.get("revenue", {})
-                op = fd.get("op_profit", {})
-                rg = (rev.get("current") or 0) > (rev.get("prev") or 0) if rev.get("current") and rev.get("prev") else False
-                og = (op.get("current") or 0) > (op.get("prev") or 0) if op.get("current") and op.get("prev") else False
-                ct = conds.get("condition_type", "or")
-                cr = conds.get("revenue_growth", True)
-                co = conds.get("op_profit_growth", True)
-                passed = ((cr and rg) or (co and og)) if ct == "or" else ((not cr or rg) and (not co or og))
-                if not passed:
+            data = res.json()
+            if data.get("status") != "000":
+                break
+            items = data.get("list", [])
+            if not items:
+                break
+            for it in items:
+                title = it.get("report_nm", "")
+                if "잠정실적" not in title and "영업(잠정)" not in title:
                     continue
+                rno = it.get("rcept_no", "")
+                key = f"e_{rno}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                chg = True
 
-            mc = _mcap_str(stock_code)
-            msg = "📊 <b>잠정실적 공시 알림</b>\n\n"
-            msg += f"📅 공시일시: {it.get('rcept_dt', '')}\n"
-            msg += f"🏢 기업명: <b>{corp_name}</b> (시총: {mc})\n"
-            msg += f"📋 보고서: {title}\n"
-            if fd:
-                msg += f"📑 재무제표: {fd.get('fs_type', '-')}\n\n"
-                r_ = fd.get("revenue", {})
-                o_ = fd.get("op_profit", {})
-                n_ = fd.get("net_income", {})
-                msg += f"💰 매출액: {_fv(r_.get('current'))} (전기: {_fv(r_.get('prev'))})\n"
-                msg += f"💰 영업이익: {_fv(o_.get('current'))} (전기: {_fv(o_.get('prev'))})\n"
-                msg += f"💰 순이익: {_fv(n_.get('current'))} (전기: {_fv(n_.get('prev'))})\n"
-                reason = fd.get("reason", "")
-                if reason:
-                    msg += f"\n📝 변동요인: {reason}\n"
-            msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>DART 공시 원문</a>"
-            if stock_code:
-                msg += f"\n🔗 <a href='https://finance.naver.com/item/main.naver?code={stock_code}'>네이버 회사정보</a>"
-            _tg_send(TELEGRAM_TOKEN_EARNINGS, cid, msg)
-            _alog("잠정", f"{corp_name} - {title}")
+                corp_name = it.get("corp_name", "")
+                stock_code = it.get("stock_code", "")
+
+                doc = _dart_doc(rno)
+                extract = _gemini(
+                    "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+                    '{"fs_type":"연결 또는 별도",'
+                    '"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
+                    '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)},'
+                    '"net_income":{"current":당기순이익(억원),"prev":전기순이익(억원)},'
+                    '"reason":"변동요인 2줄 요약"}\n'
+                    f"숫자는 억원 단위, 없으면 null.\n\n{doc[:5000]}"
+                )
+
+                fd = None
+                try:
+                    m = re.search(r"\{[\s\S]*\}", extract)
+                    if m:
+                        fd = json.loads(m.group())
+                except Exception:
+                    pass
+
+                if fd:
+                    rev = fd.get("revenue", {})
+                    op = fd.get("op_profit", {})
+                    rg = (rev.get("current") or 0) > (rev.get("prev") or 0) if rev.get("current") and rev.get("prev") else False
+                    og = (op.get("current") or 0) > (op.get("prev") or 0) if op.get("current") and op.get("prev") else False
+                    ct = conds.get("condition_type", "or")
+                    cr = conds.get("revenue_growth", True)
+                    co = conds.get("op_profit_growth", True)
+                    passed = ((cr and rg) or (co and og)) if ct == "or" else ((not cr or rg) and (not co or og))
+                    if not passed:
+                        continue
+
+                mc = _mcap_str(stock_code)
+                msg = "📊 <b>잠정실적 공시 알림</b>\n\n"
+                msg += f"📅 공시일시: {it.get('rcept_dt', '')}\n"
+                msg += f"🏢 기업명: <b>{corp_name}</b> (시총: {mc})\n"
+                msg += f"📋 보고서: {title}\n"
+                if fd:
+                    msg += f"📑 재무제표: {fd.get('fs_type', '-')}\n\n"
+                    r_ = fd.get("revenue", {})
+                    o_ = fd.get("op_profit", {})
+                    n_ = fd.get("net_income", {})
+                    msg += f"💰 매출액: {_fv(r_.get('current'))} (전기: {_fv(r_.get('prev'))})\n"
+                    msg += f"💰 영업이익: {_fv(o_.get('current'))} (전기: {_fv(o_.get('prev'))})\n"
+                    msg += f"💰 순이익: {_fv(n_.get('current'))} (전기: {_fv(n_.get('prev'))})\n"
+                    reason = fd.get("reason", "")
+                    if reason:
+                        msg += f"\n📝 변동요인: {reason}\n"
+                msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>DART 공시 원문</a>"
+                if stock_code:
+                    msg += f"\n🔗 <a href='https://finance.naver.com/item/main.naver?code={stock_code}'>네이버 회사정보</a>"
+                _tg_send(TELEGRAM_TOKEN_EARNINGS, cid, msg)
+                _alog("잠정", f"{corp_name} - {title}")
+            total_page = int(data.get("total_page", 1))
+            if page_no >= total_page:
+                break
+            page_no += 1
+            time.sleep(0.2)
     except Exception:
         pass
     if chg:
@@ -1242,11 +1479,12 @@ def _ck_earnings():
 
 
 # --- Feature 3: 주요 공시 ---
-_MAJOR_KW = ["30%", "변동", "단일판매", "단일공급", "수주", "공급계약",
-             "타법인주식", "출자증권", "투자판단", "주요경영"]
+_MAJOR_KW = ["대량보유", "기업설명회", "실적", "매출액", "공급계약"]
 
 
 def _ck_major():
+    cfg = load_dm_cfg()
+    cid = cfg["telegram_chat_ids"].get("general")
     seen = _load_seen()
     daily = _load_daily()
     td = date.today().strftime("%Y%m%d")
@@ -1256,32 +1494,57 @@ def _ck_major():
 
     chg = False
     try:
-        res = requests.get(
-            "https://opendart.fss.or.kr/api/list.json",
-            params={"crtfc_key": DART_API_KEY, "bgn_de": td, "end_de": td,
-                    "pblntf_ty": "B", "page_count": 100},
-            timeout=10,
-        )
-        data = res.json()
-        if data.get("status") != "000":
-            return
-        for it in data.get("list", []):
-            title = it.get("report_nm", "")
-            if not any(k in title for k in _MAJOR_KW):
-                continue
-            rno = it.get("rcept_no", "")
-            key = f"m_{rno}"
-            if key in seen:
-                continue
-            seen.add(key)
-            chg = True
-            daily["items"].append({
-                "corp_name": it.get("corp_name", ""),
-                "stock_code": it.get("stock_code", ""),
-                "title": title, "rcept_no": rno,
-                "rcept_dt": it.get("rcept_dt", ""),
-            })
-            _alog("주요", f"{it.get('corp_name', '')} - {title}")
+        page_no = 1
+        while True:
+            res = requests.get(
+                "https://opendart.fss.or.kr/api/list.json",
+                params={"crtfc_key": DART_API_KEY, "bgn_de": td, "end_de": td,
+                        "page_no": page_no, "page_count": 100},
+                timeout=10,
+            )
+            data = res.json()
+            if data.get("status") != "000":
+                break
+            items = data.get("list", [])
+            if not items:
+                break
+            for it in items:
+                title = it.get("report_nm", "")
+                if not any(k in title for k in _MAJOR_KW):
+                    continue
+                rno = it.get("rcept_no", "")
+                key = f"m_{rno}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                chg = True
+                corp_name = it.get("corp_name", "")
+                stock_code = it.get("stock_code", "")
+                daily["items"].append({
+                    "corp_name": corp_name,
+                    "stock_code": stock_code,
+                    "title": title, "rcept_no": rno,
+                    "rcept_dt": it.get("rcept_dt", ""),
+                })
+                _alog("주요", f"{corp_name} - {title}")
+                # 즉시 텔레그램 전송
+                if cid:
+                    doc = _dart_doc(rno)
+                    summary = _gemini(f"다음 DART 공시의 핵심 내용을 2~3줄로 요약:\n{doc[:3000]}") if doc else ""
+                    msg = f"📢 <b>주요 공시</b>\n\n"
+                    msg += f"🏢 <b>{corp_name}</b>\n"
+                    msg += f"📋 {title}\n"
+                    if summary:
+                        msg += f"\n💡 <b>요약:</b> {summary}\n"
+                    msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>DART 공시 원문</a>"
+                    if stock_code:
+                        msg += f"\n🔗 <a href='https://finance.naver.com/item/main.naver?code={stock_code}'>네이버 회사정보</a>"
+                    _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg)
+            total_page = int(data.get("total_page", 1))
+            if page_no >= total_page:
+                break
+            page_no += 1
+            time.sleep(0.2)
     except Exception:
         pass
     if chg:
@@ -1304,14 +1567,17 @@ def _send_daily():
 
 
 def _save_excel():
+    import shutil
     from openpyxl import Workbook, load_workbook
     daily = _load_daily()
     if not daily.get("items"):
         return
+
+    # 항상 로컬에 저장
     try:
-        wb = load_workbook(EXCEL_PATH)
+        wb = load_workbook(EXCEL_PATH_LOCAL)
         ws = wb.active
-    except FileNotFoundError:
+    except Exception:
         wb = Workbook()
         ws = wb.active
         ws.title = "DART 공시"
@@ -1352,9 +1618,20 @@ def _save_excel():
         ws.append([it.get("rcept_dt", ""), it.get("corp_name", ""), it.get("title", ""),
                    sector, mc_s, rev_s, op_s, summary[:200], ratio])
 
-    os.makedirs(os.path.dirname(EXCEL_PATH), exist_ok=True)
-    wb.save(EXCEL_PATH)
-    _alog("엑셀", f"공시 {len(daily['items'])}건 저장")
+    try:
+        wb.save(EXCEL_PATH_LOCAL)
+        _alog("엑셀", f"공시 {len(daily['items'])}건 로컬 저장 완료")
+    except Exception as e:
+        _alog("엑셀", f"로컬 저장 실패: {e}")
+        return
+
+    # Google Drive로 복사
+    try:
+        os.makedirs(os.path.dirname(EXCEL_PATH), exist_ok=True)
+        shutil.copy2(EXCEL_PATH_LOCAL, EXCEL_PATH)
+        _alog("엑셀", "Google Drive 복사 완료")
+    except Exception as e:
+        _alog("엑셀", f"Google Drive 복사 실패 (로컬 저장은 완료): {e}")
 
 
 # --- Background monitor ---
@@ -1438,6 +1715,17 @@ def toggle_dm():
     if cfg["monitor_enabled"]:
         _start_monitor()
     return jsonify({"ok": True, "enabled": cfg["monitor_enabled"]})
+
+
+@app.route("/api/dart/daily/trigger", methods=["POST"])
+def trigger_daily():
+    """수동으로 일일 공시 정리 + 엑셀 저장을 실행"""
+    try:
+        _send_daily()
+        _save_excel()
+        return jsonify({"ok": True, "msg": "일일 공시 정리 및 엑셀 저장 완료"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 
 
 if __name__ == "__main__":
