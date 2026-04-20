@@ -1480,11 +1480,10 @@ def _ck_earnings():
 
 # --- Feature 3: 주요 공시 ---
 _MAJOR_KW = ["대량보유", "기업설명회", "실적", "매출액", "공급계약"]
+_MAJOR_EXCLUDE = ["증권발행실적보고서"]
 
 
 def _ck_major():
-    cfg = load_dm_cfg()
-    cid = cfg["telegram_chat_ids"].get("general")
     seen = _load_seen()
     daily = _load_daily()
     td = date.today().strftime("%Y%m%d")
@@ -1512,6 +1511,8 @@ def _ck_major():
                 title = it.get("report_nm", "")
                 if not any(k in title for k in _MAJOR_KW):
                     continue
+                if any(ex in title for ex in _MAJOR_EXCLUDE):
+                    continue
                 rno = it.get("rcept_no", "")
                 key = f"m_{rno}"
                 if key in seen:
@@ -1525,21 +1526,9 @@ def _ck_major():
                     "stock_code": stock_code,
                     "title": title, "rcept_no": rno,
                     "rcept_dt": it.get("rcept_dt", ""),
+                    "detected_at": datetime.now().strftime("%H:%M"),
                 })
                 _alog("주요", f"{corp_name} - {title}")
-                # 즉시 텔레그램 전송
-                if cid:
-                    doc = _dart_doc(rno)
-                    summary = _gemini(f"다음 DART 공시의 핵심 내용을 2~3줄로 요약:\n{doc[:3000]}") if doc else ""
-                    msg = f"📢 <b>주요 공시</b>\n\n"
-                    msg += f"🏢 <b>{corp_name}</b>\n"
-                    msg += f"📋 {title}\n"
-                    if summary:
-                        msg += f"\n💡 <b>요약:</b> {summary}\n"
-                    msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>DART 공시 원문</a>"
-                    if stock_code:
-                        msg += f"\n🔗 <a href='https://finance.naver.com/item/main.naver?code={stock_code}'>네이버 회사정보</a>"
-                    _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg)
             total_page = int(data.get("total_page", 1))
             if page_no >= total_page:
                 break
@@ -1552,18 +1541,41 @@ def _ck_major():
         _save_daily(daily)
 
 
-def _send_daily():
+_DAILY_SLOTS = [
+    {"hour": 11, "key": "11", "start": "00:00", "end": "10:59",
+     "header": "📋 <b>오전 공시 정리 (00:00~11:00)</b>"},
+    {"hour": 14, "key": "14", "start": "11:00", "end": "13:59",
+     "header": "📋 <b>오후 공시 정리 (11:00~14:00)</b>"},
+    {"hour": 18, "key": "18", "start": "14:00", "end": "17:59",
+     "header": "📋 <b>오후 공시 정리 (14:00~18:00)</b>"},
+    {"hour": 22, "key": "22", "start": None, "end": None,
+     "header": None},
+]
+
+
+def _send_daily_slot(slot):
     cfg = load_dm_cfg()
     daily = _load_daily()
     cid = cfg["telegram_chat_ids"].get("general")
     if not cid or not daily.get("items"):
         return
-    msg = f"📋 <b>오늘의 주요 공시 정리</b> ({date.today().isoformat()})\n\n"
-    for i, it in enumerate(daily["items"], 1):
+    if slot["start"] is not None:
+        filtered = [it for it in daily["items"]
+                    if slot["start"] <= it.get("detected_at", "00:00") <= slot["end"]]
+        if not filtered:
+            return
+        header = slot["header"]
+    else:
+        filtered = daily["items"]
+        if not filtered:
+            return
+        header = f"📋 <b>오늘의 전체 공시 정리 ({date.today().isoformat()})</b>"
+    msg = f"{header}\n\n"
+    for i, it in enumerate(filtered, 1):
         msg += f"{i}. <b>{it['corp_name']}</b>\n   📋 {it['title']}\n"
         msg += f"   🔗 https://dart.fss.or.kr/dsaf001/main.do?rcpNo={it['rcept_no']}\n\n"
     _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg[:4000])
-    _alog("일일", f"주요 공시 {len(daily['items'])}건 전송")
+    _alog("일일", f"{slot['key']}시 공시 {len(filtered)}건 전송")
 
 
 def _save_excel():
@@ -1636,7 +1648,7 @@ def _save_excel():
 
 # --- Background monitor ---
 def _dart_loop():
-    daily_sent = None
+    daily_sent = {}
     time.sleep(10)
     while True:
         try:
@@ -1646,10 +1658,12 @@ def _dart_loop():
                 _ck_earnings()
                 _ck_major()
                 now = datetime.now()
-                if now.hour == 18 and daily_sent != now.date():
-                    _send_daily()
-                    _save_excel()
-                    daily_sent = now.date()
+                for slot in _DAILY_SLOTS:
+                    if now.hour == slot["hour"] and daily_sent.get(slot["key"]) != now.date():
+                        _send_daily_slot(slot)
+                        daily_sent[slot["key"]] = now.date()
+                        if slot["key"] == "22":
+                            _save_excel()
         except Exception as e:
             print(f"[DART Monitor] {e}")
         time.sleep(300)
@@ -1719,11 +1733,12 @@ def toggle_dm():
 
 @app.route("/api/dart/daily/trigger", methods=["POST"])
 def trigger_daily():
-    """수동으로 일일 공시 정리 + 엑셀 저장을 실행"""
+    """수동으로 전체 공시 정리 + 엑셀 저장을 실행"""
     try:
-        _send_daily()
+        full_slot = _DAILY_SLOTS[-1]
+        _send_daily_slot(full_slot)
         _save_excel()
-        return jsonify({"ok": True, "msg": "일일 공시 정리 및 엑셀 저장 완료"})
+        return jsonify({"ok": True, "msg": "전체 공시 정리 및 엑셀 저장 완료"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
