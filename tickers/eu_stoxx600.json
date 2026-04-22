@@ -1,0 +1,4214 @@
+{
+ "last_updated": "2026-04-22T06:23:50.422778+02:00",
+ "source": "iShares STOXX Europe 600 (DE)",
+ "universe": "STOXX Europe 600",
+ "tickers": [
+  {
+   "ticker": "ASML.AS",
+   "raw_ticker": "ASML",
+   "name": "ASML HOLDING NV",
+   "sector": "IT",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "HSBA.L",
+   "raw_ticker": "HSBA",
+   "name": "HSBC HOLDINGS PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AZN.L",
+   "raw_ticker": "AZN",
+   "name": "ASTRAZENECA PLC",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "NOVN.SW",
+   "raw_ticker": "NOVN",
+   "name": "NOVARTIS AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "ROP.SW",
+   "raw_ticker": "ROP",
+   "name": "ROCHE PS PAR AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "NESN.SW",
+   "raw_ticker": "NESN",
+   "name": "NESTLE SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SHELL.AS",
+   "raw_ticker": "SHELL",
+   "name": "SHELL PLC",
+   "sector": "Energie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "SIE.DE",
+   "raw_ticker": "SIE",
+   "name": "SIEMENS N AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "TTE.PA",
+   "raw_ticker": "TTE",
+   "name": "TOTALENERGIES",
+   "sector": "Energie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SAN.MC",
+   "raw_ticker": "SAN",
+   "name": "BANCO SANTANDER SA",
+   "sector": "Financials",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "SU.PA",
+   "raw_ticker": "SU",
+   "name": "SCHNEIDER ELECTRIC",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SAP.DE",
+   "raw_ticker": "SAP",
+   "name": "SAP",
+   "sector": "IT",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ALV.DE",
+   "raw_ticker": "ALV",
+   "name": "ALLIANZ",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ENR.DE",
+   "raw_ticker": "ENR",
+   "name": "SIEMENS ENERGY N AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ABBN.SW",
+   "raw_ticker": "ABBN",
+   "name": "ABB LTD",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "IBE.MC",
+   "raw_ticker": "IBE",
+   "name": "IBERDROLA SA",
+   "sector": "Versorger",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "MC.PA",
+   "raw_ticker": "MC",
+   "name": "LVMH",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "RR.L",
+   "raw_ticker": "RR.",
+   "name": "ROLLS-ROYCE HOLDINGS PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "UBSG.SW",
+   "raw_ticker": "UBSG",
+   "name": "UBS GROUP AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "BBVA.MC",
+   "raw_ticker": "BBVA",
+   "name": "BANCO BILBAO VIZCAYA ARGENTARIA SA",
+   "sector": "Financials",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "SAF.PA",
+   "raw_ticker": "SAF",
+   "name": "SAFRAN SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "NOVO-B.CO",
+   "raw_ticker": "NOVO B",
+   "name": "NOVO NORDISK CLASS B",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "ULVR.L",
+   "raw_ticker": "ULVR",
+   "name": "UNILEVER PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AI.PA",
+   "raw_ticker": "AI",
+   "name": "LAIR LIQUIDE SOCIETE ANONYME POUR",
+   "sector": "Materialien",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "BP.L",
+   "raw_ticker": "BP.",
+   "name": "BP PLC",
+   "sector": "Energie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BATS.L",
+   "raw_ticker": "BATS",
+   "name": "BRITISH AMERICAN TOBACCO",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "DTE.DE",
+   "raw_ticker": "DTE",
+   "name": "DEUTSCHE TELEKOM N AG",
+   "sector": "Kommunikation",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "AIR.PA",
+   "raw_ticker": "AIR",
+   "name": "AIRBUS GROUP",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "UCG.MI",
+   "raw_ticker": "UCG",
+   "name": "UNICREDIT",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "GSK.L",
+   "raw_ticker": "GSK",
+   "name": "GLAXOSMITHKLINE",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BNP.PA",
+   "raw_ticker": "BNP",
+   "name": "BNP PARIBAS SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SAN.PA",
+   "raw_ticker": "SAN",
+   "name": "SANOFI SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "CFR.SW",
+   "raw_ticker": "CFR",
+   "name": "COMPAGNIE FINANCIERE RICHEMONT SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "RIO.L",
+   "raw_ticker": "RIO",
+   "name": "RIO TINTO PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ZURN.SW",
+   "raw_ticker": "ZURN",
+   "name": "ZURICH INSURANCE GROUP AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "ISP.MI",
+   "raw_ticker": "ISP",
+   "name": "INTESA SANPAOLO",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "OR.PA",
+   "raw_ticker": "OR",
+   "name": "LOREAL SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "DG.PA",
+   "raw_ticker": "DG",
+   "name": "VINCI SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "BA.L",
+   "raw_ticker": "BA.",
+   "name": "BAE SYSTEMS PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CS.PA",
+   "raw_ticker": "CS",
+   "name": "AXA SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "NG.L",
+   "raw_ticker": "NG.",
+   "name": "NATIONAL GRID PLC",
+   "sector": "Versorger",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ENEL.MI",
+   "raw_ticker": "ENEL",
+   "name": "ENEL",
+   "sector": "Versorger",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "MUV2.DE",
+   "raw_ticker": "MUV2",
+   "name": "MUENCHENER RUECKVERSICHERUNGS-GESE",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "INGA.AS",
+   "raw_ticker": "INGA",
+   "name": "ING GROEP NV",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "BARC.L",
+   "raw_ticker": "BARC",
+   "name": "BARCLAYS PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "LLOY.L",
+   "raw_ticker": "LLOY",
+   "name": "LLOYDS BANKING GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "RHM.DE",
+   "raw_ticker": "RHM",
+   "name": "RHEINMETALL AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ABI.BR",
+   "raw_ticker": "ABI",
+   "name": "ANHEUSER-BUSCH INBEV SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "EL.PA",
+   "raw_ticker": "EL",
+   "name": "ESSILORLUXOTTICA SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "INVE-B.ST",
+   "raw_ticker": "INVE B",
+   "name": "INVESTOR CLASS B",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "IFX.DE",
+   "raw_ticker": "IFX",
+   "name": "INFINEON TECHNOLOGIES AG",
+   "sector": "IT",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "GLEN.L",
+   "raw_ticker": "GLEN",
+   "name": "GLENCORE PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ITX.MC",
+   "raw_ticker": "ITX",
+   "name": "INDUSTRIA DE DISENO TEXTIL SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "RMS.PA",
+   "raw_ticker": "RMS",
+   "name": "HERMES INTERNATIONAL",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "NWG.L",
+   "raw_ticker": "NWG",
+   "name": "NATWEST GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "REL.L",
+   "raw_ticker": "REL",
+   "name": "RELX PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "GLE.PA",
+   "raw_ticker": "GLE",
+   "name": "SOCIETE GENERALE SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "DBK.DE",
+   "raw_ticker": "DBK",
+   "name": "DEUTSCHE BANK AG",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "NDA-FI.HE",
+   "raw_ticker": "NDA FI",
+   "name": "NORDEA BANK",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "PRX.AS",
+   "raw_ticker": "PRX",
+   "name": "PROSUS NV CLASS N",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "LSEG.L",
+   "raw_ticker": "LSEG",
+   "name": "LONDON STOCK EXCHANGE GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ENGI.PA",
+   "raw_ticker": "ENGI",
+   "name": "ENGIE SA",
+   "sector": "Versorger",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "DB1.DE",
+   "raw_ticker": "DB1",
+   "name": "DEUTSCHE BOERSE AG",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "NOKIA.HE",
+   "raw_ticker": "NOKIA",
+   "name": "NOKIA",
+   "sector": "IT",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "VOLV-B.ST",
+   "raw_ticker": "VOLV B",
+   "name": "VOLVO CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "BAS.DE",
+   "raw_ticker": "BAS",
+   "name": "BASF N",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "DHL.DE",
+   "raw_ticker": "DHL",
+   "name": "DEUTSCHE POST AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "AAL.L",
+   "raw_ticker": "AAL",
+   "name": "ANGLO AMERICAN PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "DSV.CO",
+   "raw_ticker": "DSV",
+   "name": "DSV",
+   "sector": "Industrie",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "ATCO-A.ST",
+   "raw_ticker": "ATCO A",
+   "name": "ATLAS COPCO CLASS A",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "ARGX.BR",
+   "raw_ticker": "ARGX",
+   "name": "ARGENX",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "BN.PA",
+   "raw_ticker": "BN",
+   "name": "DANONE SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "ENI.MI",
+   "raw_ticker": "ENI",
+   "name": "ENI",
+   "sector": "Energie",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "CPG.L",
+   "raw_ticker": "CPG",
+   "name": "COMPASS GROUP PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SREN.SW",
+   "raw_ticker": "SREN",
+   "name": "SWISS RE AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "EOAN.DE",
+   "raw_ticker": "EOAN",
+   "name": "E.ON N",
+   "sector": "Versorger",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "HOLN.SW",
+   "raw_ticker": "HOLN",
+   "name": "HOLCIM LTD AG",
+   "sector": "Materialien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "G.MI",
+   "raw_ticker": "G",
+   "name": "ASSICURAZIONI GENERALI",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "BAYN.DE",
+   "raw_ticker": "BAYN",
+   "name": "BAYER AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "LONN.SW",
+   "raw_ticker": "LONN",
+   "name": "LONZA GROUP AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SAND.ST",
+   "raw_ticker": "SAND",
+   "name": "SANDVIK",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "RKT.L",
+   "raw_ticker": "RKT",
+   "name": "RECKITT BENCKISER GROUP PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "LR.PA",
+   "raw_ticker": "LR",
+   "name": "LEGRAND SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "DGE.L",
+   "raw_ticker": "DGE",
+   "name": "DIAGEO PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SGO.PA",
+   "raw_ticker": "SGO",
+   "name": "COMPAGNIE DE SAINT GOBAIN SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "RWE.DE",
+   "raw_ticker": "RWE",
+   "name": "RWE AG",
+   "sector": "Versorger",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ASM.AS",
+   "raw_ticker": "ASM",
+   "name": "ASM INTERNATIONAL NV",
+   "sector": "IT",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "CABK.MC",
+   "raw_ticker": "CABK",
+   "name": "CAIXABANK SA",
+   "sector": "Financials",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "STAN.L",
+   "raw_ticker": "STAN",
+   "name": "STANDARD CHARTERED PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "RACE.MI",
+   "raw_ticker": "RACE",
+   "name": "FERRARI NV",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "MBG.DE",
+   "raw_ticker": "MBG",
+   "name": "MERCEDES-BENZ GROUP N AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "AD.AS",
+   "raw_ticker": "AD",
+   "name": "KONINKLIJKE AHOLD DELHAIZE NV",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "TSCO.L",
+   "raw_ticker": "TSCO",
+   "name": "TESCO PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HLN.L",
+   "raw_ticker": "HLN",
+   "name": "HALEON PLC",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "PRY.MI",
+   "raw_ticker": "PRY",
+   "name": "PRYSMIAN",
+   "sector": "Industrie",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "SSE.L",
+   "raw_ticker": "SSE",
+   "name": "SSE PLC",
+   "sector": "Versorger",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ORA.PA",
+   "raw_ticker": "ORA",
+   "name": "ORANGE SA",
+   "sector": "Kommunikation",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "ASSA-B.ST",
+   "raw_ticker": "ASSA B",
+   "name": "ASSA ABLOY B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "ALC.SW",
+   "raw_ticker": "ALC",
+   "name": "ALCON AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "UCB.BR",
+   "raw_ticker": "UCB",
+   "name": "UCB SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "PRU.L",
+   "raw_ticker": "PRU",
+   "name": "PRUDENTIAL PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SDZ.SW",
+   "raw_ticker": "SDZ",
+   "name": "SANDOZ GROUP AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "EBS.VI",
+   "raw_ticker": "EBS",
+   "name": "ERSTE GROUP BANK AG",
+   "sector": "Financials",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "III.L",
+   "raw_ticker": "III",
+   "name": "3I GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ADYEN.AS",
+   "raw_ticker": "ADYEN",
+   "name": "ADYEN NV",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "FER.MC",
+   "raw_ticker": "FER",
+   "name": "FERROVIAL",
+   "sector": "Industrie",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "EXPN.L",
+   "raw_ticker": "EXPN",
+   "name": "EXPERIAN PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ERIC-B.ST",
+   "raw_ticker": "ERIC B",
+   "name": "ERICSSON B",
+   "sector": "IT",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "SLHN.SW",
+   "raw_ticker": "SLHN",
+   "name": "SWISS LIFE HOLDING AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "DANSKE.CO",
+   "raw_ticker": "DANSKE",
+   "name": "DANSKE BANK",
+   "sector": "Financials",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "SWED-A.ST",
+   "raw_ticker": "SWED A",
+   "name": "SWEDBANK",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "GALD.SW",
+   "raw_ticker": "GALD",
+   "name": "GALDERMA GROUP N AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SIKA.SW",
+   "raw_ticker": "SIKA",
+   "name": "SIKA AG",
+   "sector": "Materialien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SEB-A.ST",
+   "raw_ticker": "SEB A",
+   "name": "SKANDINAVISKA ENSKILDA BANKEN",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "EQT.ST",
+   "raw_ticker": "EQT",
+   "name": "EQT",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "KBC.BR",
+   "raw_ticker": "KBC",
+   "name": "KBC GROEP",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "ADS.DE",
+   "raw_ticker": "ADS",
+   "name": "ADIDAS N AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "VWS.CO",
+   "raw_ticker": "VWS",
+   "name": "VESTAS WIND SYSTEMS",
+   "sector": "Industrie",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "EQNR.OL",
+   "raw_ticker": "EQNR",
+   "name": "EQUINOR",
+   "sector": "Energie",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "VOD.L",
+   "raw_ticker": "VOD",
+   "name": "VODAFONE GROUP PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SUNB.L",
+   "raw_ticker": "SUNB",
+   "name": "SUNBELT RENTALS HOLDINGS INC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HO.PA",
+   "raw_ticker": "HO",
+   "name": "THALES SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "CBK.DE",
+   "raw_ticker": "CBK",
+   "name": "COMMERZBANK AG",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ACS.MC",
+   "raw_ticker": "ACS",
+   "name": "ACS ACTIVIDADES DE CONSTRUCCION Y",
+   "sector": "Industrie",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "GIVN.SW",
+   "raw_ticker": "GIVN",
+   "name": "GIVAUDAN SA",
+   "sector": "Materialien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "STMMI.MI",
+   "raw_ticker": "STMMI",
+   "name": "STMICROELECTRONICS NV",
+   "sector": "IT",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "IMB.L",
+   "raw_ticker": "IMB",
+   "name": "IMPERIAL BRANDS PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "VIE.PA",
+   "raw_ticker": "VIE",
+   "name": "VEOLIA ENVIRON. SA",
+   "sector": "Versorger",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "HEI.DE",
+   "raw_ticker": "HEI",
+   "name": "HEIDELBERG MATERIALS AG",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "SAMPO.HE",
+   "raw_ticker": "SAMPO",
+   "name": "SAMPO CLASS A",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "AMS.MC",
+   "raw_ticker": "AMS",
+   "name": "AMADEUS IT GROUP SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "PGHN.SW",
+   "raw_ticker": "PGHN",
+   "name": "PARTNERS GROUP HOLDING AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "DNB.OL",
+   "raw_ticker": "DNB",
+   "name": "DNB BANK",
+   "sector": "Financials",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "DTG.DE",
+   "raw_ticker": "DTG",
+   "name": "DAIMLER TRUCK HOLDING E AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BMW.DE",
+   "raw_ticker": "BMW",
+   "name": "BMW AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "LDO.MI",
+   "raw_ticker": "LDO",
+   "name": "LEONARDO FINMECCANICA SPA",
+   "sector": "Industrie",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "KNEBV.HE",
+   "raw_ticker": "KNEBV",
+   "name": "KONE",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "UMG.AS",
+   "raw_ticker": "UMG",
+   "name": "UNIVERSAL MUSIC GROUP NV",
+   "sector": "Kommunikation",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "MT.AS",
+   "raw_ticker": "MT",
+   "name": "ARCELORMITTAL SA",
+   "sector": "Materialien",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "ML.PA",
+   "raw_ticker": "ML",
+   "name": "MICHELIN",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "REP.MC",
+   "raw_ticker": "REP",
+   "name": "REPSOL SA",
+   "sector": "Energie",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "AV.L",
+   "raw_ticker": "AV.",
+   "name": "AVIVA PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "PKO.WA",
+   "raw_ticker": "PKO",
+   "name": "POWSZECHNA KASA OSZCZEDNOSCI BANK",
+   "sector": "Financials",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "RYA.IR",
+   "raw_ticker": "RYA",
+   "name": "RYANAIR HOLDINGS PLC",
+   "sector": "Industrie",
+   "exchange": "Irish Stock Exchange - All Market"
+  },
+  {
+   "ticker": "A5G.IR",
+   "raw_ticker": "A5G",
+   "name": "AIB GROUP PLC",
+   "sector": "Financials",
+   "exchange": "Irish Stock Exchange - All Market"
+  },
+  {
+   "ticker": "HEXA-B.ST",
+   "raw_ticker": "HEXA B",
+   "name": "HEXAGON CLASS B",
+   "sector": "IT",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "GEBN.SW",
+   "raw_ticker": "GEBN",
+   "name": "GEBERIT AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "BMPS.MI",
+   "raw_ticker": "BMPS",
+   "name": "BANCA MONTE DEI PASCHI DI SIENA SP",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "ACA.PA",
+   "raw_ticker": "ACA",
+   "name": "CREDIT AGRICOLE SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "HEIA.AS",
+   "raw_ticker": "HEIA",
+   "name": "HEINEKEN NV",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "AENA.MC",
+   "raw_ticker": "AENA",
+   "name": "AENA SME SA",
+   "sector": "Industrie",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "PHIA.AS",
+   "raw_ticker": "PHIA",
+   "name": "KONINKLIJKE PHILIPS NV",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "HBAN.SW",
+   "raw_ticker": "HBAN",
+   "name": "HELVETIA BALOISE HOLDING N AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SHB-A.ST",
+   "raw_ticker": "SHB A",
+   "name": "SVENSKA HANDELSBANKEN-A SHS",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "NN.AS",
+   "raw_ticker": "NN",
+   "name": "NN GROUP NV",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "NXT.L",
+   "raw_ticker": "NXT",
+   "name": "NEXT PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HLMA.L",
+   "raw_ticker": "HLMA",
+   "name": "HALMA PLC",
+   "sector": "IT",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CAP.PA",
+   "raw_ticker": "CAP",
+   "name": "CAPGEMINI",
+   "sector": "IT",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "IHG.L",
+   "raw_ticker": "IHG",
+   "name": "INTERCONTINENTAL HOTELS GROUP PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "VOW3.DE",
+   "raw_ticker": "VOW3",
+   "name": "VOLKSWAGEN NON-VOTING PREF AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ABN.AS",
+   "raw_ticker": "ABN",
+   "name": "ABN AMRO BANK NV",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "PUB.PA",
+   "raw_ticker": "PUB",
+   "name": "PUBLICIS GROUPE SA",
+   "sector": "Kommunikation",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SCMN.SW",
+   "raw_ticker": "SCMN",
+   "name": "SWISSCOM AG",
+   "sector": "Kommunikation",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SAAB-B.ST",
+   "raw_ticker": "SAAB B",
+   "name": "SAAB CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "FRE.DE",
+   "raw_ticker": "FRE",
+   "name": "FRESENIUS SE AND CO KGAA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "NSIS-B.CO",
+   "raw_ticker": "NSIS B",
+   "name": "NOVOZYMES B",
+   "sector": "Materialien",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "WRT1V.HE",
+   "raw_ticker": "WRT1V",
+   "name": "WARTSILA",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "KPN.AS",
+   "raw_ticker": "KPN",
+   "name": "KONINKLIJKE KPN NV",
+   "sector": "Kommunikation",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "MTX.DE",
+   "raw_ticker": "MTX",
+   "name": "MTU AERO ENGINES HOLDING AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "PKN.WA",
+   "raw_ticker": "PKN",
+   "name": "ORLEN SA",
+   "sector": "Energie",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "KER.PA",
+   "raw_ticker": "KER",
+   "name": "KERING SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "LGEN.L",
+   "raw_ticker": "LGEN",
+   "name": "LEGAL AND GENERAL GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BPE.MI",
+   "raw_ticker": "BPE",
+   "name": "BPER BANCA",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "VACN.SW",
+   "raw_ticker": "VACN",
+   "name": "VAT GROUP AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "VNA.DE",
+   "raw_ticker": "VNA",
+   "name": "VONOVIA SE",
+   "sector": "Immobilien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BESI.AS",
+   "raw_ticker": "BESI",
+   "name": "BE SEMICONDUCTOR INDUSTRIES NV",
+   "sector": "IT",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "ANTO.L",
+   "raw_ticker": "ANTO",
+   "name": "ANTOFAGASTA PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SAB.MC",
+   "raw_ticker": "SAB",
+   "name": "BANCO DE SABADELL SA",
+   "sector": "Financials",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "HNR1.DE",
+   "raw_ticker": "HNR1",
+   "name": "HANNOVER RUECK",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "WKL.AS",
+   "raw_ticker": "WKL",
+   "name": "WOLTERS KLUWER NV",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "SGSN.SW",
+   "raw_ticker": "SGSN",
+   "name": "SGS SA",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "BIRG.IR",
+   "raw_ticker": "BIRG",
+   "name": "BANK OF IRELAND GROUP PLC",
+   "sector": "Financials",
+   "exchange": "Irish Stock Exchange - All Market"
+  },
+  {
+   "ticker": "BT-A.L",
+   "raw_ticker": "BT.A",
+   "name": "BT GROUP PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "STLAM.MI",
+   "raw_ticker": "STLAM",
+   "name": "STELLANTIS NV",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "GMAB.CO",
+   "raw_ticker": "GMAB",
+   "name": "GENMAB",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "ALFA.ST",
+   "raw_ticker": "ALFA",
+   "name": "ALFA LAVAL",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "KOG.OL",
+   "raw_ticker": "KOG",
+   "name": "KONGSBERG GRUPPEN",
+   "sector": "Industrie",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "MRK.DE",
+   "raw_ticker": "MRK",
+   "name": "MERCK",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BOL.ST",
+   "raw_ticker": "BOL",
+   "name": "BOLIDEN",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "TEF.MC",
+   "raw_ticker": "TEF",
+   "name": "TELEFONICA SA",
+   "sector": "Kommunikation",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "TRN.MI",
+   "raw_ticker": "TRN",
+   "name": "TERNA RETE ELETTRICA NAZIONALE",
+   "sector": "Versorger",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "EPI-A.ST",
+   "raw_ticker": "EPI A",
+   "name": "EPIROC CLASS A",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "BAMI.MI",
+   "raw_ticker": "BAMI",
+   "name": "BANCO BPM",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "SHL.DE",
+   "raw_ticker": "SHL",
+   "name": "SIEMENS HEALTHINEERS AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "RTO.L",
+   "raw_ticker": "RTO",
+   "name": "RENTOKIL INITIAL PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BAER.SW",
+   "raw_ticker": "BAER",
+   "name": "JULIUS BAER GRUPPE AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "EN.PA",
+   "raw_ticker": "EN",
+   "name": "BOUYGUES SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "CLNX.MC",
+   "raw_ticker": "CLNX",
+   "name": "CELLNEX TELECOM",
+   "sector": "Kommunikation",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "UPM.HE",
+   "raw_ticker": "UPM",
+   "name": "UPM-KYMMENE",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "ESSITY-B.ST",
+   "raw_ticker": "ESSITY B",
+   "name": "ESSITY CLASS B",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "FGR.PA",
+   "raw_ticker": "FGR",
+   "name": "EIFFAGE SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "FBK.MI",
+   "raw_ticker": "FBK",
+   "name": "FINECOBANK BANCA FINECO",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "SRG.MI",
+   "raw_ticker": "SRG",
+   "name": "SNAM",
+   "sector": "Versorger",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "DSY.PA",
+   "raw_ticker": "DSY",
+   "name": "DASSAULT SYSTEMES",
+   "sector": "IT",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "EDP.LS",
+   "raw_ticker": "EDP",
+   "name": "EDP ENERGIAS DE PORTUGAL SA",
+   "sector": "Versorger",
+   "exchange": "Nyse Euronext - Euronext Lisbon"
+  },
+  {
+   "ticker": "RI.PA",
+   "raw_ticker": "RI",
+   "name": "PERNOD RICARD SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "MONC.MI",
+   "raw_ticker": "MONC",
+   "name": "MONCLER",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "NHY.OL",
+   "raw_ticker": "NHY",
+   "name": "NORSK HYDRO",
+   "sector": "Materialien",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "SN.L",
+   "raw_ticker": "SN.",
+   "name": "SMITH AND NEPHEW PLC",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "INF.L",
+   "raw_ticker": "INF",
+   "name": "INFORMA PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "KRX.IR",
+   "raw_ticker": "KRX",
+   "name": "KINGSPAN GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "Irish Stock Exchange - All Market"
+  },
+  {
+   "ticker": "LOGN.SW",
+   "raw_ticker": "LOGN",
+   "name": "LOGITECH INTERNATIONAL SA",
+   "sector": "IT",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "ELE.MC",
+   "raw_ticker": "ELE",
+   "name": "ENDESA SA",
+   "sector": "Versorger",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "SPSN.SW",
+   "raw_ticker": "SPSN",
+   "name": "SWISS PRIME SITE AG",
+   "sector": "Immobilien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SCHP.SW",
+   "raw_ticker": "SCHP",
+   "name": "SCHINDLER HOLDING PAR AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "STMN.SW",
+   "raw_ticker": "STMN",
+   "name": "STRAUMANN HOLDING AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "BG.VI",
+   "raw_ticker": "BG",
+   "name": "BAWAG GROUP AG",
+   "sector": "Financials",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "ENX.PA",
+   "raw_ticker": "ENX",
+   "name": "EURONEXT NV",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "IAG.L",
+   "raw_ticker": "IAG",
+   "name": "INTERNATIONAL AIRLINES GROUP SA",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CNA.L",
+   "raw_ticker": "CNA",
+   "name": "CENTRICA PLC",
+   "sector": "Versorger",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "DSFIR.AS",
+   "raw_ticker": "DSFIR",
+   "name": "DSM FIRMENICH AG",
+   "sector": "Materialien",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "LISP.SW",
+   "raw_ticker": "LISP",
+   "name": "CHOCOLADEFABRIKEN LINDT & SPRUENGL",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "URW.PA",
+   "raw_ticker": "URW",
+   "name": "UNIBAIL RODAMCO WE STAPLED UNITS",
+   "sector": "Immobilien",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "KNIN.SW",
+   "raw_ticker": "KNIN",
+   "name": "KUEHNE UND NAGEL INTERNATIONAL AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "KRZ.IR",
+   "raw_ticker": "KRZ",
+   "name": "KERRY GROUP PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Irish Stock Exchange - All Market"
+  },
+  {
+   "ticker": "CA.PA",
+   "raw_ticker": "CA",
+   "name": "CARREFOUR SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "CCH.L",
+   "raw_ticker": "CCH",
+   "name": "COCA COLA HBC AG",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "KGH.WA",
+   "raw_ticker": "KGH",
+   "name": "KGHM POLSKA MIEDZ SA",
+   "sector": "Materialien",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "AGS.BR",
+   "raw_ticker": "AGS",
+   "name": "AGEAS SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "DPLM.L",
+   "raw_ticker": "DPLM",
+   "name": "DIPLOMA PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "UU.L",
+   "raw_ticker": "UU.",
+   "name": "UNITED UTILITIES GROUP PLC",
+   "sector": "Versorger",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CARL-B.CO",
+   "raw_ticker": "CARL B",
+   "name": "CARLSBERG AS CL B",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "NESTE.HE",
+   "raw_ticker": "NESTE",
+   "name": "NESTE",
+   "sector": "Energie",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "WISE.L",
+   "raw_ticker": "WISE",
+   "name": "WISE PLC CLASS A",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "TELIA.ST",
+   "raw_ticker": "TELIA",
+   "name": "TELIA COMPANY",
+   "sector": "Kommunikation",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "PST.MI",
+   "raw_ticker": "PST",
+   "name": "POSTE ITALIANE",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "HEN3.DE",
+   "raw_ticker": "HEN3",
+   "name": "HENKEL & KGAA PREF AG",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "SY1.DE",
+   "raw_ticker": "SY1",
+   "name": "SYMRISE AG",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "PEO.WA",
+   "raw_ticker": "PEO",
+   "name": "BANK PEKAO SA",
+   "sector": "Financials",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "ADM.L",
+   "raw_ticker": "ADM",
+   "name": "ADMIRAL GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ORSTED.CO",
+   "raw_ticker": "ORSTED",
+   "name": "ORSTED A/S",
+   "sector": "Versorger",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "METSO.HE",
+   "raw_ticker": "METSO",
+   "name": "METSO CORPORATION",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "SOON.SW",
+   "raw_ticker": "SOON",
+   "name": "SONOVA HOLDING AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SMIN.L",
+   "raw_ticker": "SMIN",
+   "name": "SMITHS GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SGE.L",
+   "raw_ticker": "SGE",
+   "name": "THE SAGE GROUP PLC",
+   "sector": "IT",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BVI.PA",
+   "raw_ticker": "BVI",
+   "name": "BUREAU VERITAS SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SGRO.L",
+   "raw_ticker": "SGRO",
+   "name": "SEGRO REIT PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "FORTUM.HE",
+   "raw_ticker": "FORTUM",
+   "name": "FORTUM",
+   "sector": "Versorger",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "TEL2-B.ST",
+   "raw_ticker": "TEL2 B",
+   "name": "TELE2 B",
+   "sector": "Kommunikation",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "BKT.MC",
+   "raw_ticker": "BKT",
+   "name": "BANKINTER SA",
+   "sector": "Financials",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "SOBI.ST",
+   "raw_ticker": "SOBI",
+   "name": "SWEDISH ORPHAN BIOVITRUM",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "AC.PA",
+   "raw_ticker": "AC",
+   "name": "ACCOR SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SVT.L",
+   "raw_ticker": "SVT",
+   "name": "SEVERN TRENT PLC",
+   "sector": "Versorger",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "G1A.DE",
+   "raw_ticker": "G1A",
+   "name": "GEA GROUP AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ASRNL.AS",
+   "raw_ticker": "ASRNL",
+   "name": "ASR NEDERLAND NV",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "PZU.WA",
+   "raw_ticker": "PZU",
+   "name": "PZU SA",
+   "sector": "Financials",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "TEL.OL",
+   "raw_ticker": "TEL",
+   "name": "TELENOR",
+   "sector": "Kommunikation",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "AKZA.AS",
+   "raw_ticker": "AKZA",
+   "name": "AKZO NOBEL NV",
+   "sector": "Materialien",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "ITRK.L",
+   "raw_ticker": "ITRK",
+   "name": "INTERTEK GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BNZL.L",
+   "raw_ticker": "BNZL",
+   "name": "BUNZL",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "WEIR.L",
+   "raw_ticker": "WEIR",
+   "name": "WEIR GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BEZ.L",
+   "raw_ticker": "BEZ",
+   "name": "BEAZLEY PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "COLO-B.CO",
+   "raw_ticker": "COLO B",
+   "name": "COLOPLAST B",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "AKRBP.OL",
+   "raw_ticker": "AKRBP",
+   "name": "AKER BP",
+   "sector": "Energie",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "ACLN.SW",
+   "raw_ticker": "ACLN",
+   "name": "ACCELLERON N AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "IMI.L",
+   "raw_ticker": "IMI",
+   "name": "IMI PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AGN.AS",
+   "raw_ticker": "AGN",
+   "name": "AEGON LTD",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "UNI.MI",
+   "raw_ticker": "UNI",
+   "name": "UNIPOL ASSICURAZIONI SPA",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "MOWI.OL",
+   "raw_ticker": "MOWI",
+   "name": "MOWI",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "RXL.PA",
+   "raw_ticker": "RXL",
+   "name": "REXEL SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "MKS.L",
+   "raw_ticker": "MKS",
+   "name": "MARKS AND SPENCER GROUP PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HOT.DE",
+   "raw_ticker": "HOT",
+   "name": "HOCHTIEF AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "SKA-B.ST",
+   "raw_ticker": "SKA B",
+   "name": "SKANSKA B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "INDU-C.ST",
+   "raw_ticker": "INDU C",
+   "name": "INDUSTRIVARDEN SERIES",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "ADDT-B.ST",
+   "raw_ticker": "ADDT B",
+   "name": "ADDTECH CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "ORK.OL",
+   "raw_ticker": "ORK",
+   "name": "ORKLA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "GALP.LS",
+   "raw_ticker": "GALP",
+   "name": "GALP ENERGIA SGPS SA CLASS B",
+   "sector": "Energie",
+   "exchange": "Nyse Euronext - Euronext Lisbon"
+  },
+  {
+   "ticker": "BCP.LS",
+   "raw_ticker": "BCP",
+   "name": "BANCO COMERCIAL PORTUGUES SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Lisbon"
+  },
+  {
+   "ticker": "ERF.PA",
+   "raw_ticker": "ERF",
+   "name": "EUROFINS SCIENTIFIC",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SPIE.PA",
+   "raw_ticker": "SPIE",
+   "name": "SPIE SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "TEN.MI",
+   "raw_ticker": "TEN",
+   "name": "TENARIS SA",
+   "sector": "Energie",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "LI.PA",
+   "raw_ticker": "LI",
+   "name": "KLEPIERRE REIT SA",
+   "sector": "Immobilien",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "TIT.MI",
+   "raw_ticker": "TIT",
+   "name": "TELECOM ITALIA",
+   "sector": "Kommunikation",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "OMV.VI",
+   "raw_ticker": "OMV",
+   "name": "OMV AG",
+   "sector": "Energie",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "PSON.L",
+   "raw_ticker": "PSON",
+   "name": "PEARSON PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ORNBV.HE",
+   "raw_ticker": "ORNBV",
+   "name": "ORION CLASS B",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "EVO.ST",
+   "raw_ticker": "EVO",
+   "name": "EVOLUTION",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "MNG.L",
+   "raw_ticker": "MNG",
+   "name": "M&G PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HM-B.ST",
+   "raw_ticker": "HM B",
+   "name": "HENNES & MAURITZ",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "SECU-B.ST",
+   "raw_ticker": "SECU B",
+   "name": "SECURITAS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "SKF-B.ST",
+   "raw_ticker": "SKF B",
+   "name": "SKF B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "MRO.L",
+   "raw_ticker": "MRO",
+   "name": "MELROSE INDUSTRIES PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "YAR.OL",
+   "raw_ticker": "YAR",
+   "name": "YARA INTERNATIONAL",
+   "sector": "Materialien",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "PSPN.SW",
+   "raw_ticker": "PSPN",
+   "name": "PSP SWISS PROPERTY AG",
+   "sector": "Immobilien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "FME.DE",
+   "raw_ticker": "FME",
+   "name": "FRESENIUS MEDICAL CARE AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BEAN.SW",
+   "raw_ticker": "BEAN",
+   "name": "BELIMO N AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "STJ.L",
+   "raw_ticker": "STJ",
+   "name": "ST JAMESS PLACE PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CON.DE",
+   "raw_ticker": "CON",
+   "name": "CONTINENTAL AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "GAW.L",
+   "raw_ticker": "GAW",
+   "name": "GAMES WORKSHOP GROUP PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "FRES.L",
+   "raw_ticker": "FRES",
+   "name": "FRESNILLO PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BNR.DE",
+   "raw_ticker": "BNR",
+   "name": "BRENNTAG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "HEIO.AS",
+   "raw_ticker": "HEIO",
+   "name": "HEINEKEN HOLDING NV",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "QIA.DE",
+   "raw_ticker": "QIA",
+   "name": "QIAGEN NV",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "GTT.PA",
+   "raw_ticker": "GTT",
+   "name": "GAZTRANSPORT & TECHNIGAZ SA",
+   "sector": "Energie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SDLF.L",
+   "raw_ticker": "SDLF",
+   "name": "STANDARD LIFE PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BAB.L",
+   "raw_ticker": "BAB",
+   "name": "BABCOCK INTERNATIONAL GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "TLX.DE",
+   "raw_ticker": "TLX",
+   "name": "TALANX AG",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "LPP.WA",
+   "raw_ticker": "LPP",
+   "name": "LPP SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "TREL-B.ST",
+   "raw_ticker": "TREL B",
+   "name": "TRELLEBORG B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "SBRY.L",
+   "raw_ticker": "SBRY",
+   "name": "SAINSBURY(J) PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BEI.DE",
+   "raw_ticker": "BEI",
+   "name": "BEIERSDORF AG",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "NTGY.MC",
+   "raw_ticker": "NTGY",
+   "name": "NATURGY ENERGY GROUP SA",
+   "sector": "Versorger",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "MAERSK-B.CO",
+   "raw_ticker": "MAERSK B",
+   "name": "A P MOLLER MAERSK B",
+   "sector": "Industrie",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "AED.BR",
+   "raw_ticker": "AED",
+   "name": "AEDIFICA NV",
+   "sector": "Immobilien",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "NKT.CO",
+   "raw_ticker": "NKT",
+   "name": "NKT",
+   "sector": "Industrie",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "ABVX.PA",
+   "raw_ticker": "ABVX",
+   "name": "ABIVAX SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "IGG.L",
+   "raw_ticker": "IGG",
+   "name": "IG GROUP HOLDINGS PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "GBLB.BR",
+   "raw_ticker": "GBLB",
+   "name": "GROUPE BRUXELLES LAMBERT NV",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "ELI.BR",
+   "raw_ticker": "ELI",
+   "name": "ELIA GROUP SA",
+   "sector": "Versorger",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "KBX.DE",
+   "raw_ticker": "KBX",
+   "name": "KNORR BREMSE AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "LTMC.MI",
+   "raw_ticker": "LTMC",
+   "name": "LOTTOMATICA GROUP",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "TRYG.CO",
+   "raw_ticker": "TRYG",
+   "name": "TRYG",
+   "sector": "Financials",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "IG.MI",
+   "raw_ticker": "IG",
+   "name": "ITALGAS",
+   "sector": "Versorger",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "LIFCO-B.ST",
+   "raw_ticker": "LIFCO B",
+   "name": "LIFCO CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "SPL.WA",
+   "raw_ticker": "SPL",
+   "name": "SANTANDER BANK POLSKA SA",
+   "sector": "Financials",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "STB.OL",
+   "raw_ticker": "STB",
+   "name": "STOREBRAND",
+   "sector": "Financials",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "SUBC.OL",
+   "raw_ticker": "SUBC",
+   "name": "SUBSEA SA",
+   "sector": "Energie",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "EXO.AS",
+   "raw_ticker": "EXO",
+   "name": "EXOR NV",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "HSX.L",
+   "raw_ticker": "HSX",
+   "name": "HISCOX LTD",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "RNO.PA",
+   "raw_ticker": "RNO",
+   "name": "RENAULT SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "ELISA.HE",
+   "raw_ticker": "ELISA",
+   "name": "ELISA",
+   "sector": "Kommunikation",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "ALE.WA",
+   "raw_ticker": "ALE",
+   "name": "ALLEGRO SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "ABF.L",
+   "raw_ticker": "ABF",
+   "name": "ASSOCIATED BRITISH FOODS PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "KGF.L",
+   "raw_ticker": "KGF",
+   "name": "KINGFISHER PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "KCR.HE",
+   "raw_ticker": "KCR",
+   "name": "KONECRANES",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "STERV.HE",
+   "raw_ticker": "STERV",
+   "name": "STORA ENSO CLASS R",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "SDR.L",
+   "raw_ticker": "SDR",
+   "name": "SCHRODERS PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "MICC.AS",
+   "raw_ticker": "MICC",
+   "name": "MAGNUM ICE CREAM NV",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "ALO.PA",
+   "raw_ticker": "ALO",
+   "name": "ALSTOM SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "INDT.ST",
+   "raw_ticker": "INDT",
+   "name": "INDUTRADE",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "AM.PA",
+   "raw_ticker": "AM",
+   "name": "DASSAULT AVIATION SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "UHR.SW",
+   "raw_ticker": "UHR",
+   "name": "THE SWATCH GROUP AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "ICG.L",
+   "raw_ticker": "ICG",
+   "name": "ICG PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AVOL.SW",
+   "raw_ticker": "AVOL",
+   "name": "AVOLTA AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "IPN.PA",
+   "raw_ticker": "IPN",
+   "name": "IPSEN SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "JMT.LS",
+   "raw_ticker": "JMT",
+   "name": "JERONIMO MARTINS SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Lisbon"
+  },
+  {
+   "ticker": "DCC.L",
+   "raw_ticker": "DCC",
+   "name": "DCC PLC",
+   "sector": "Energie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SQN.SW",
+   "raw_ticker": "SQN",
+   "name": "SWISSQUOTE GROUP HOLDING SA",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SPX.L",
+   "raw_ticker": "SPX",
+   "name": "SPIRAX GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SRT3.DE",
+   "raw_ticker": "SRT3",
+   "name": "SARTORIUS PREF AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ANA.MC",
+   "raw_ticker": "ANA",
+   "name": "ACCIONA SA",
+   "sector": "Versorger",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "GET.PA",
+   "raw_ticker": "GET",
+   "name": "GETLINK",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "ACKB.BR",
+   "raw_ticker": "ACKB",
+   "name": "ACKERMANS & VAN HAAREN NV",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "NIBE-B.ST",
+   "raw_ticker": "NIBE B",
+   "name": "NIBE INDUSTRIER CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "KESKOB.HE",
+   "raw_ticker": "KESKOB",
+   "name": "KESKO CLASS B",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "MRL.MC",
+   "raw_ticker": "MRL",
+   "name": "MERLIN PROPERTIES REIT SA",
+   "sector": "Immobilien",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "ZAL.DE",
+   "raw_ticker": "ZAL",
+   "name": "ZALANDO",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BBY.L",
+   "raw_ticker": "BBY",
+   "name": "BALFOUR BEATTY PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "RILBA.CO",
+   "raw_ticker": "RILBA",
+   "name": "RINGKJOBING LANDBOBANK",
+   "sector": "Financials",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "BEIJ-B.ST",
+   "raw_ticker": "BEIJ B",
+   "name": "BEIJER REF CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "NEX.PA",
+   "raw_ticker": "NEX",
+   "name": "NEXANS SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SAVE.ST",
+   "raw_ticker": "SAVE",
+   "name": "NORDNET",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "REC.MI",
+   "raw_ticker": "REC",
+   "name": "RECORDATI INDUSTRIA CHIMICA E FARM",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "IMCD.AS",
+   "raw_ticker": "IMCD",
+   "name": "IMCD NV",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "RBI.VI",
+   "raw_ticker": "RBI",
+   "name": "RAIFFEISEN BANK INTERNATIONAL AG",
+   "sector": "Financials",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "PAH3.DE",
+   "raw_ticker": "PAH3",
+   "name": "PORSCHE AUTOMOBIL HOLDING PREF",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "G24.DE",
+   "raw_ticker": "G24",
+   "name": "SCOUT24 N",
+   "sector": "Kommunikation",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "NDX1.DE",
+   "raw_ticker": "NDX1",
+   "name": "NORDEX",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "SCA-B.ST",
+   "raw_ticker": "SCA B",
+   "name": "SVENSKA CELLULOSA B",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "SPM.MI",
+   "raw_ticker": "SPM",
+   "name": "SAIPEM",
+   "sector": "Energie",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "CTEC.L",
+   "raw_ticker": "CTEC",
+   "name": "CONVATEC GROUP PLC",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ALSYDB.CO",
+   "raw_ticker": "ALSYDB",
+   "name": "AL SYDBANK",
+   "sector": "Financials",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "DIM.PA",
+   "raw_ticker": "DIM",
+   "name": "SARTORIUS STEDIM BIOTECH SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "LAND.L",
+   "raw_ticker": "LAND",
+   "name": "LAND SECURITIES GROUP REIT PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "FHZN.SW",
+   "raw_ticker": "FHZN",
+   "name": "FLUGHAFEN ZUERICH AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "HWDN.L",
+   "raw_ticker": "HWDN",
+   "name": "HOWDEN JOINERY GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "JYSK.CO",
+   "raw_ticker": "JYSK",
+   "name": "JYSKE BANK",
+   "sector": "Financials",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "TE.PA",
+   "raw_ticker": "TE",
+   "name": "TECHNIP ENERGIES NV",
+   "sector": "Energie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "SCR.PA",
+   "raw_ticker": "SCR",
+   "name": "SCOR",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "ISS.CO",
+   "raw_ticker": "ISS",
+   "name": "ISS A S",
+   "sector": "Industrie",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "LEG.DE",
+   "raw_ticker": "LEG",
+   "name": "LEG IMMOBILIEN N",
+   "sector": "Immobilien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "NDA.DE",
+   "raw_ticker": "NDA",
+   "name": "AURUBIS AG",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "GALE.SW",
+   "raw_ticker": "GALE",
+   "name": "GALENICA AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "PNDORA.CO",
+   "raw_ticker": "PNDORA",
+   "name": "PANDORA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "AUTO.L",
+   "raw_ticker": "AUTO",
+   "name": "AUTOTRADER GROUP PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CAST.ST",
+   "raw_ticker": "CAST",
+   "name": "CASTELLUM",
+   "sector": "Immobilien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "EDEN.PA",
+   "raw_ticker": "EDEN",
+   "name": "EDENRED",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "EMSN.SW",
+   "raw_ticker": "EMSN",
+   "name": "EMS-CHEMIE HOLDING AG",
+   "sector": "Materialien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "WTB.L",
+   "raw_ticker": "WTB",
+   "name": "WHITBREAD PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AIXA.DE",
+   "raw_ticker": "AIXA",
+   "name": "AIXTRON",
+   "sector": "IT",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "SSAB-B.ST",
+   "raw_ticker": "SSAB B",
+   "name": "SSAB CLASS B",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "BRBY.L",
+   "raw_ticker": "BRBY",
+   "name": "BURBERRY GROUP PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "LHA.DE",
+   "raw_ticker": "LHA",
+   "name": "DEUTSCHE LUFTHANSA AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "HAG.DE",
+   "raw_ticker": "HAG",
+   "name": "HENSOLDT AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "VOE.VI",
+   "raw_ticker": "VOE",
+   "name": "VOESTALPINE AG",
+   "sector": "Materialien",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "AMUN.PA",
+   "raw_ticker": "AMUN",
+   "name": "AMUNDI SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "IDR.MC",
+   "raw_ticker": "IDR",
+   "name": "INDRA SISTEMAS SA",
+   "sector": "IT",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "AZA.ST",
+   "raw_ticker": "AZA",
+   "name": "AVANZA BANK HOLDING",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "GJF.OL",
+   "raw_ticker": "GJF",
+   "name": "GJENSIDIGE FORSIKRING",
+   "sector": "Financials",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "BLND.L",
+   "raw_ticker": "BLND",
+   "name": "BRITISH LAND REIT PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BGEO.L",
+   "raw_ticker": "BGEO",
+   "name": "LION FINANCE GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ELIS.PA",
+   "raw_ticker": "ELIS",
+   "name": "ELIS SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "R3NK.DE",
+   "raw_ticker": "R3NK",
+   "name": "RENK GROUP AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "WDP.BR",
+   "raw_ticker": "WDP",
+   "name": "WAREHOUSES DE PAUW NV",
+   "sector": "Immobilien",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "SBMO.AS",
+   "raw_ticker": "SBMO",
+   "name": "SBM OFFSHORE NV",
+   "sector": "Energie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "SB1NO.OL",
+   "raw_ticker": "SB1NO",
+   "name": "SPAREBANK SR-NORGE",
+   "sector": "Financials",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "P911.DE",
+   "raw_ticker": "P911",
+   "name": "DR ING HC F PORSCHE PRF AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "TUB.BR",
+   "raw_ticker": "TUB",
+   "name": "FINANCIERE DE TUBIZE SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "DIE.BR",
+   "raw_ticker": "DIE",
+   "name": "DIETEREN (D) SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "TEMN.SW",
+   "raw_ticker": "TEMN",
+   "name": "TEMENOS AG",
+   "sector": "IT",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "AKE.PA",
+   "raw_ticker": "AKE",
+   "name": "ARKEMA SA",
+   "sector": "Materialien",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "CRDA.L",
+   "raw_ticker": "CRDA",
+   "name": "CRODA INTERNATIONAL PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "DHER.DE",
+   "raw_ticker": "DHER",
+   "name": "DELIVERY HERO",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "RED.MC",
+   "raw_ticker": "RED",
+   "name": "REDEIA CORPORACION SA",
+   "sector": "Versorger",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "TKA.DE",
+   "raw_ticker": "TKA",
+   "name": "THYSSENKRUPP AG",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BTRW.L",
+   "raw_ticker": "BTRW",
+   "name": "BARRATT REDROW PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CDR.WA",
+   "raw_ticker": "CDR",
+   "name": "CD PROJEKT SA",
+   "sector": "Kommunikation",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "ANDR.VI",
+   "raw_ticker": "ANDR",
+   "name": "ANDRITZ AG",
+   "sector": "Industrie",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "BIM.PA",
+   "raw_ticker": "BIM",
+   "name": "BIOMERIEUX SA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "LMP.L",
+   "raw_ticker": "LMP",
+   "name": "LONDONMETRIC PROPERTY REIT PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "PSN.L",
+   "raw_ticker": "PSN",
+   "name": "PERSIMMON PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ENT.L",
+   "raw_ticker": "ENT",
+   "name": "ENTAIN PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "NEM.DE",
+   "raw_ticker": "NEM",
+   "name": "NEMETSCHEK",
+   "sector": "IT",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ABDN.L",
+   "raw_ticker": "ABDN",
+   "name": "ABERDEEN GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AAK.ST",
+   "raw_ticker": "AAK",
+   "name": "AAK",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "VER.VI",
+   "raw_ticker": "VER",
+   "name": "VERBUND AG",
+   "sector": "Versorger",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "LAGR-B.ST",
+   "raw_ticker": "LAGR B",
+   "name": "LAGERCRANTZ GROUP CLASS B",
+   "sector": "IT",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "FRO.OL",
+   "raw_ticker": "FRO",
+   "name": "FRONTLINE PLC",
+   "sector": "Energie",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "BARN.SW",
+   "raw_ticker": "BARN",
+   "name": "BARRY CALLEBAUT AG",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "LOTB.BR",
+   "raw_ticker": "LOTB",
+   "name": "LOTUS BAKERIES NV",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "LUND-B.ST",
+   "raw_ticker": "LUND B",
+   "name": "LUNDBERGFORETAGEN CLASS B",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "EDPR.LS",
+   "raw_ticker": "EDPR",
+   "name": "EDP RENOVAVEIS SA",
+   "sector": "Versorger",
+   "exchange": "Nyse Euronext - Euronext Lisbon"
+  },
+  {
+   "ticker": "BZU.MI",
+   "raw_ticker": "BZU",
+   "name": "BUZZI",
+   "sector": "Materialien",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "AYV.PA",
+   "raw_ticker": "AYV",
+   "name": "AYVENS SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "ALLN.SW",
+   "raw_ticker": "ALLN",
+   "name": "ALLREAL HOLDING AG",
+   "sector": "Immobilien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "EVK.DE",
+   "raw_ticker": "EVK",
+   "name": "EVONIK INDUSTRIES AG",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BMED.MI",
+   "raw_ticker": "BMED",
+   "name": "BANCA MEDIOLANUM",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "RMV.L",
+   "raw_ticker": "RMV",
+   "name": "RIGHTMOVE PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BCVN.SW",
+   "raw_ticker": "BCVN",
+   "name": "BC VAUD N",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "GETI-B.ST",
+   "raw_ticker": "GETI B",
+   "name": "GETINGE B",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "VEND.OL",
+   "raw_ticker": "VEND",
+   "name": "VEND MARKETPLACES ASA",
+   "sector": "Kommunikation",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "SYENS.BR",
+   "raw_ticker": "SYENS",
+   "name": "SYENSQO NV",
+   "sector": "Materialien",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "BKG.L",
+   "raw_ticker": "BKG",
+   "name": "BERKELEY GROUP HOLDINGS (THE) PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HUBN.SW",
+   "raw_ticker": "HUBN",
+   "name": "HUBER & SUHNER AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "GFC.PA",
+   "raw_ticker": "GFC",
+   "name": "GECINA SA",
+   "sector": "Immobilien",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "INVP.L",
+   "raw_ticker": "INVP",
+   "name": "INVESTEC PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "A2A.MI",
+   "raw_ticker": "A2A",
+   "name": "A2A",
+   "sector": "Versorger",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "ZEG.L",
+   "raw_ticker": "ZEG",
+   "name": "ZEGONA COMMUNICATIONS PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "JMAT.L",
+   "raw_ticker": "JMAT",
+   "name": "JOHNSON MATTHEY PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AZM.MI",
+   "raw_ticker": "AZM",
+   "name": "AZIMUT HOLDING",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "DNP.WA",
+   "raw_ticker": "DNP",
+   "name": "DINO POLSKA SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "SAGA-B.ST",
+   "raw_ticker": "SAGA B",
+   "name": "SAGAX CLASS B",
+   "sector": "Immobilien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "MAP.MC",
+   "raw_ticker": "MAP",
+   "name": "MAPFRE SA",
+   "sector": "Financials",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "INPST.AS",
+   "raw_ticker": "INPST",
+   "name": "INPOST SA",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "SOF.BR",
+   "raw_ticker": "SOF",
+   "name": "SOFINA SA",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "ALK-B.CO",
+   "raw_ticker": "ALK B",
+   "name": "ALK-ABELLO CLASS B",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "PLUS.L",
+   "raw_ticker": "PLUS",
+   "name": "PLUS500 LTD",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ENG.MC",
+   "raw_ticker": "ENG",
+   "name": "ENAGAS SA",
+   "sector": "Versorger",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "VALMT.HE",
+   "raw_ticker": "VALMT",
+   "name": "VALMET CORP",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "SALM.OL",
+   "raw_ticker": "SALM",
+   "name": "SALMAR",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "BBOX.L",
+   "raw_ticker": "BBOX",
+   "name": "TRITAX BIG BOX REIT PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BALD-B.ST",
+   "raw_ticker": "BALD B",
+   "name": "FASTIGHETS BALDER CLASS B",
+   "sector": "Immobilien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "SRP.L",
+   "raw_ticker": "SRP",
+   "name": "SERCO GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "CPR.MI",
+   "raw_ticker": "CPR",
+   "name": "DAVIDE CAMPARI MILANO NV",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "INCH.L",
+   "raw_ticker": "INCH",
+   "name": "INCHCAPE PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "VK.PA",
+   "raw_ticker": "VK",
+   "name": "VALLOUREC SA",
+   "sector": "Energie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "MNDI.L",
+   "raw_ticker": "MNDI",
+   "name": "MONDI PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SECT-B.ST",
+   "raw_ticker": "SECT B",
+   "name": "SECTRA CLASS B",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "MYCR.ST",
+   "raw_ticker": "MYCR",
+   "name": "MYCRONIC",
+   "sector": "IT",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "RAA.DE",
+   "raw_ticker": "RAA",
+   "name": "RATIONAL AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "UMI.BR",
+   "raw_ticker": "UMI",
+   "name": "UMICORE SA",
+   "sector": "Materialien",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "SIGN.SW",
+   "raw_ticker": "SIGN",
+   "name": "SIG GROUP N AG",
+   "sector": "Materialien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "EMG.L",
+   "raw_ticker": "EMG",
+   "name": "MAN GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BOL.PA",
+   "raw_ticker": "BOL",
+   "name": "BOLLORE",
+   "sector": "Energie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "DRX.L",
+   "raw_ticker": "DRX",
+   "name": "DRAX GROUP PLC",
+   "sector": "Versorger",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "KGX.DE",
+   "raw_ticker": "KGX",
+   "name": "KION GROUP AG",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "VAR.OL",
+   "raw_ticker": "VAR",
+   "name": "VAR ENERGI",
+   "sector": "Energie",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "BKW.SW",
+   "raw_ticker": "BKW",
+   "name": "BKW N AG",
+   "sector": "Versorger",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SW.PA",
+   "raw_ticker": "SW",
+   "name": "SODEXO SA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "ITV.L",
+   "raw_ticker": "ITV",
+   "name": "ITV PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HER.MI",
+   "raw_ticker": "HER",
+   "name": "HERA",
+   "sector": "Versorger",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "VSURE.ST",
+   "raw_ticker": "VSURE",
+   "name": "VERISURE PLC",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "FNTN.DE",
+   "raw_ticker": "FNTN",
+   "name": "FREENET AG",
+   "sector": "Kommunikation",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "EVD.DE",
+   "raw_ticker": "EVD",
+   "name": "CTS EVENTIM AG",
+   "sector": "Kommunikation",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "GF.SW",
+   "raw_ticker": "GF",
+   "name": "GEORG FISCHER AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "SFZN.SW",
+   "raw_ticker": "SFZN",
+   "name": "SIEGFRIED HOLDING AG",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "TW.L",
+   "raw_ticker": "TW.",
+   "name": "TAYLOR WIMPEY PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "GBF.DE",
+   "raw_ticker": "GBF",
+   "name": "BILFINGER",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "MBK.WA",
+   "raw_ticker": "MBK",
+   "name": "MBANK SA",
+   "sector": "Financials",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "ADEN.SW",
+   "raw_ticker": "ADEN",
+   "name": "ADECCO GROUP AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "CVC.AS",
+   "raw_ticker": "CVC",
+   "name": "CVC CAPITAL PARTNERS PLC",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "RBREW.CO",
+   "raw_ticker": "RBREW",
+   "name": "ROYAL UNIBREW",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "IP.MI",
+   "raw_ticker": "IP",
+   "name": "INTERPUMP GROUP",
+   "sector": "Industrie",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "UNI.MC",
+   "raw_ticker": "UNI",
+   "name": "UNICAJA BANCO SA",
+   "sector": "Financials",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "CCL.L",
+   "raw_ticker": "CCL",
+   "name": "CARNIVAL PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "MANTA.HE",
+   "raw_ticker": "MANTA",
+   "name": "MANDATUM",
+   "sector": "Financials",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "CSG.AS",
+   "raw_ticker": "CSG",
+   "name": "CSG CLASS A NV",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "SUNN.SW",
+   "raw_ticker": "SUNN",
+   "name": "SUNRISE N CLASS A LTD",
+   "sector": "Kommunikation",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "PNN.L",
+   "raw_ticker": "PNN",
+   "name": "PENNON GROUP PLC",
+   "sector": "Versorger",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BGN.MI",
+   "raw_ticker": "BGN",
+   "name": "BANCA GENERALI",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "TEG.DE",
+   "raw_ticker": "TEG",
+   "name": "TAG IMMOBILIEN AG",
+   "sector": "Immobilien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "TUI1.DE",
+   "raw_ticker": "TUI1",
+   "name": "TUI N AG",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "FTK.DE",
+   "raw_ticker": "FTK",
+   "name": "FLATEXDEGIRO N",
+   "sector": "Financials",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "TOM.OL",
+   "raw_ticker": "TOM",
+   "name": "TOMRA SYSTEMS",
+   "sector": "Industrie",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "WPP.L",
+   "raw_ticker": "WPP",
+   "name": "WPP PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "GL9.IR",
+   "raw_ticker": "GL9",
+   "name": "GLANBIA PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Irish Stock Exchange - All Market"
+  },
+  {
+   "ticker": "CWK.L",
+   "raw_ticker": "CWK",
+   "name": "CRANSWICK PLC",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BC.MI",
+   "raw_ticker": "BC",
+   "name": "BRUNELLO CUCINELLI",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "CMBN.SW",
+   "raw_ticker": "CMBN",
+   "name": "CEMBRA MONEY BANK AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "COV.PA",
+   "raw_ticker": "COV",
+   "name": "COVIVIO SA",
+   "sector": "Immobilien",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "LATO-B.ST",
+   "raw_ticker": "LATO B",
+   "name": "LATOUR INVESTMENT CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "RS1.L",
+   "raw_ticker": "RS1",
+   "name": "RS GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "FDJU.PA",
+   "raw_ticker": "FDJU",
+   "name": "FDJ UNITED",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "TPRO.MI",
+   "raw_ticker": "TPRO",
+   "name": "TECHNOPROBE SPA",
+   "sector": "IT",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "SWEC-B.ST",
+   "raw_ticker": "SWEC B",
+   "name": "SWECO CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "ROR.L",
+   "raw_ticker": "ROR",
+   "name": "ROTORK PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AALB.AS",
+   "raw_ticker": "AALB",
+   "name": "AALBERTS NV",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "ADP.PA",
+   "raw_ticker": "ADP",
+   "name": "AEROPORTS DE PARIS SA",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "TEP.PA",
+   "raw_ticker": "TEP",
+   "name": "TELEPERFORMANCE",
+   "sector": "Industrie",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "MOBN.SW",
+   "raw_ticker": "MOBN",
+   "name": "MOBIMO HOLDING AG",
+   "sector": "Immobilien",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "KBCA.BR",
+   "raw_ticker": "KBCA",
+   "name": "KBC ANCORA NV",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "RUI.PA",
+   "raw_ticker": "RUI",
+   "name": "RUBIS",
+   "sector": "Versorger",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "AXFO.ST",
+   "raw_ticker": "AXFO",
+   "name": "AXFOOD",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "PAF.L",
+   "raw_ticker": "PAF",
+   "name": "PAN AFRICAN RESOURCES PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AAF.L",
+   "raw_ticker": "AAF",
+   "name": "AIRTEL AFRICA PLC",
+   "sector": "Kommunikation",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "QQ.L",
+   "raw_ticker": "QQ.",
+   "name": "QINETIQ GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "HUH1V.HE",
+   "raw_ticker": "HUH1V",
+   "name": "HUHTAMAKI",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "SUN.SW",
+   "raw_ticker": "SUN",
+   "name": "SULZER AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "GRF.MC",
+   "raw_ticker": "GRF",
+   "name": "GRIFOLS SA CLASS A",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "LOOMIS.ST",
+   "raw_ticker": "LOOMIS",
+   "name": "LOOMIS CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "NOD.OL",
+   "raw_ticker": "NOD",
+   "name": "NORDIC SEMICONDUCTOR",
+   "sector": "IT",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "TCAP.L",
+   "raw_ticker": "TCAP",
+   "name": "TP ICAP GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "FLS.CO",
+   "raw_ticker": "FLS",
+   "name": "FLSMIDTH AND CO CLASS B",
+   "sector": "Industrie",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "DEMANT.CO",
+   "raw_ticker": "DEMANT",
+   "name": "DEMANT",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "PUM.DE",
+   "raw_ticker": "PUM",
+   "name": "PUMA",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "TBCG.L",
+   "raw_ticker": "TBCG",
+   "name": "TBC BANK GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "ACP.WA",
+   "raw_ticker": "ACP",
+   "name": "ASSECO POLAND SA",
+   "sector": "IT",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "BFT.WA",
+   "raw_ticker": "BFT",
+   "name": "BENEFIT SYSTEMS SA",
+   "sector": "Industrie",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "ZAB.WA",
+   "raw_ticker": "ZAB",
+   "name": "ZABKA GROUP SOCIETE ANONYME SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "BC8.DE",
+   "raw_ticker": "BC8",
+   "name": "BECHTLE AG",
+   "sector": "IT",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "ING.WA",
+   "raw_ticker": "ING",
+   "name": "ING BANK SLASKI SA",
+   "sector": "Financials",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "IVG.MI",
+   "raw_ticker": "IVG",
+   "name": "IVECO GROUP NV",
+   "sector": "Industrie",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "ZEAL.CO",
+   "raw_ticker": "ZEAL",
+   "name": "ZEALAND PHARMA",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "HOLM-B.ST",
+   "raw_ticker": "HOLM B",
+   "name": "HOLMEN CLASS B",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "VIS.MC",
+   "raw_ticker": "VIS",
+   "name": "VISCOFAN SA",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "VZN.SW",
+   "raw_ticker": "VZN",
+   "name": "VZ HOLDING AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "UTG.L",
+   "raw_ticker": "UTG",
+   "name": "UNITE GROUP PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "LIGHT.AS",
+   "raw_ticker": "LIGHT",
+   "name": "SIGNIFY NV",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "WIE.VI",
+   "raw_ticker": "WIE",
+   "name": "WIENERBERGER AG",
+   "sector": "Materialien",
+   "exchange": "Wiener Boerse Ag"
+  },
+  {
+   "ticker": "FRA.DE",
+   "raw_ticker": "FRA",
+   "name": "FRAPORT FRANKFURT AIRPORT SERVICES",
+   "sector": "Industrie",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "AG1.DE",
+   "raw_ticker": "AG1",
+   "name": "AUTO1 GROUP",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BWY.L",
+   "raw_ticker": "BWY",
+   "name": "BELLWAY PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "TPE.WA",
+   "raw_ticker": "TPE",
+   "name": "TAURON POLSKA ENERGIA SA",
+   "sector": "Versorger",
+   "exchange": "Warsaw Stock Exchange/Equities/Main Market"
+  },
+  {
+   "ticker": "VATN.SW",
+   "raw_ticker": "VATN",
+   "name": "VALIANT HOLDING AG",
+   "sector": "Financials",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "RAND.AS",
+   "raw_ticker": "RAND",
+   "name": "RANDSTAD HOLDING",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "ALLFG.AS",
+   "raw_ticker": "ALLFG",
+   "name": "ALLFUNDS GROUP PLC",
+   "sector": "Financials",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "NEXI.MI",
+   "raw_ticker": "NEXI",
+   "name": "NEXI",
+   "sector": "Financials",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "THULE.ST",
+   "raw_ticker": "THULE",
+   "name": "THULE GROUP",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "ARCAD.AS",
+   "raw_ticker": "ARCAD",
+   "name": "ARCADIS NV",
+   "sector": "Industrie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "ROCK-B.CO",
+   "raw_ticker": "ROCK B",
+   "name": "ROCKWOOL CLASS B",
+   "sector": "Industrie",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "FPE3.DE",
+   "raw_ticker": "FPE3",
+   "name": "FUCHS PREF",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "HIK.L",
+   "raw_ticker": "HIK",
+   "name": "HIKMA PHARMACEUTICALS PLC",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "FR.PA",
+   "raw_ticker": "FR",
+   "name": "VALEO",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "PHP.L",
+   "raw_ticker": "PHP",
+   "name": "PRIMARY HEALTH PROPERTIES REIT PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SHC.L",
+   "raw_ticker": "SHC",
+   "name": "SHAFTESBURY CAPITAL PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "VPK.AS",
+   "raw_ticker": "VPK",
+   "name": "KONINKLIJKE VOPAK NV",
+   "sector": "Energie",
+   "exchange": "Euronext Amsterdam"
+  },
+  {
+   "ticker": "MTO.L",
+   "raw_ticker": "MTO",
+   "name": "MITIE GROUP PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "SDF.DE",
+   "raw_ticker": "SDF",
+   "name": "K+S N AG",
+   "sector": "Materialien",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "HOC.L",
+   "raw_ticker": "HOC",
+   "name": "HOCHSCHILD MINING PLC",
+   "sector": "Materialien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "QLT.L",
+   "raw_ticker": "QLT",
+   "name": "QUILTER PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "PUIG.MC",
+   "raw_ticker": "PUIG",
+   "name": "PUIG BRANDS SA CLASS B",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "PIRC.MI",
+   "raw_ticker": "PIRC",
+   "name": "PIRELLI & C",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "SFSN.SW",
+   "raw_ticker": "SFSN",
+   "name": "SFS GROUP AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "KEMIRA.HE",
+   "raw_ticker": "KEMIRA",
+   "name": "KEMIRA",
+   "sector": "Materialien",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "INW.MI",
+   "raw_ticker": "INW",
+   "name": "INFRASTRUTTURE WIRELESS ITALIANE",
+   "sector": "Kommunikation",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "DLG.MI",
+   "raw_ticker": "DLG",
+   "name": "DELONGHI",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "REY.MI",
+   "raw_ticker": "REY",
+   "name": "REPLY",
+   "sector": "IT",
+   "exchange": "Borsa Italiana"
+  },
+  {
+   "ticker": "SCYR.MC",
+   "raw_ticker": "SCYR",
+   "name": "SACYR SA",
+   "sector": "Industrie",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "MF.PA",
+   "raw_ticker": "MF",
+   "name": "WENDEL",
+   "sector": "Financials",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "JD.L",
+   "raw_ticker": "JD.",
+   "name": "JD SPORTS FASHION PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "VID.MC",
+   "raw_ticker": "VID",
+   "name": "VIDRALA SA",
+   "sector": "Materialien",
+   "exchange": "Bolsa De Madrid"
+  },
+  {
+   "ticker": "BYG.L",
+   "raw_ticker": "BYG",
+   "name": "BIG YELLOW GROUP PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "BPT.L",
+   "raw_ticker": "BPT",
+   "name": "BRIDGEPOINT GROUP PLC",
+   "sector": "Financials",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "DKSH.SW",
+   "raw_ticker": "DKSH",
+   "name": "DKSH HOLDING AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "BUCN.SW",
+   "raw_ticker": "BUCN",
+   "name": "BUCHER INDUSTRIES AG",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  },
+  {
+   "ticker": "CAMX.ST",
+   "raw_ticker": "CAMX",
+   "name": "CAMURUS",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "WIHL.ST",
+   "raw_ticker": "WIHL",
+   "name": "WIHLBORGS FASTIGHETER",
+   "sector": "Immobilien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "BAVA.CO",
+   "raw_ticker": "BAVA",
+   "name": "BAVARIAN NORDIC",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "AMV0.DE",
+   "raw_ticker": "AMV0",
+   "name": "AUMOVIO N",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Xetra"
+  },
+  {
+   "ticker": "BME.L",
+   "raw_ticker": "BME",
+   "name": "B&M EUROPEAN VALUE RETAIL PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "AMBU-B.CO",
+   "raw_ticker": "AMBU B",
+   "name": "AMBU CLASS B",
+   "sector": "Gesundheitsversorgung",
+   "exchange": "Omx Nordic Exchange Copenhagen A/S"
+  },
+  {
+   "ticker": "DLN.L",
+   "raw_ticker": "DLN",
+   "name": "DERWENT LONDON REIT PLC",
+   "sector": "Immobilien",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "WALL-B.ST",
+   "raw_ticker": "WALL B",
+   "name": "WALLENSTAM CLASS B",
+   "sector": "Immobilien",
+   "exchange": "Nasdaq Omx Nordic"
+  },
+  {
+   "ticker": "CDI.PA",
+   "raw_ticker": "CDI",
+   "name": "CHRISTIAN DIOR",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "BAKKA.OL",
+   "raw_ticker": "BAKKA",
+   "name": "BAKKAFROST",
+   "sector": "Nichtzyklische Konsumgüter",
+   "exchange": "Oslo Bors Asa"
+  },
+  {
+   "ticker": "SOP.PA",
+   "raw_ticker": "SOP",
+   "name": "SOPRA STERIA GROUP",
+   "sector": "IT",
+   "exchange": "Nyse Euronext - Euronext Paris"
+  },
+  {
+   "ticker": "HIAB.HE",
+   "raw_ticker": "HIAB",
+   "name": "HIAB CORPORATION CLASS B",
+   "sector": "Industrie",
+   "exchange": "Nasdaq Omx Helsinki Ltd."
+  },
+  {
+   "ticker": "EZJ.L",
+   "raw_ticker": "EZJ",
+   "name": "EASYJET PLC",
+   "sector": "Industrie",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "VTY.L",
+   "raw_ticker": "VTY",
+   "name": "VISTRY GROUP PLC",
+   "sector": "Zyklische Konsumgüter",
+   "exchange": "London Stock Exchange"
+  },
+  {
+   "ticker": "COFB.BR",
+   "raw_ticker": "COFB",
+   "name": "COFINIMMO REIT SA",
+   "sector": "Immobilien",
+   "exchange": "Nyse Euronext - Euronext Brussels"
+  },
+  {
+   "ticker": "SGSN.SW",
+   "raw_ticker": "SGSN",
+   "name": "SGS SA COUPON",
+   "sector": "Industrie",
+   "exchange": "SIX Swiss Exchange"
+  }
+ ]
+}

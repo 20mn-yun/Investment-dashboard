@@ -1,0 +1,1357 @@
+{
+ "last_updated": "2026-04-22T13:02:12.079198+09:00",
+ "source": "Wikipedia Nikkei 225",
+ "universe": "Nikkei 225",
+ "tickers": [
+  {
+   "ticker": "6857.T",
+   "code": "6857",
+   "name": "Advantest Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "8267.T",
+   "code": "8267",
+   "name": "Aeon Co., Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "5201.T",
+   "code": "5201",
+   "name": "Agc Inc.",
+   "sector": "Glass & Ceramics"
+  },
+  {
+   "ticker": "2802.T",
+   "code": "2802",
+   "name": "Ajinomoto Co., Inc.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "6770.T",
+   "code": "6770",
+   "name": "Alps Alpine Co., Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "6113.T",
+   "code": "6113",
+   "name": "Amada Co., Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "9202.T",
+   "code": "9202",
+   "name": "Ana Holdings Inc.",
+   "sector": "Air Transport"
+  },
+  {
+   "ticker": "8304.T",
+   "code": "8304",
+   "name": "Aozora Bank, Ltd.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "2502.T",
+   "code": "2502",
+   "name": "Asahi Group Holdings, Ltd.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "3407.T",
+   "code": "3407",
+   "name": "Asahi Kasei Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "4503.T",
+   "code": "4503",
+   "name": "Astellas Pharma Inc.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "7832.T",
+   "code": "7832",
+   "name": "Bandai Namco Holdings Inc.",
+   "sector": "Other Manufacturing"
+  },
+  {
+   "ticker": "5108.T",
+   "code": "5108",
+   "name": "Bridgestone Corp.",
+   "sector": "Rubber"
+  },
+  {
+   "ticker": "7751.T",
+   "code": "7751",
+   "name": "Canon Inc.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "6952.T",
+   "code": "6952",
+   "name": "Casio Computer Co., Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "9022.T",
+   "code": "9022",
+   "name": "Central Japan Railway Co., Ltd.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "9502.T",
+   "code": "9502",
+   "name": "Chubu Electric Power Co., Inc.",
+   "sector": "Electric Power"
+  },
+  {
+   "ticker": "4519.T",
+   "code": "4519",
+   "name": "Chugai Pharmaceutical Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "7762.T",
+   "code": "7762",
+   "name": "Citizen Watch Co., Ltd.",
+   "sector": "Precision Instruments"
+  },
+  {
+   "ticker": "1721.T",
+   "code": "1721",
+   "name": "Comsys Holdings Corp.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "7186.T",
+   "code": "7186",
+   "name": "Concordia Financial Group, Ltd.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "8253.T",
+   "code": "8253",
+   "name": "Credit Saison Co., Ltd.",
+   "sector": "Other Financial Services"
+  },
+  {
+   "ticker": "4751.T",
+   "code": "4751",
+   "name": "Cyberagent, Inc.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "7912.T",
+   "code": "7912",
+   "name": "Dai Nippon Printing Co., Ltd.",
+   "sector": "Other Manufacturing"
+  },
+  {
+   "ticker": "8750.T",
+   "code": "8750",
+   "name": "Dai-Ichi Life Holdings, Inc.",
+   "sector": "Insurance"
+  },
+  {
+   "ticker": "4568.T",
+   "code": "4568",
+   "name": "Daiichi Sankyo Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "6367.T",
+   "code": "6367",
+   "name": "Daikin Industries, Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "1925.T",
+   "code": "1925",
+   "name": "Daiwa House Ind. Co., Ltd.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "8601.T",
+   "code": "8601",
+   "name": "Daiwa Securities Group Inc.",
+   "sector": "Securities"
+  },
+  {
+   "ticker": "2432.T",
+   "code": "2432",
+   "name": "Dena Co., Ltd.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "4061.T",
+   "code": "4061",
+   "name": "Denka Co., Ltd.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "6902.T",
+   "code": "6902",
+   "name": "Denso Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "4324.T",
+   "code": "4324",
+   "name": "Dentsu Group Inc.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "4631.T",
+   "code": "4631",
+   "name": "Dic Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "5714.T",
+   "code": "5714",
+   "name": "Dowa Holdings Co., Ltd.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "9020.T",
+   "code": "9020",
+   "name": "East Japan Railway Co.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "6361.T",
+   "code": "6361",
+   "name": "Ebara Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "4523.T",
+   "code": "4523",
+   "name": "Eisai Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "5020.T",
+   "code": "5020",
+   "name": "Eneos Holdings, Inc.",
+   "sector": "Petroleum"
+  },
+  {
+   "ticker": "6954.T",
+   "code": "6954",
+   "name": "Fanuc Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "9983.T",
+   "code": "9983",
+   "name": "Fast Retailing Co., Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "6504.T",
+   "code": "6504",
+   "name": "Fuji Electric Co., Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "4901.T",
+   "code": "4901",
+   "name": "Fujifilm Holdings Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "5803.T",
+   "code": "5803",
+   "name": "Fujikura Ltd.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "6702.T",
+   "code": "6702",
+   "name": "Fujitsu Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "8354.T",
+   "code": "8354",
+   "name": "Fukuoka Financial Group, Inc.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "5801.T",
+   "code": "5801",
+   "name": "Furukawa Electric Co., Ltd.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "6674.T",
+   "code": "6674",
+   "name": "Gs Yuasa Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "1808.T",
+   "code": "1808",
+   "name": "Haseko Corp.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "7205.T",
+   "code": "7205",
+   "name": "Hino Motors, Ltd.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "6305.T",
+   "code": "6305",
+   "name": "Hitachi Const. Mach. Co., Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "7004.T",
+   "code": "7004",
+   "name": "Hitachi Zosen Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "6501.T",
+   "code": "6501",
+   "name": "Hitachi, Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "7267.T",
+   "code": "7267",
+   "name": "Honda Motor Co., Ltd.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "7741.T",
+   "code": "7741",
+   "name": "Hoya Corp.",
+   "sector": "Precision Instruments"
+  },
+  {
+   "ticker": "5019.T",
+   "code": "5019",
+   "name": "Idemitsu Kosan Co., Ltd.",
+   "sector": "Petroleum"
+  },
+  {
+   "ticker": "7013.T",
+   "code": "7013",
+   "name": "Ihi Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "1605.T",
+   "code": "1605",
+   "name": "Inpex Corp.",
+   "sector": "Mining"
+  },
+  {
+   "ticker": "3099.T",
+   "code": "3099",
+   "name": "Isetan Mitsukoshi Holdings Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "7202.T",
+   "code": "7202",
+   "name": "Isuzu Motors Ltd.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "8001.T",
+   "code": "8001",
+   "name": "Itochu Corp.",
+   "sector": "Trading Companies"
+  },
+  {
+   "ticker": "3086.T",
+   "code": "3086",
+   "name": "J.Front Retailing Co., Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "9201.T",
+   "code": "9201",
+   "name": "Japan Airlines Co., Ltd.",
+   "sector": "Air Transport"
+  },
+  {
+   "ticker": "8697.T",
+   "code": "8697",
+   "name": "Japan Exchange Group, Inc.",
+   "sector": "Other Financial Services"
+  },
+  {
+   "ticker": "6178.T",
+   "code": "6178",
+   "name": "Japan Post Holdings Co., Ltd.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "2914.T",
+   "code": "2914",
+   "name": "Japan Tobacco Inc.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "5411.T",
+   "code": "5411",
+   "name": "Jfe Holdings, Inc.",
+   "sector": "Steel"
+  },
+  {
+   "ticker": "1963.T",
+   "code": "1963",
+   "name": "Jgc Holdings Corp.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "6473.T",
+   "code": "6473",
+   "name": "Jtekt Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "1812.T",
+   "code": "1812",
+   "name": "Kajima Corp.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "4452.T",
+   "code": "4452",
+   "name": "Kao Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "7012.T",
+   "code": "7012",
+   "name": "Kawasaki Heavy Ind., Ltd.",
+   "sector": "Shipbuilding"
+  },
+  {
+   "ticker": "9107.T",
+   "code": "9107",
+   "name": "Kawasaki Kisen Kaisha, Ltd.",
+   "sector": "Marine Transport"
+  },
+  {
+   "ticker": "9433.T",
+   "code": "9433",
+   "name": "Kddi Corp.",
+   "sector": "Communications"
+  },
+  {
+   "ticker": "9008.T",
+   "code": "9008",
+   "name": "Keio Corp.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "9009.T",
+   "code": "9009",
+   "name": "Keisei Electric Railway Co., Ltd.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "6861.T",
+   "code": "6861",
+   "name": "Keyence Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "2801.T",
+   "code": "2801",
+   "name": "Kikkoman Corp.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "2503.T",
+   "code": "2503",
+   "name": "Kirin Holdings Co., Ltd.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "5406.T",
+   "code": "5406",
+   "name": "Kobe Steel, Ltd.",
+   "sector": "Steel"
+  },
+  {
+   "ticker": "6301.T",
+   "code": "6301",
+   "name": "Komatsu Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "9766.T",
+   "code": "9766",
+   "name": "Konami Group Corp.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "4902.T",
+   "code": "4902",
+   "name": "Konica Minolta, Inc.",
+   "sector": "Precision Instruments"
+  },
+  {
+   "ticker": "6326.T",
+   "code": "6326",
+   "name": "Kubota Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "3405.T",
+   "code": "3405",
+   "name": "Kuraray Co., Ltd.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "6971.T",
+   "code": "6971",
+   "name": "Kyocera Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "4151.T",
+   "code": "4151",
+   "name": "Kyowa Kirin Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "6920.T",
+   "code": "6920",
+   "name": "Lasertec Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "4689.T",
+   "code": "4689",
+   "name": "Ly Corp.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "2413.T",
+   "code": "2413",
+   "name": "M3, Inc.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "8002.T",
+   "code": "8002",
+   "name": "Marubeni Corp.",
+   "sector": "Trading Companies"
+  },
+  {
+   "ticker": "8252.T",
+   "code": "8252",
+   "name": "Marui Group Co., Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "7261.T",
+   "code": "7261",
+   "name": "Mazda Motor Corp.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "2269.T",
+   "code": "2269",
+   "name": "Meiji Holdings Co., Ltd.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "4385.T",
+   "code": "4385",
+   "name": "Mercari, Inc.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "6479.T",
+   "code": "6479",
+   "name": "Minebea Mitsumi Inc.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "4188.T",
+   "code": "4188",
+   "name": "Mitsubishi Chemical Group Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "8058.T",
+   "code": "8058",
+   "name": "Mitsubishi Corp.",
+   "sector": "Trading Companies"
+  },
+  {
+   "ticker": "6503.T",
+   "code": "6503",
+   "name": "Mitsubishi Electric Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "8802.T",
+   "code": "8802",
+   "name": "Mitsubishi Estate Co., Ltd.",
+   "sector": "Real Estate"
+  },
+  {
+   "ticker": "7011.T",
+   "code": "7011",
+   "name": "Mitsubishi Heavy Ind., Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "9301.T",
+   "code": "9301",
+   "name": "Mitsubishi Logistics Corp.",
+   "sector": "Warehousing"
+  },
+  {
+   "ticker": "5711.T",
+   "code": "5711",
+   "name": "Mitsubishi Materials Corp.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "7211.T",
+   "code": "7211",
+   "name": "Mitsubishi Motors Corp.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "8306.T",
+   "code": "8306",
+   "name": "Mitsubishi Ufj Financial Group, Inc.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "8031.T",
+   "code": "8031",
+   "name": "Mitsui & Co., Ltd.",
+   "sector": "Trading Companies"
+  },
+  {
+   "ticker": "4183.T",
+   "code": "4183",
+   "name": "Mitsui Chemicals, Inc.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "8801.T",
+   "code": "8801",
+   "name": "Mitsui Fudosan Co., Ltd.",
+   "sector": "Real Estate"
+  },
+  {
+   "ticker": "5706.T",
+   "code": "5706",
+   "name": "Mitsui Mining & Smelting Co.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "9104.T",
+   "code": "9104",
+   "name": "Mitsui O.S.K.Lines, Ltd.",
+   "sector": "Marine Transport"
+  },
+  {
+   "ticker": "8411.T",
+   "code": "8411",
+   "name": "Mizuho Financial Group, Inc.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "8725.T",
+   "code": "8725",
+   "name": "Ms&Ad Insurance Group Holdings, Inc.",
+   "sector": "Insurance"
+  },
+  {
+   "ticker": "6981.T",
+   "code": "6981",
+   "name": "Murata Manufacturing Co., Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "6701.T",
+   "code": "6701",
+   "name": "Nec Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "3659.T",
+   "code": "3659",
+   "name": "Nexon Co., Ltd.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "5333.T",
+   "code": "5333",
+   "name": "Ngk Insulators, Ltd.",
+   "sector": "Glass & Ceramics"
+  },
+  {
+   "ticker": "2282.T",
+   "code": "2282",
+   "name": "Nh Foods Ltd.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "2871.T",
+   "code": "2871",
+   "name": "Nichirei Corp.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "6594.T",
+   "code": "6594",
+   "name": "Nidec Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "7731.T",
+   "code": "7731",
+   "name": "Nikon Corp.",
+   "sector": "Precision Instruments"
+  },
+  {
+   "ticker": "7974.T",
+   "code": "7974",
+   "name": "Nintendo Co., Ltd.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "5214.T",
+   "code": "5214",
+   "name": "Nippon Electric Glass Co., Ltd.",
+   "sector": "Glass & Ceramics"
+  },
+  {
+   "ticker": "9147.T",
+   "code": "9147",
+   "name": "Nippon Express Holdings, Inc.",
+   "sector": "Land Transport"
+  },
+  {
+   "ticker": "3863.T",
+   "code": "3863",
+   "name": "Nippon Paper Industries Co., Ltd.",
+   "sector": "Pulp & Paper"
+  },
+  {
+   "ticker": "5401.T",
+   "code": "5401",
+   "name": "Nippon Steel Corp.",
+   "sector": "Steel"
+  },
+  {
+   "ticker": "9432.T",
+   "code": "9432",
+   "name": "Nippon Telegraph & Telephone Corp.",
+   "sector": "Communications"
+  },
+  {
+   "ticker": "9101.T",
+   "code": "9101",
+   "name": "Nippon Yusen K.K.",
+   "sector": "Marine Transport"
+  },
+  {
+   "ticker": "4021.T",
+   "code": "4021",
+   "name": "Nissan Chemical Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "7201.T",
+   "code": "7201",
+   "name": "Nissan Motor Co., Ltd.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "2002.T",
+   "code": "2002",
+   "name": "Nisshin Seifun Group Inc.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "1332.T",
+   "code": "1332",
+   "name": "Nissui Corp.",
+   "sector": "Fishery"
+  },
+  {
+   "ticker": "9843.T",
+   "code": "9843",
+   "name": "Nitori Holdings Co., Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "6988.T",
+   "code": "6988",
+   "name": "Nitto Denko Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "8604.T",
+   "code": "8604",
+   "name": "Nomura Holdings, Inc.",
+   "sector": "Securities"
+  },
+  {
+   "ticker": "6471.T",
+   "code": "6471",
+   "name": "Nsk Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "6472.T",
+   "code": "6472",
+   "name": "Ntn Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "9613.T",
+   "code": "9613",
+   "name": "Ntt Data Group Corp.",
+   "sector": "Communications"
+  },
+  {
+   "ticker": "1802.T",
+   "code": "1802",
+   "name": "Obayashi Corp.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "9007.T",
+   "code": "9007",
+   "name": "Odakyu Electric Railway Co., Ltd.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "3861.T",
+   "code": "3861",
+   "name": "Oji Holdings Corp.",
+   "sector": "Pulp & Paper"
+  },
+  {
+   "ticker": "6103.T",
+   "code": "6103",
+   "name": "Okuma Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "7733.T",
+   "code": "7733",
+   "name": "Olympus Corp.",
+   "sector": "Precision Instruments"
+  },
+  {
+   "ticker": "6645.T",
+   "code": "6645",
+   "name": "Omron Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "4661.T",
+   "code": "4661",
+   "name": "Oriental Land Co., Ltd.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "8591.T",
+   "code": "8591",
+   "name": "Orix Corp.",
+   "sector": "Other Financial Services"
+  },
+  {
+   "ticker": "9532.T",
+   "code": "9532",
+   "name": "Osaka Gas Co., Ltd.",
+   "sector": "Gas"
+  },
+  {
+   "ticker": "4578.T",
+   "code": "4578",
+   "name": "Otsuka Holdings Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "5541.T",
+   "code": "5541",
+   "name": "Pacific Metals Co., Ltd.",
+   "sector": "Steel"
+  },
+  {
+   "ticker": "6752.T",
+   "code": "6752",
+   "name": "Panasonic Holdings Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "4755.T",
+   "code": "4755",
+   "name": "Rakuten Group, Inc.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "6098.T",
+   "code": "6098",
+   "name": "Recruit Holdings Co., Ltd.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "6723.T",
+   "code": "6723",
+   "name": "Renesas Electronics Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "8308.T",
+   "code": "8308",
+   "name": "Resona Holdings, Inc.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "4004.T",
+   "code": "4004",
+   "name": "Resonac Holdings Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "7752.T",
+   "code": "7752",
+   "name": "Ricoh Co., Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "2501.T",
+   "code": "2501",
+   "name": "Sapporo Holdings Ltd.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "7735.T",
+   "code": "7735",
+   "name": "Screen Holdings Co., Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "9735.T",
+   "code": "9735",
+   "name": "Secom Co., Ltd.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "6724.T",
+   "code": "6724",
+   "name": "Seiko Epson Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "1928.T",
+   "code": "1928",
+   "name": "Sekisui House, Ltd.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "3382.T",
+   "code": "3382",
+   "name": "Seven & I Holdings Co., Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "6753.T",
+   "code": "6753",
+   "name": "Sharp Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "1803.T",
+   "code": "1803",
+   "name": "Shimizu Corp.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "4063.T",
+   "code": "4063",
+   "name": "Shin-Etsu Chemical Co., Ltd.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "4507.T",
+   "code": "4507",
+   "name": "Shionogi & Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "4911.T",
+   "code": "4911",
+   "name": "Shiseido Co., Ltd.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "5831.T",
+   "code": "5831",
+   "name": "Shizuoka Financial Group, Inc.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "6273.T",
+   "code": "6273",
+   "name": "Smc Corp.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "9434.T",
+   "code": "9434",
+   "name": "Softbank Corp.",
+   "sector": "Communications"
+  },
+  {
+   "ticker": "9984.T",
+   "code": "9984",
+   "name": "Softbank Group Corp.",
+   "sector": "Communications"
+  },
+  {
+   "ticker": "2768.T",
+   "code": "2768",
+   "name": "Sojitz Corp.",
+   "sector": "Trading Companies"
+  },
+  {
+   "ticker": "8630.T",
+   "code": "8630",
+   "name": "Sompo Holdings, Inc.",
+   "sector": "Insurance"
+  },
+  {
+   "ticker": "6758.T",
+   "code": "6758",
+   "name": "Sony Group Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "7270.T",
+   "code": "7270",
+   "name": "Subaru Corp.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "3436.T",
+   "code": "3436",
+   "name": "Sumco Corp.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "4005.T",
+   "code": "4005",
+   "name": "Sumitomo Chemical Co., Ltd.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "8053.T",
+   "code": "8053",
+   "name": "Sumitomo Corp.",
+   "sector": "Trading Companies"
+  },
+  {
+   "ticker": "5802.T",
+   "code": "5802",
+   "name": "Sumitomo Electric Ind., Ltd.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "6302.T",
+   "code": "6302",
+   "name": "Sumitomo Heavy Ind., Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "5713.T",
+   "code": "5713",
+   "name": "Sumitomo Metal Mining Co., Ltd.",
+   "sector": "Nonferrous Metals"
+  },
+  {
+   "ticker": "8316.T",
+   "code": "8316",
+   "name": "Sumitomo Mitsui Financial Group, Inc.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "8309.T",
+   "code": "8309",
+   "name": "Sumitomo Mitsui Trust Holdings, Inc.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "5232.T",
+   "code": "5232",
+   "name": "Sumitomo Osaka Cement Co., Ltd.",
+   "sector": "Glass & Ceramics"
+  },
+  {
+   "ticker": "4506.T",
+   "code": "4506",
+   "name": "Sumitomo Pharma Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "8830.T",
+   "code": "8830",
+   "name": "Sumitomo Realty & Development Co., Ltd.",
+   "sector": "Real Estate"
+  },
+  {
+   "ticker": "7269.T",
+   "code": "7269",
+   "name": "Suzuki Motor Corp.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "8795.T",
+   "code": "8795",
+   "name": "T&D Holdings, Inc.",
+   "sector": "Insurance"
+  },
+  {
+   "ticker": "5233.T",
+   "code": "5233",
+   "name": "Taiheiyo Cement Corp.",
+   "sector": "Glass & Ceramics"
+  },
+  {
+   "ticker": "1801.T",
+   "code": "1801",
+   "name": "Taisei Corp.",
+   "sector": "Construction"
+  },
+  {
+   "ticker": "6976.T",
+   "code": "6976",
+   "name": "Taiyo Yuden Co., Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "2531.T",
+   "code": "2531",
+   "name": "Takara Holdings Inc.",
+   "sector": "Foods"
+  },
+  {
+   "ticker": "8233.T",
+   "code": "8233",
+   "name": "Takashimaya Co., Ltd.",
+   "sector": "Retail"
+  },
+  {
+   "ticker": "4502.T",
+   "code": "4502",
+   "name": "Takeda Pharmaceutical Co., Ltd.",
+   "sector": "Pharmaceuticals"
+  },
+  {
+   "ticker": "6762.T",
+   "code": "6762",
+   "name": "Tdk Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "3401.T",
+   "code": "3401",
+   "name": "Teijin Ltd.",
+   "sector": "Textiles & Apparel"
+  },
+  {
+   "ticker": "4543.T",
+   "code": "4543",
+   "name": "Terumo Corp.",
+   "sector": "Precision Instruments"
+  },
+  {
+   "ticker": "8331.T",
+   "code": "8331",
+   "name": "The Chiba Bank, Ltd.",
+   "sector": "Banking"
+  },
+  {
+   "ticker": "5631.T",
+   "code": "5631",
+   "name": "The Japan Steel Works, Ltd.",
+   "sector": "Machinery"
+  },
+  {
+   "ticker": "9503.T",
+   "code": "9503",
+   "name": "The Kansai Electric Power Co., Inc.",
+   "sector": "Electric Power"
+  },
+  {
+   "ticker": "5101.T",
+   "code": "5101",
+   "name": "The Yokohama Rubber Co., Ltd.",
+   "sector": "Rubber"
+  },
+  {
+   "ticker": "9001.T",
+   "code": "9001",
+   "name": "Tobu Railway Co., Ltd.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "9602.T",
+   "code": "9602",
+   "name": "Toho Co., Ltd",
+   "sector": "Services"
+  },
+  {
+   "ticker": "5301.T",
+   "code": "5301",
+   "name": "Tokai Carbon Co., Ltd.",
+   "sector": "Glass & Ceramics"
+  },
+  {
+   "ticker": "8766.T",
+   "code": "8766",
+   "name": "Tokio Marine Holdings, Inc.",
+   "sector": "Insurance"
+  },
+  {
+   "ticker": "4043.T",
+   "code": "4043",
+   "name": "Tokuyama Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "9501.T",
+   "code": "9501",
+   "name": "Tokyo Electric Power Company Holdings, I",
+   "sector": "Electric Power"
+  },
+  {
+   "ticker": "8035.T",
+   "code": "8035",
+   "name": "Tokyo Electron Ltd.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "9531.T",
+   "code": "9531",
+   "name": "Tokyo Gas Co., Ltd.",
+   "sector": "Gas"
+  },
+  {
+   "ticker": "8804.T",
+   "code": "8804",
+   "name": "Tokyo Tatemono Co., Ltd.",
+   "sector": "Real Estate"
+  },
+  {
+   "ticker": "9005.T",
+   "code": "9005",
+   "name": "Tokyu Corp.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "3289.T",
+   "code": "3289",
+   "name": "Tokyu Fudosan Holdings Corp.",
+   "sector": "Real Estate"
+  },
+  {
+   "ticker": "7911.T",
+   "code": "7911",
+   "name": "Toppan Holdings Inc.",
+   "sector": "Other Manufacturing"
+  },
+  {
+   "ticker": "3402.T",
+   "code": "3402",
+   "name": "Toray Industries, Inc.",
+   "sector": "-"
+  },
+  {
+   "ticker": "4042.T",
+   "code": "4042",
+   "name": "Tosoh Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "5332.T",
+   "code": "5332",
+   "name": "Toto Ltd.",
+   "sector": "Glass & Ceramics"
+  },
+  {
+   "ticker": "7203.T",
+   "code": "7203",
+   "name": "Toyota Motor Corp.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "8015.T",
+   "code": "8015",
+   "name": "Toyota Tsusho Corp.",
+   "sector": "Trading Companies"
+  },
+  {
+   "ticker": "4704.T",
+   "code": "4704",
+   "name": "Trend Micro Inc.",
+   "sector": "Services"
+  },
+  {
+   "ticker": "4208.T",
+   "code": "4208",
+   "name": "Ube Corp.",
+   "sector": "Chemicals"
+  },
+  {
+   "ticker": "9021.T",
+   "code": "9021",
+   "name": "West Japan Railway Co.",
+   "sector": "Railway & Bus"
+  },
+  {
+   "ticker": "7951.T",
+   "code": "7951",
+   "name": "Yamaha Corp.",
+   "sector": "Other Manufacturing"
+  },
+  {
+   "ticker": "7272.T",
+   "code": "7272",
+   "name": "Yamaha Motor Co., Ltd.",
+   "sector": "Automobiles & Auto parts"
+  },
+  {
+   "ticker": "9064.T",
+   "code": "9064",
+   "name": "Yamato Holdings Co., Ltd.",
+   "sector": "Land Transport"
+  },
+  {
+   "ticker": "6506.T",
+   "code": "6506",
+   "name": "Yaskawa Electric Corp.",
+   "sector": "Electric Machinery"
+  },
+  {
+   "ticker": "6841.T",
+   "code": "6841",
+   "name": "Yokogawa Electric Corp.",
+   "sector": "Electric Machinery"
+  }
+ ]
+}

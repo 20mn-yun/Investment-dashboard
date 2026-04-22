@@ -149,6 +149,181 @@ def load_kr_top600(top_n=300):
     return tickers
 
 
+def load_jp_nikkei225():
+    path = os.path.join(TICKERS_DIR, "jp_nikkei225.json")
+    if os.path.exists(path):
+        age_days = (time.time() - os.path.getmtime(path)) / 86400
+        if age_days < 30:
+            with open(path, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            tickers = cached.get("tickers", [])
+            log(f"Cached JP ticker list loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
+            return tickers
+
+    log("Downloading Nikkei 225 component list...")
+    print("WARNING: iShares JP TOPIX ETF URLs unavailable, using Nikkei 225 fallback (225 tickers instead of 500)", file=sys.stderr)
+
+    url = "https://topforeignstocks.com/indices/the-components-of-the-nikkei-225-index/"
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+    resp = req.get(url, headers=headers, timeout=30)
+    if resp.status_code != 200:
+        print(f"ERROR: topforeignstocks returned HTTP {resp.status_code}", file=sys.stderr)
+        sys.exit(1)
+
+    tables = pd.read_html(io.StringIO(resp.text), flavor="lxml")
+    if not tables:
+        print("ERROR: Could not find Nikkei 225 table", file=sys.stderr)
+        sys.exit(1)
+
+    df = tables[0]
+    tickers = []
+    for _, row in df.iterrows():
+        code = str(row.get("Code", "")).strip()
+        name = str(row.get("Company Name", "")).strip()
+        sector = str(row.get("Sector", "")).strip()
+        if not code or code == "nan":
+            continue
+        if name == "nan":
+            name = code
+        if sector == "nan":
+            sector = "-"
+        ticker = code if ".T" in code else code + ".T"
+        tickers.append({
+            "ticker": ticker,
+            "code": code.replace(".T", ""),
+            "name": name,
+            "sector": sector,
+        })
+
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("Asia/Tokyo"))
+    os.makedirs(TICKERS_DIR, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({
+            "last_updated": now.isoformat(),
+            "source": "Wikipedia Nikkei 225",
+            "universe": "Nikkei 225",
+            "tickers": tickers,
+        }, f, ensure_ascii=False, indent=1)
+    log(f"Saved {len(tickers)} JP tickers to {path}")
+    return tickers
+
+
+_EU_EXCHANGE_SUFFIX = {
+    "Xetra": ".DE",
+    "London Stock Exchange": ".L",
+    "Euronext Amsterdam": ".AS",
+    "Nyse Euronext - Euronext Paris": ".PA",
+    "SIX Swiss Exchange": ".SW",
+    "Borsa Italiana": ".MI",
+    "Bolsa De Madrid": ".MC",
+    "Nasdaq Omx Nordic": ".ST",
+    "Nasdaq Omx Helsinki Ltd.": ".HE",
+    "Omx Nordic Exchange Copenhagen A/S": ".CO",
+    "Nyse Euronext - Euronext Brussels": ".BR",
+    "Nyse Euronext - Euronext Lisbon": ".LS",
+    "Oslo Bors Asa": ".OL",
+    "Irish Stock Exchange - All Market": ".IR",
+    "Wiener Boerse Ag": ".VI",
+    "Warsaw Stock Exchange/Equities/Main Market": ".WA",
+}
+
+
+def load_eu_stoxx600():
+    path = os.path.join(TICKERS_DIR, "eu_stoxx600.json")
+    if os.path.exists(path):
+        age_days = (time.time() - os.path.getmtime(path)) / 86400
+        if age_days < 7:
+            with open(path, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            tickers = cached.get("tickers", [])
+            log(f"Cached EU ticker list loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
+            return tickers
+
+    log("Downloading STOXX 600 holdings from iShares DE...")
+    url = (
+        "https://www.ishares.com/de/privatanleger/de/produkte/251931/"
+        "ishares-stoxx-europe-600-ucits-etf-de-fund/1478358465952.ajax"
+        "?fileType=csv&fileName=EXSA_holdings&dataType=fund"
+    )
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "text/csv,text/plain,*/*",
+    }
+    resp = req.get(url, headers=headers, timeout=30)
+    if resp.status_code != 200:
+        print(f"ERROR: iShares DE returned HTTP {resp.status_code}", file=sys.stderr)
+        sys.exit(1)
+
+    lines = resp.text.splitlines()
+    header_idx = None
+    for i, line in enumerate(lines):
+        if "Emittententicker" in line or "Ticker" in line:
+            header_idx = i
+            break
+    if header_idx is None:
+        print("ERROR: Could not find CSV header row in iShares DE", file=sys.stderr)
+        sys.exit(1)
+
+    csv_text = "\n".join(lines[header_idx:])
+    df = pd.read_csv(io.StringIO(csv_text))
+
+    col_ticker = "Emittententicker" if "Emittententicker" in df.columns else "Ticker"
+    col_name = "Name" if "Name" in df.columns else df.columns[1]
+    col_sector = "Sektor" if "Sektor" in df.columns else "Sector"
+    col_asset = "Anlageklasse" if "Anlageklasse" in df.columns else "Asset Class"
+    col_exchange = "Börse" if "Börse" in df.columns else "Exchange"
+
+    if col_asset in df.columns:
+        df = df[df[col_asset] == "Aktien"]
+
+    tickers = []
+    for _, row in df.iterrows():
+        t = str(row.get(col_ticker, "")).strip()
+        if not t or t == "-" or t == "nan":
+            continue
+        name = str(row.get(col_name, "")).strip()
+        sector = str(row.get(col_sector, "")).strip()
+        exchange = str(row.get(col_exchange, "")).strip()
+        if name == "nan":
+            name = t
+        if sector == "nan":
+            sector = "-"
+
+        suffix = _EU_EXCHANGE_SUFFIX.get(exchange, "")
+        if not suffix:
+            for key, val in _EU_EXCHANGE_SUFFIX.items():
+                if key.lower() in exchange.lower():
+                    suffix = val
+                    break
+        if not suffix:
+            suffix = ".DE"
+
+        yahoo_ticker = t.replace(" ", "-").replace(".", "-").rstrip("-") + suffix
+        tickers.append({
+            "ticker": yahoo_ticker,
+            "raw_ticker": t,
+            "name": name,
+            "sector": sector,
+            "exchange": exchange,
+        })
+
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("Europe/Berlin"))
+    os.makedirs(TICKERS_DIR, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({
+            "last_updated": now.isoformat(),
+            "source": "iShares STOXX Europe 600 (DE)",
+            "universe": "STOXX Europe 600",
+            "tickers": tickers,
+        }, f, ensure_ascii=False, indent=1)
+    log(f"Saved {len(tickers)} EU tickers to {path}")
+    return tickers
+
+
 def _download_chunk(chunk):
     """단일 청크 다운로드. 성공 dict + 미수신 리스트 반환."""
     got = {}
@@ -274,7 +449,7 @@ def main():
         sys.exit(1)
 
     market = sys.argv[1]
-    if market not in ("us", "kr"):
+    if market not in ("us", "kr", "jp", "eu"):
         print(f"ERROR: market '{market}' not yet supported", file=sys.stderr)
         sys.exit(1)
 
@@ -286,6 +461,12 @@ def main():
     elif market == "kr":
         tickers = load_kr_top600()
         universe_label = "KOSPI top 300 + KOSDAQ top 300"
+    elif market == "jp":
+        tickers = load_jp_nikkei225()
+        universe_label = "Nikkei 225"
+    elif market == "eu":
+        tickers = load_eu_stoxx600()
+        universe_label = "STOXX Europe 600"
 
     log(f"Loaded {len(tickers)} tickers")
 
@@ -298,13 +479,14 @@ def main():
     rankings = calc_rankings(price_data, tickers)
 
     from zoneinfo import ZoneInfo
-    now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
+    tz_map = {"us": "America/New_York", "kr": "Asia/Seoul", "jp": "Asia/Tokyo", "eu": "Europe/Berlin"}
+    now = datetime.now(ZoneInfo(tz_map.get(market, "Asia/Seoul")))
 
     output = {
         "market": market,
         "universe": universe_label,
         "universe_size": len(tickers),
-        "last_updated": now_kst.isoformat(),
+        "last_updated": now.isoformat(),
         "failed_tickers": failed[:50],
         "failed_count": len(failed),
         "data": rankings,

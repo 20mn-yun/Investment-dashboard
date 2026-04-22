@@ -1338,12 +1338,14 @@
             const res = await fetch(API_BASE + '/api/top-gainers?market=' + gainerMarket + '&period=' + gainerPeriod);
             const body = await res.json();
             if (res.status === 503) {
-                container.innerHTML = '<div class="loading">데이터가 아직 생성되지 않았습니다. 다음 배치: 06:30</div>';
+                const schedMap = {us:'06:30', kr:'16:00', jp:'15:15', eu:'02:00'};
+                const sched = schedMap[gainerMarket] || '';
+                container.innerHTML = `<div class="loading">데이터가 아직 생성되지 않았습니다. 다음 배치: ${sched}</div>`;
                 tsEl.textContent = '';
                 return;
             }
-            if (res.status === 501) {
-                container.innerHTML = '<div class="loading">이 시장은 아직 구현되지 않았습니다</div>';
+            if (res.status === 404) {
+                container.innerHTML = '<div class="loading">지원하지 않는 시장입니다</div>';
                 tsEl.textContent = '';
                 return;
             }
