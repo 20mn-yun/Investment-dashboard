@@ -1,5 +1,14 @@
 cache/
 !cache/.gitkeep
 *.log
+*.err
 __pycache__/
 *.pyc
+.DS_Store
+
+# 런타임 생성 데이터
+dart_*.json
+calendar_watchlist.json
+expanded_stocks.json
+us_stock_map.json
+DART_*.xlsx
