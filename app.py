@@ -444,7 +444,7 @@ def get_top_gainers():
     market = request.args.get("market", "us")
     period = request.args.get("period", "1w")
 
-    if market != "us":
+    if market not in ("us", "kr"):
         return jsonify({"error": "아직 구현되지 않음"}), 501
 
     cache_path = os.path.join(_CACHE_DIR, f"top_gainers_{market}.json")

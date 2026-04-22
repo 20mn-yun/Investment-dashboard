@@ -87,6 +87,68 @@ def load_russell1000():
     return tickers
 
 
+def load_kr_top600(top_n=300):
+    path = os.path.join(TICKERS_DIR, "kr_top600.json")
+    if os.path.exists(path):
+        age_days = (time.time() - os.path.getmtime(path)) / 86400
+        if age_days < 7:
+            with open(path, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            tickers = cached.get("tickers", [])
+            log(f"Cached KR ticker list loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
+            return tickers
+
+    log("Downloading KR top stocks from Naver Finance...")
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+    tickers = []
+
+    for market, suffix in [("KOSPI", ".KS"), ("KOSDAQ", ".KQ")]:
+        market_tickers = []
+        for page in range(1, (top_n // 100) + 2):
+            url = (f"https://m.stock.naver.com/api/stocks/marketValue/{market}"
+                   f"?page={page}&pageSize=100")
+            resp = req.get(url, headers=headers, timeout=15)
+            if resp.status_code != 200:
+                break
+            stocks = resp.json().get("stocks", [])
+            if not stocks:
+                break
+            for s in stocks:
+                code = s.get("itemCode", "")
+                name = s.get("stockName", "")
+                stock_end_type = s.get("stockEndType", "")
+                if stock_end_type != "stock":
+                    continue
+                if not code or not code.isdigit():
+                    continue
+                market_tickers.append({
+                    "ticker": code + suffix,
+                    "code": code,
+                    "name": name,
+                    "market_sub": market,
+                    "sector": "",
+                })
+                if len(market_tickers) >= top_n:
+                    break
+            if len(market_tickers) >= top_n:
+                break
+        tickers.extend(market_tickers[:top_n])
+        log(f"  {market}: {len(market_tickers[:top_n])} stocks")
+
+    from zoneinfo import ZoneInfo
+    now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
+    os.makedirs(TICKERS_DIR, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({
+            "last_updated": now_kst.isoformat(),
+            "source": "Naver Finance",
+            "universe": f"KOSPI top {top_n} + KOSDAQ top {top_n}",
+            "tickers": tickers,
+        }, f, ensure_ascii=False, indent=1)
+    log(f"Saved {len(tickers)} KR tickers to {path}")
+    return tickers
+
+
 def _download_chunk(chunk):
     """단일 청크 다운로드. 성공 dict + 미수신 리스트 반환."""
     got = {}
@@ -212,15 +274,27 @@ def main():
         sys.exit(1)
 
     market = sys.argv[1]
-    if market != "us":
+    if market not in ("us", "kr"):
         print(f"ERROR: market '{market}' not yet supported", file=sys.stderr)
         sys.exit(1)
 
     log(f"=== Batch top gainers: {market} ===")
-    tickers = load_russell1000()
+
+    if market == "us":
+        tickers = load_russell1000()
+        universe_label = "Russell 1000"
+    elif market == "kr":
+        tickers = load_kr_top600()
+        universe_label = "KOSPI top 300 + KOSDAQ top 300"
+
     log(f"Loaded {len(tickers)} tickers")
 
     price_data, failed = download_prices(tickers)
+
+    fail_rate = len(failed) / max(len(tickers), 1) * 100
+    if fail_rate > 15:
+        print(f"WARNING: high failure rate {fail_rate:.1f}% ({len(failed)}/{len(tickers)})", file=sys.stderr)
+
     rankings = calc_rankings(price_data, tickers)
 
     from zoneinfo import ZoneInfo
@@ -228,7 +302,7 @@ def main():
 
     output = {
         "market": market,
-        "universe": "Russell 1000",
+        "universe": universe_label,
         "universe_size": len(tickers),
         "last_updated": now_kst.isoformat(),
         "failed_tickers": failed[:50],
