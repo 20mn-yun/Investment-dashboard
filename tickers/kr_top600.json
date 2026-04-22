@@ -1,0 +1,4081 @@
+{
+ "last_updated": "2026-04-22T12:48:31.709299+09:00",
+ "source": "Naver Finance",
+ "universe": "KOSPI top 300 + KOSDAQ top 300",
+ "tickers": [
+  {
+   "ticker": "005930.KS",
+   "code": "005930",
+   "name": "삼성전자",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000660.KS",
+   "code": "000660",
+   "name": "SK하이닉스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005935.KS",
+   "code": "005935",
+   "name": "삼성전자우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "373220.KS",
+   "code": "373220",
+   "name": "LG에너지솔루션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005380.KS",
+   "code": "005380",
+   "name": "현대차",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "402340.KS",
+   "code": "402340",
+   "name": "SK스퀘어",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "034020.KS",
+   "code": "034020",
+   "name": "두산에너빌리티",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "012450.KS",
+   "code": "012450",
+   "name": "한화에어로스페이스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "207940.KS",
+   "code": "207940",
+   "name": "삼성바이오로직스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "329180.KS",
+   "code": "329180",
+   "name": "HD현대중공업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000270.KS",
+   "code": "000270",
+   "name": "기아",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009150.KS",
+   "code": "009150",
+   "name": "삼성전기",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "105560.KS",
+   "code": "105560",
+   "name": "KB금융",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006400.KS",
+   "code": "006400",
+   "name": "삼성SDI",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "032830.KS",
+   "code": "032830",
+   "name": "삼성생명",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "028260.KS",
+   "code": "028260",
+   "name": "삼성물산",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "055550.KS",
+   "code": "055550",
+   "name": "신한지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "068270.KS",
+   "code": "068270",
+   "name": "셀트리온",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "042660.KS",
+   "code": "042660",
+   "name": "한화오션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "012330.KS",
+   "code": "012330",
+   "name": "현대모비스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006800.KS",
+   "code": "006800",
+   "name": "미래에셋증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "267260.KS",
+   "code": "267260",
+   "name": "HD현대일렉트릭",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "010130.KS",
+   "code": "010130",
+   "name": "고려아연",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "035420.KS",
+   "code": "035420",
+   "name": "NAVER",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "086790.KS",
+   "code": "086790",
+   "name": "하나금융지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005490.KS",
+   "code": "005490",
+   "name": "POSCO홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009540.KS",
+   "code": "009540",
+   "name": "HD한국조선해양",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "015760.KS",
+   "code": "015760",
+   "name": "한국전력",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "010120.KS",
+   "code": "010120",
+   "name": "LS ELECTRIC",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "298040.KS",
+   "code": "298040",
+   "name": "효성중공업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "010140.KS",
+   "code": "010140",
+   "name": "삼성중공업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "051910.KS",
+   "code": "051910",
+   "name": "LG화학",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "042700.KS",
+   "code": "042700",
+   "name": "한미반도체",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "034730.KS",
+   "code": "034730",
+   "name": "SK",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "064350.KS",
+   "code": "064350",
+   "name": "현대로템",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "316140.KS",
+   "code": "316140",
+   "name": "우리금융지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "272210.KS",
+   "code": "272210",
+   "name": "한화시스템",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000150.KS",
+   "code": "000150",
+   "name": "두산",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003670.KS",
+   "code": "003670",
+   "name": "포스코퓨처엠",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "096770.KS",
+   "code": "096770",
+   "name": "SK이노베이션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "079550.KS",
+   "code": "079550",
+   "name": "LIG디펜스앤에어로스페이스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "017670.KS",
+   "code": "017670",
+   "name": "SK텔레콤",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "066570.KS",
+   "code": "066570",
+   "name": "LG전자",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "035720.KS",
+   "code": "035720",
+   "name": "카카오",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000810.KS",
+   "code": "000810",
+   "name": "삼성화재",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "267250.KS",
+   "code": "267250",
+   "name": "HD현대",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "011200.KS",
+   "code": "011200",
+   "name": "HMM",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "138040.KS",
+   "code": "138040",
+   "name": "메리츠금융지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "033780.KS",
+   "code": "033780",
+   "name": "KT&G",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000720.KS",
+   "code": "000720",
+   "name": "현대건설",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "047810.KS",
+   "code": "047810",
+   "name": "한국항공우주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "024110.KS",
+   "code": "024110",
+   "name": "기업은행",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "086280.KS",
+   "code": "086280",
+   "name": "현대글로비스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "278470.KS",
+   "code": "278470",
+   "name": "에이피알",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "030200.KS",
+   "code": "030200",
+   "name": "KT",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003550.KS",
+   "code": "003550",
+   "name": "LG",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "071050.KS",
+   "code": "071050",
+   "name": "한국금융지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "047050.KS",
+   "code": "047050",
+   "name": "포스코인터내셔널",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "018260.KS",
+   "code": "018260",
+   "name": "삼성에스디에스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "047040.KS",
+   "code": "047040",
+   "name": "대우건설",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "010950.KS",
+   "code": "010950",
+   "name": "S-Oil",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005940.KS",
+   "code": "005940",
+   "name": "NH투자증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "259960.KS",
+   "code": "259960",
+   "name": "크래프톤",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "307950.KS",
+   "code": "307950",
+   "name": "현대오토에버",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "323410.KS",
+   "code": "323410",
+   "name": "카카오뱅크",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "011070.KS",
+   "code": "011070",
+   "name": "LG이노텍",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "039490.KS",
+   "code": "039490",
+   "name": "키움증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "007660.KS",
+   "code": "007660",
+   "name": "이수페타시스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005830.KS",
+   "code": "005830",
+   "name": "DB손해보험",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006260.KS",
+   "code": "006260",
+   "name": "LS",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "352820.KS",
+   "code": "352820",
+   "name": "하이브",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003230.KS",
+   "code": "003230",
+   "name": "삼양식품",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "443060.KS",
+   "code": "443060",
+   "name": "HD현대마린솔루션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "028050.KS",
+   "code": "028050",
+   "name": "삼성E&A",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "016360.KS",
+   "code": "016360",
+   "name": "삼성증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000880.KS",
+   "code": "000880",
+   "name": "한화",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003490.KS",
+   "code": "003490",
+   "name": "대한항공",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005387.KS",
+   "code": "005387",
+   "name": "현대차2우B",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "267270.KS",
+   "code": "267270",
+   "name": "HD건설기계",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009830.KS",
+   "code": "009830",
+   "name": "한화솔루션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "326030.KS",
+   "code": "326030",
+   "name": "SK바이오팜",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "161390.KS",
+   "code": "161390",
+   "name": "한국타이어앤테크놀로지",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "066970.KS",
+   "code": "066970",
+   "name": "엘앤에프",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "180640.KS",
+   "code": "180640",
+   "name": "한진칼",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "034220.KS",
+   "code": "034220",
+   "name": "LG디스플레이",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "090430.KS",
+   "code": "090430",
+   "name": "아모레퍼시픽",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "377300.KS",
+   "code": "377300",
+   "name": "카카오페이",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001440.KS",
+   "code": "001440",
+   "name": "대한전선",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000100.KS",
+   "code": "000100",
+   "name": "유한양행",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "032640.KS",
+   "code": "032640",
+   "name": "LG유플러스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "241560.KS",
+   "code": "241560",
+   "name": "두산밥캣",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "052690.KS",
+   "code": "052690",
+   "name": "한전기술",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "064400.KS",
+   "code": "064400",
+   "name": "LG씨엔에스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "078930.KS",
+   "code": "078930",
+   "name": "GS",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "128940.KS",
+   "code": "128940",
+   "name": "한미약품",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "062040.KS",
+   "code": "062040",
+   "name": "산일전기",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "029780.KS",
+   "code": "029780",
+   "name": "삼성카드",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001040.KS",
+   "code": "001040",
+   "name": "CJ",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "454910.KS",
+   "code": "454910",
+   "name": "두산로보틱스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005385.KS",
+   "code": "005385",
+   "name": "현대차우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "036570.KS",
+   "code": "036570",
+   "name": "NC",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "450080.KS",
+   "code": "450080",
+   "name": "에코프로머티",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "138930.KS",
+   "code": "138930",
+   "name": "BNK금융지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "021240.KS",
+   "code": "021240",
+   "name": "코웨이",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "010060.KS",
+   "code": "010060",
+   "name": "OCI홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "175330.KS",
+   "code": "175330",
+   "name": "JB금융지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "088980.KS",
+   "code": "088980",
+   "name": "맥쿼리인프라",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "271560.KS",
+   "code": "271560",
+   "name": "오리온",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000990.KS",
+   "code": "000990",
+   "name": "DB하이텍",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "022100.KS",
+   "code": "022100",
+   "name": "포스코DX",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "082740.KS",
+   "code": "082740",
+   "name": "한화엔진",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "004020.KS",
+   "code": "004020",
+   "name": "현대제철",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "353200.KS",
+   "code": "353200",
+   "name": "대덕전자",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "002380.KS",
+   "code": "002380",
+   "name": "KCC",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "011790.KS",
+   "code": "011790",
+   "name": "SKC",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "018880.KS",
+   "code": "018880",
+   "name": "한온시스템",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "251270.KS",
+   "code": "251270",
+   "name": "넷마블",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "103590.KS",
+   "code": "103590",
+   "name": "일진전기",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "088350.KS",
+   "code": "088350",
+   "name": "한화생명",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "489790.KS",
+   "code": "489790",
+   "name": "한화비전",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "457190.KS",
+   "code": "457190",
+   "name": "이수스페셜티케미컬",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "011170.KS",
+   "code": "011170",
+   "name": "롯데케미칼",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "017800.KS",
+   "code": "017800",
+   "name": "현대엘리베이터",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "051900.KS",
+   "code": "051900",
+   "name": "LG생활건강",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "375500.KS",
+   "code": "375500",
+   "name": "DL이앤씨",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "111770.KS",
+   "code": "111770",
+   "name": "영원무역",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "012510.KS",
+   "code": "012510",
+   "name": "더존비즈온",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "035250.KS",
+   "code": "035250",
+   "name": "강원랜드",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "439260.KS",
+   "code": "439260",
+   "name": "대한조선",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "004170.KS",
+   "code": "004170",
+   "name": "신세계",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006360.KS",
+   "code": "006360",
+   "name": "GS건설",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "097950.KS",
+   "code": "097950",
+   "name": "CJ제일제당",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "302440.KS",
+   "code": "302440",
+   "name": "SK바이오사이언스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "031210.KS",
+   "code": "031210",
+   "name": "서울보증보험",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "036460.KS",
+   "code": "036460",
+   "name": "한국가스공사",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "011780.KS",
+   "code": "011780",
+   "name": "금호석유화학",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "023530.KS",
+   "code": "023530",
+   "name": "롯데쇼핑",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001720.KS",
+   "code": "001720",
+   "name": "신영증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "012750.KS",
+   "code": "012750",
+   "name": "에스원",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "071970.KS",
+   "code": "071970",
+   "name": "HD현대마린엔진",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "014680.KS",
+   "code": "014680",
+   "name": "한솔케미칼",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "020150.KS",
+   "code": "020150",
+   "name": "롯데에너지머티리얼즈",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "336260.KS",
+   "code": "336260",
+   "name": "두산퓨얼셀",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "139130.KS",
+   "code": "139130",
+   "name": "iM금융지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000500.KS",
+   "code": "000500",
+   "name": "가온전선",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "085620.KS",
+   "code": "085620",
+   "name": "미래에셋생명",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "028670.KS",
+   "code": "028670",
+   "name": "팬오션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005850.KS",
+   "code": "005850",
+   "name": "에스엘",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009970.KS",
+   "code": "009970",
+   "name": "영원무역홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "112610.KS",
+   "code": "112610",
+   "name": "씨에스윈드",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "139480.KS",
+   "code": "139480",
+   "name": "이마트",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "004990.KS",
+   "code": "004990",
+   "name": "롯데지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "103140.KS",
+   "code": "103140",
+   "name": "풍산",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "097230.KS",
+   "code": "097230",
+   "name": "HJ중공업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "051600.KS",
+   "code": "051600",
+   "name": "한전KPS",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "017960.KS",
+   "code": "017960",
+   "name": "한국카본",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "026960.KS",
+   "code": "026960",
+   "name": "동서",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001450.KS",
+   "code": "001450",
+   "name": "현대해상",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "008930.KS",
+   "code": "008930",
+   "name": "한미사이언스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "004800.KS",
+   "code": "004800",
+   "name": "효성",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "483650.KS",
+   "code": "483650",
+   "name": "달바글로벌",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "120110.KS",
+   "code": "120110",
+   "name": "코오롱인더",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "279570.KS",
+   "code": "279570",
+   "name": "케이뱅크",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "383220.KS",
+   "code": "383220",
+   "name": "F&F",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009420.KS",
+   "code": "009420",
+   "name": "한올바이오파마",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "204320.KS",
+   "code": "204320",
+   "name": "HL만도",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001430.KS",
+   "code": "001430",
+   "name": "세아베스틸지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "192820.KS",
+   "code": "192820",
+   "name": "코스맥스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "007340.KS",
+   "code": "007340",
+   "name": "DN오토모티브",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000120.KS",
+   "code": "000120",
+   "name": "CJ대한통운",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000240.KS",
+   "code": "000240",
+   "name": "한국앤컴퍼니",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005440.KS",
+   "code": "005440",
+   "name": "현대지에프홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "298020.KS",
+   "code": "298020",
+   "name": "효성티앤씨",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "011210.KS",
+   "code": "011210",
+   "name": "현대위아",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "282330.KS",
+   "code": "282330",
+   "name": "BGF리테일",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "004370.KS",
+   "code": "004370",
+   "name": "농심",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "030000.KS",
+   "code": "030000",
+   "name": "제일기획",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "018670.KS",
+   "code": "018670",
+   "name": "SK가스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "361610.KS",
+   "code": "361610",
+   "name": "SK아이이테크놀로지",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000155.KS",
+   "code": "000155",
+   "name": "두산우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "007810.KS",
+   "code": "007810",
+   "name": "코리아써키트",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "081660.KS",
+   "code": "081660",
+   "name": "미스토홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "008770.KS",
+   "code": "008770",
+   "name": "호텔신라",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005070.KS",
+   "code": "005070",
+   "name": "코스모신소재",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003690.KS",
+   "code": "003690",
+   "name": "코리안리",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "002790.KS",
+   "code": "002790",
+   "name": "아모레퍼시픽홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "322000.KS",
+   "code": "322000",
+   "name": "HD현대에너지솔루션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "023590.KS",
+   "code": "023590",
+   "name": "다우기술",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "395400.KS",
+   "code": "395400",
+   "name": "SK리츠",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "161890.KS",
+   "code": "161890",
+   "name": "한국콜마",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "069960.KS",
+   "code": "069960",
+   "name": "현대백화점",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001120.KS",
+   "code": "001120",
+   "name": "LX인터내셔널",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "462870.KS",
+   "code": "462870",
+   "name": "시프트업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "077970.KS",
+   "code": "077970",
+   "name": "STX엔진",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "007070.KS",
+   "code": "007070",
+   "name": "GS리테일",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003540.KS",
+   "code": "003540",
+   "name": "대신증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003570.KS",
+   "code": "003570",
+   "name": "SNT다이내믹스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "475150.KS",
+   "code": "475150",
+   "name": "SK이터닉스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "229640.KS",
+   "code": "229640",
+   "name": "LS에코에너지",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "069620.KS",
+   "code": "069620",
+   "name": "대웅제약",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006040.KS",
+   "code": "006040",
+   "name": "동원산업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "073240.KS",
+   "code": "073240",
+   "name": "금호타이어",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006280.KS",
+   "code": "006280",
+   "name": "녹십자",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003530.KS",
+   "code": "003530",
+   "name": "한화투자증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "012630.KS",
+   "code": "012630",
+   "name": "HDC",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "294870.KS",
+   "code": "294870",
+   "name": "IPARK현대산업개발",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "032350.KS",
+   "code": "032350",
+   "name": "롯데관광개발",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "030610.KS",
+   "code": "030610",
+   "name": "교보증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001800.KS",
+   "code": "001800",
+   "name": "오리온홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "020560.KS",
+   "code": "020560",
+   "name": "아시아나항공",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "093370.KS",
+   "code": "093370",
+   "name": "후성",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "007310.KS",
+   "code": "007310",
+   "name": "오뚜기",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "100090.KS",
+   "code": "100090",
+   "name": "SK오션플랜트",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "051915.KS",
+   "code": "051915",
+   "name": "LG화학우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "034230.KS",
+   "code": "034230",
+   "name": "파라다이스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "004000.KS",
+   "code": "004000",
+   "name": "롯데정밀화학",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "181710.KS",
+   "code": "181710",
+   "name": "NHN",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "330590.KS",
+   "code": "330590",
+   "name": "롯데리츠",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "082640.KS",
+   "code": "082640",
+   "name": "동양생명",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003240.KS",
+   "code": "003240",
+   "name": "태광산업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003090.KS",
+   "code": "003090",
+   "name": "대웅",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000210.KS",
+   "code": "000210",
+   "name": "DL",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "300720.KS",
+   "code": "300720",
+   "name": "한일시멘트",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000670.KS",
+   "code": "000670",
+   "name": "영풍",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "415640.KS",
+   "code": "415640",
+   "name": "KB발해인프라",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "185750.KS",
+   "code": "185750",
+   "name": "종근당",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "089860.KS",
+   "code": "089860",
+   "name": "롯데렌탈",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000080.KS",
+   "code": "000080",
+   "name": "하이트진로",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "090460.KS",
+   "code": "090460",
+   "name": "비에이치",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001740.KS",
+   "code": "001740",
+   "name": "SK네트웍스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "195870.KS",
+   "code": "195870",
+   "name": "해성디에스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "451800.KS",
+   "code": "451800",
+   "name": "한화리츠",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "075580.KS",
+   "code": "075580",
+   "name": "세진중공업",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "281820.KS",
+   "code": "281820",
+   "name": "케이씨텍",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005300.KS",
+   "code": "005300",
+   "name": "롯데칠성",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "365550.KS",
+   "code": "365550",
+   "name": "ESR켄달스퀘어리츠",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006110.KS",
+   "code": "006110",
+   "name": "삼아알미늄",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "000815.KS",
+   "code": "000815",
+   "name": "삼성화재우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "100840.KS",
+   "code": "100840",
+   "name": "SNT에너지",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "192080.KS",
+   "code": "192080",
+   "name": "더블유게임즈",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "484870.KS",
+   "code": "484870",
+   "name": "엠앤씨솔루션",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "280360.KS",
+   "code": "280360",
+   "name": "롯데웰푸드",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005690.KS",
+   "code": "005690",
+   "name": "파미셀",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "137310.KS",
+   "code": "137310",
+   "name": "에스디바이오센서",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006120.KS",
+   "code": "006120",
+   "name": "SK디스커버리",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "298050.KS",
+   "code": "298050",
+   "name": "HS효성첨단소재",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "192400.KS",
+   "code": "192400",
+   "name": "쿠쿠홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "071055.KS",
+   "code": "071055",
+   "name": "한국금융지주우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "036530.KS",
+   "code": "036530",
+   "name": "SNT홀딩스",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "057050.KS",
+   "code": "057050",
+   "name": "현대홈쇼핑",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "285130.KS",
+   "code": "285130",
+   "name": "SK케미칼",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "006650.KS",
+   "code": "006650",
+   "name": "대한유화",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003470.KS",
+   "code": "003470",
+   "name": "유안타증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009450.KS",
+   "code": "009450",
+   "name": "경동나비엔",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "079900.KS",
+   "code": "079900",
+   "name": "전진건설로봇",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "066575.KS",
+   "code": "066575",
+   "name": "LG전자우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "499790.KS",
+   "code": "499790",
+   "name": "GS피앤엘",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "248070.KS",
+   "code": "248070",
+   "name": "솔루엠",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "033240.KS",
+   "code": "033240",
+   "name": "자화전자",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "456040.KS",
+   "code": "456040",
+   "name": "OCI",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "336370.KS",
+   "code": "336370",
+   "name": "솔루스첨단소재",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009155.KS",
+   "code": "009155",
+   "name": "삼성전기우",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "064960.KS",
+   "code": "064960",
+   "name": "SNT모티브",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "030190.KS",
+   "code": "030190",
+   "name": "NICE평가정보",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "009240.KS",
+   "code": "009240",
+   "name": "한샘",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "004490.KS",
+   "code": "004490",
+   "name": "세방전지",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "071320.KS",
+   "code": "071320",
+   "name": "지역난방공사",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "108320.KS",
+   "code": "108320",
+   "name": "LX세미콘",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003160.KS",
+   "code": "003160",
+   "name": "디아이",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "161000.KS",
+   "code": "161000",
+   "name": "애경케미칼",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003030.KS",
+   "code": "003030",
+   "name": "세아제강지주",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005090.KS",
+   "code": "005090",
+   "name": "SGC에너지",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "249420.KS",
+   "code": "249420",
+   "name": "일동제약",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "005880.KS",
+   "code": "005880",
+   "name": "대한해운",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "001510.KS",
+   "code": "001510",
+   "name": "SK증권",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "025540.KS",
+   "code": "025540",
+   "name": "한국단자",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003850.KS",
+   "code": "003850",
+   "name": "보령",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "011930.KS",
+   "code": "011930",
+   "name": "신성이엔지",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "010780.KS",
+   "code": "010780",
+   "name": "아이에스동서",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "317450.KS",
+   "code": "317450",
+   "name": "명인제약",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "003620.KS",
+   "code": "003620",
+   "name": "KG모빌리티",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "010820.KS",
+   "code": "010820",
+   "name": "퍼스텍",
+   "market_sub": "KOSPI",
+   "sector": ""
+  },
+  {
+   "ticker": "086520.KQ",
+   "code": "086520",
+   "name": "에코프로",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "247540.KQ",
+   "code": "247540",
+   "name": "에코프로비엠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "196170.KQ",
+   "code": "196170",
+   "name": "알테오젠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "277810.KQ",
+   "code": "277810",
+   "name": "레인보우로보틱스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "000250.KQ",
+   "code": "000250",
+   "name": "삼천당제약",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "058470.KQ",
+   "code": "058470",
+   "name": "리노공업",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "298380.KQ",
+   "code": "298380",
+   "name": "에이비엘바이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "950160.KQ",
+   "code": "950160",
+   "name": "코오롱티슈진",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "028300.KQ",
+   "code": "028300",
+   "name": "HLB",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "141080.KQ",
+   "code": "141080",
+   "name": "리가켐바이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "087010.KQ",
+   "code": "087010",
+   "name": "펩트론",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "039030.KQ",
+   "code": "039030",
+   "name": "이오테크닉스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "240810.KQ",
+   "code": "240810",
+   "name": "원익IPS",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "036930.KQ",
+   "code": "036930",
+   "name": "주성엔지니어링",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "310210.KQ",
+   "code": "310210",
+   "name": "보로노이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "095340.KQ",
+   "code": "095340",
+   "name": "ISC",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "214370.KQ",
+   "code": "214370",
+   "name": "케어젠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "108490.KQ",
+   "code": "108490",
+   "name": "로보티즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "403870.KQ",
+   "code": "403870",
+   "name": "HPSP",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "032820.KQ",
+   "code": "032820",
+   "name": "우리기술",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "214150.KQ",
+   "code": "214150",
+   "name": "클래시스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "263750.KQ",
+   "code": "263750",
+   "name": "펄어비스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "043260.KQ",
+   "code": "043260",
+   "name": "성호전자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "357780.KQ",
+   "code": "357780",
+   "name": "솔브레인",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "347850.KQ",
+   "code": "347850",
+   "name": "디앤디파마텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "319400.KQ",
+   "code": "319400",
+   "name": "현대무벡스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "226950.KQ",
+   "code": "226950",
+   "name": "올릭스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "145020.KQ",
+   "code": "145020",
+   "name": "휴젤",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "222800.KQ",
+   "code": "222800",
+   "name": "심텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "064760.KQ",
+   "code": "064760",
+   "name": "티씨케이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "100790.KQ",
+   "code": "100790",
+   "name": "미래에셋벤처투자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "440110.KQ",
+   "code": "440110",
+   "name": "파두",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "214450.KQ",
+   "code": "214450",
+   "name": "파마리서치",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "178320.KQ",
+   "code": "178320",
+   "name": "서진시스템",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "083650.KQ",
+   "code": "083650",
+   "name": "비에이치아이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "005290.KQ",
+   "code": "005290",
+   "name": "동진쎄미켐",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "084370.KQ",
+   "code": "084370",
+   "name": "유진테크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "257720.KQ",
+   "code": "257720",
+   "name": "실리콘투",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "237690.KQ",
+   "code": "237690",
+   "name": "에스티팜",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "140410.KQ",
+   "code": "140410",
+   "name": "메지온",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "218410.KQ",
+   "code": "218410",
+   "name": "RFHIC",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "082920.KQ",
+   "code": "082920",
+   "name": "비츠로셀",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "476830.KQ",
+   "code": "476830",
+   "name": "알지노믹스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "058610.KQ",
+   "code": "058610",
+   "name": "에스피지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "067310.KQ",
+   "code": "067310",
+   "name": "하나마이크론",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "068760.KQ",
+   "code": "068760",
+   "name": "셀트리온제약",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "010170.KQ",
+   "code": "010170",
+   "name": "대한광통신",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "319660.KQ",
+   "code": "319660",
+   "name": "피에스케이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "031980.KQ",
+   "code": "031980",
+   "name": "피에스케이홀딩스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "030530.KQ",
+   "code": "030530",
+   "name": "원익홀딩스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "078600.KQ",
+   "code": "078600",
+   "name": "대주전자재료",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "323280.KQ",
+   "code": "323280",
+   "name": "태성",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "347700.KQ",
+   "code": "347700",
+   "name": "스피어",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "035900.KQ",
+   "code": "035900",
+   "name": "JYP Ent.",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "098460.KQ",
+   "code": "098460",
+   "name": "고영",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "101490.KQ",
+   "code": "101490",
+   "name": "에스앤에스텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "041510.KQ",
+   "code": "041510",
+   "name": "에스엠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "131970.KQ",
+   "code": "131970",
+   "name": "두산테스나",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "089030.KQ",
+   "code": "089030",
+   "name": "테크윙",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "099320.KQ",
+   "code": "099320",
+   "name": "쎄트렉아이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "039200.KQ",
+   "code": "039200",
+   "name": "오스코텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "140860.KQ",
+   "code": "140860",
+   "name": "파크시스템스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "131290.KQ",
+   "code": "131290",
+   "name": "티에스이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "060370.KQ",
+   "code": "060370",
+   "name": "LS마린솔루션",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "095610.KQ",
+   "code": "095610",
+   "name": "테스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "027360.KQ",
+   "code": "027360",
+   "name": "아주IB투자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "458870.KQ",
+   "code": "458870",
+   "name": "씨어스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "475830.KQ",
+   "code": "475830",
+   "name": "오름테라퓨틱",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "038500.KQ",
+   "code": "038500",
+   "name": "삼표시멘트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "437730.KQ",
+   "code": "437730",
+   "name": "삼현",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "232140.KQ",
+   "code": "232140",
+   "name": "와이씨",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "065350.KQ",
+   "code": "065350",
+   "name": "신성델타테크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "290650.KQ",
+   "code": "290650",
+   "name": "엘앤씨바이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "281740.KQ",
+   "code": "281740",
+   "name": "레이크머티리얼즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "417200.KQ",
+   "code": "417200",
+   "name": "LS머트리얼즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "085660.KQ",
+   "code": "085660",
+   "name": "차바이오텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "445680.KQ",
+   "code": "445680",
+   "name": "큐리옥스바이오시스템즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "183300.KQ",
+   "code": "183300",
+   "name": "코미코",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "080220.KQ",
+   "code": "080220",
+   "name": "제주반도체",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "003380.KQ",
+   "code": "003380",
+   "name": "하림지주",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "388210.KQ",
+   "code": "388210",
+   "name": "씨엠티엑스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "127120.KQ",
+   "code": "127120",
+   "name": "제이에스링크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "189300.KQ",
+   "code": "189300",
+   "name": "인텔리안테크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "195940.KQ",
+   "code": "195940",
+   "name": "HK이노엔",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "376900.KQ",
+   "code": "376900",
+   "name": "로킷헬스케어",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "491000.KQ",
+   "code": "491000",
+   "name": "리브스메드",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "137400.KQ",
+   "code": "137400",
+   "name": "피엔티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "166090.KQ",
+   "code": "166090",
+   "name": "하나머티리얼즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "115180.KQ",
+   "code": "115180",
+   "name": "큐리언트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "213420.KQ",
+   "code": "213420",
+   "name": "덕산네오룩스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "397030.KQ",
+   "code": "397030",
+   "name": "에이프릴바이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "090710.KQ",
+   "code": "090710",
+   "name": "휴림로봇",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "036830.KQ",
+   "code": "036830",
+   "name": "솔브레인홀딩스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "089970.KQ",
+   "code": "089970",
+   "name": "브이엠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "007390.KQ",
+   "code": "007390",
+   "name": "네이처셀",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "222080.KQ",
+   "code": "222080",
+   "name": "씨아이에스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "096530.KQ",
+   "code": "096530",
+   "name": "씨젠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "048410.KQ",
+   "code": "048410",
+   "name": "현대바이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "160190.KQ",
+   "code": "160190",
+   "name": "하이젠알앤엠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "032500.KQ",
+   "code": "032500",
+   "name": "케이엠더블유",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "456160.KQ",
+   "code": "456160",
+   "name": "지투지바이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "036540.KQ",
+   "code": "036540",
+   "name": "SFA반도체",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "490470.KQ",
+   "code": "490470",
+   "name": "세미파이브",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "466100.KQ",
+   "code": "466100",
+   "name": "클로봇",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "420770.KQ",
+   "code": "420770",
+   "name": "기가비스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "171090.KQ",
+   "code": "171090",
+   "name": "선익시스템",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "035760.KQ",
+   "code": "035760",
+   "name": "CJ ENM",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "161580.KQ",
+   "code": "161580",
+   "name": "필옵틱스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "348370.KQ",
+   "code": "348370",
+   "name": "엔켐",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "023160.KQ",
+   "code": "023160",
+   "name": "태광",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "388720.KQ",
+   "code": "388720",
+   "name": "유일로보틱스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "124500.KQ",
+   "code": "124500",
+   "name": "아이티센글로벌",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "086450.KQ",
+   "code": "086450",
+   "name": "동국제약",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "056190.KQ",
+   "code": "056190",
+   "name": "에스에프에이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "204270.KQ",
+   "code": "204270",
+   "name": "제이앤티씨",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "293490.KQ",
+   "code": "293490",
+   "name": "카카오게임즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "052020.KQ",
+   "code": "052020",
+   "name": "에스티큐브",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "295310.KQ",
+   "code": "295310",
+   "name": "에이치브이엠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "253450.KQ",
+   "code": "253450",
+   "name": "스튜디오드래곤",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "328130.KQ",
+   "code": "328130",
+   "name": "루닛",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "014620.KQ",
+   "code": "014620",
+   "name": "성광벤드",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "121600.KQ",
+   "code": "121600",
+   "name": "나노신소재",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "082270.KQ",
+   "code": "082270",
+   "name": "젬백스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "122870.KQ",
+   "code": "122870",
+   "name": "와이지엔터테인먼트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "050890.KQ",
+   "code": "050890",
+   "name": "쏠리드",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "365340.KQ",
+   "code": "365340",
+   "name": "성일하이텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "126340.KQ",
+   "code": "126340",
+   "name": "비나텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "476060.KQ",
+   "code": "476060",
+   "name": "온코닉테라퓨틱스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "074600.KQ",
+   "code": "074600",
+   "name": "원익QnC",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "036810.KQ",
+   "code": "036810",
+   "name": "에프에스티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "174900.KQ",
+   "code": "174900",
+   "name": "앱클론",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "044490.KQ",
+   "code": "044490",
+   "name": "태웅",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "358570.KQ",
+   "code": "358570",
+   "name": "지아이이노베이션",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "078160.KQ",
+   "code": "078160",
+   "name": "메디포스트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "056080.KQ",
+   "code": "056080",
+   "name": "유진로봇",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "094170.KQ",
+   "code": "094170",
+   "name": "동운아나텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "032190.KQ",
+   "code": "032190",
+   "name": "다우데이타",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "241710.KQ",
+   "code": "241710",
+   "name": "코스메카코리아",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "006730.KQ",
+   "code": "006730",
+   "name": "서부T&D",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "372320.KQ",
+   "code": "372320",
+   "name": "큐로셀",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "052400.KQ",
+   "code": "052400",
+   "name": "코나아이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "033500.KQ",
+   "code": "033500",
+   "name": "동성화인텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "327260.KQ",
+   "code": "327260",
+   "name": "RF머트리얼즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "009520.KQ",
+   "code": "009520",
+   "name": "포스코엠텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "278280.KQ",
+   "code": "278280",
+   "name": "천보",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "348340.KQ",
+   "code": "348340",
+   "name": "뉴로메카",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "033100.KQ",
+   "code": "033100",
+   "name": "제룡전기",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "083450.KQ",
+   "code": "083450",
+   "name": "GST",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "368770.KQ",
+   "code": "368770",
+   "name": "파이버프로",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "112040.KQ",
+   "code": "112040",
+   "name": "위메이드",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "214430.KQ",
+   "code": "214430",
+   "name": "아이쓰리시스템",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "060250.KQ",
+   "code": "060250",
+   "name": "NHN KCP",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "252990.KQ",
+   "code": "252990",
+   "name": "샘씨엔에스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "102710.KQ",
+   "code": "102710",
+   "name": "이엔에프테크놀로지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "199800.KQ",
+   "code": "199800",
+   "name": "툴젠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "053610.KQ",
+   "code": "053610",
+   "name": "프로텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "225570.KQ",
+   "code": "225570",
+   "name": "넥슨게임즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "389470.KQ",
+   "code": "389470",
+   "name": "인벤티지랩",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "348210.KQ",
+   "code": "348210",
+   "name": "넥스틴",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "376300.KQ",
+   "code": "376300",
+   "name": "디어유",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "356860.KQ",
+   "code": "356860",
+   "name": "티엘비",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "086900.KQ",
+   "code": "086900",
+   "name": "메디톡스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "399720.KQ",
+   "code": "399720",
+   "name": "가온칩스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "253590.KQ",
+   "code": "253590",
+   "name": "네오셈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "033790.KQ",
+   "code": "033790",
+   "name": "피노",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "493280.KQ",
+   "code": "493280",
+   "name": "아이엠바이오로직스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "015750.KQ",
+   "code": "015750",
+   "name": "성우하이텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "084110.KQ",
+   "code": "084110",
+   "name": "휴온스글로벌",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "102940.KQ",
+   "code": "102940",
+   "name": "코오롱생명과학",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "024850.KQ",
+   "code": "024850",
+   "name": "HLB이노베이션",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "475960.KQ",
+   "code": "475960",
+   "name": "토모큐브",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "486990.KQ",
+   "code": "486990",
+   "name": "노타",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "425420.KQ",
+   "code": "425420",
+   "name": "티에프이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "053800.KQ",
+   "code": "053800",
+   "name": "안랩",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "460930.KQ",
+   "code": "460930",
+   "name": "현대힘스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "200710.KQ",
+   "code": "200710",
+   "name": "에이디테크놀로지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "272290.KQ",
+   "code": "272290",
+   "name": "이녹스첨단소재",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "383310.KQ",
+   "code": "383310",
+   "name": "에코프로에이치엔",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "077360.KQ",
+   "code": "077360",
+   "name": "덕산하이메탈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "059090.KQ",
+   "code": "059090",
+   "name": "미코",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "067160.KQ",
+   "code": "067160",
+   "name": "SOOP",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "025980.KQ",
+   "code": "025980",
+   "name": "아난티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "031330.KQ",
+   "code": "031330",
+   "name": "에스에이엠티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "041960.KQ",
+   "code": "041960",
+   "name": "코미팜",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "393890.KQ",
+   "code": "393890",
+   "name": "더블유씨피",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "336570.KQ",
+   "code": "336570",
+   "name": "원텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "107640.KQ",
+   "code": "107640",
+   "name": "한중엔시에스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "042000.KQ",
+   "code": "042000",
+   "name": "카페24",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "468530.KQ",
+   "code": "468530",
+   "name": "프로티나",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "187660.KQ",
+   "code": "187660",
+   "name": "페니트리움바이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "060280.KQ",
+   "code": "060280",
+   "name": "큐렉소",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "025900.KQ",
+   "code": "025900",
+   "name": "동화기업",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "104830.KQ",
+   "code": "104830",
+   "name": "원익머트리얼즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "033160.KQ",
+   "code": "033160",
+   "name": "엠케이전자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "090360.KQ",
+   "code": "090360",
+   "name": "로보스타",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "089890.KQ",
+   "code": "089890",
+   "name": "코세스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "046890.KQ",
+   "code": "046890",
+   "name": "서울반도체",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "488900.KQ",
+   "code": "488900",
+   "name": "비츠로넥스텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "448900.KQ",
+   "code": "448900",
+   "name": "한국피아이엠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "033640.KQ",
+   "code": "033640",
+   "name": "네패스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "287840.KQ",
+   "code": "287840",
+   "name": "인투셀",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "125490.KQ",
+   "code": "125490",
+   "name": "한라캐스트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "138080.KQ",
+   "code": "138080",
+   "name": "오이솔루션",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "089010.KQ",
+   "code": "089010",
+   "name": "켐트로닉스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "354320.KQ",
+   "code": "354320",
+   "name": "알멕",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "064260.KQ",
+   "code": "064260",
+   "name": "다날",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "484590.KQ",
+   "code": "484590",
+   "name": "삼양컴텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "078130.KQ",
+   "code": "078130",
+   "name": "국일제지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "099190.KQ",
+   "code": "099190",
+   "name": "아이센스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "047920.KQ",
+   "code": "047920",
+   "name": "HLB제약",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "025320.KQ",
+   "code": "025320",
+   "name": "시노펙스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "041190.KQ",
+   "code": "041190",
+   "name": "우리기술투자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "119850.KQ",
+   "code": "119850",
+   "name": "지엔씨에너지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "122640.KQ",
+   "code": "122640",
+   "name": "예스티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "045100.KQ",
+   "code": "045100",
+   "name": "한양이엔지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "069540.KQ",
+   "code": "069540",
+   "name": "빛과전자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "036620.KQ",
+   "code": "036620",
+   "name": "감성코퍼레이션",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "101730.KQ",
+   "code": "101730",
+   "name": "위메이드맥스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "424870.KQ",
+   "code": "424870",
+   "name": "이뮨온시아",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "211050.KQ",
+   "code": "211050",
+   "name": "인카금융서비스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "018290.KQ",
+   "code": "018290",
+   "name": "브이티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "101160.KQ",
+   "code": "101160",
+   "name": "월덱스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "039440.KQ",
+   "code": "039440",
+   "name": "에스티아이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "251970.KQ",
+   "code": "251970",
+   "name": "펌텍코리아",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "114810.KQ",
+   "code": "114810",
+   "name": "한솔아이원스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "037460.KQ",
+   "code": "037460",
+   "name": "삼지전자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "093320.KQ",
+   "code": "093320",
+   "name": "케이아이엔엑스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "067630.KQ",
+   "code": "067630",
+   "name": "HLB생명과학",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "290550.KQ",
+   "code": "290550",
+   "name": "디케이티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "317330.KQ",
+   "code": "317330",
+   "name": "덕산테코피아",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "095660.KQ",
+   "code": "095660",
+   "name": "네오위즈",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "019210.KQ",
+   "code": "019210",
+   "name": "와이지-원",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "030520.KQ",
+   "code": "030520",
+   "name": "한글과컴퓨터",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "079370.KQ",
+   "code": "079370",
+   "name": "제우스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "206650.KQ",
+   "code": "206650",
+   "name": "유바이오로직스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "168360.KQ",
+   "code": "168360",
+   "name": "펨트론",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "389650.KQ",
+   "code": "389650",
+   "name": "넥스트바이오메디컬",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "215600.KQ",
+   "code": "215600",
+   "name": "신라젠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "013030.KQ",
+   "code": "013030",
+   "name": "하이록코리아",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "230360.KQ",
+   "code": "230360",
+   "name": "에코마케팅",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "340570.KQ",
+   "code": "340570",
+   "name": "티앤엘",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "006910.KQ",
+   "code": "006910",
+   "name": "보성파워텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "394280.KQ",
+   "code": "394280",
+   "name": "오픈엣지테크놀로지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "036170.KQ",
+   "code": "036170",
+   "name": "에이치엠넥스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "101930.KQ",
+   "code": "101930",
+   "name": "인화정공",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "042520.KQ",
+   "code": "042520",
+   "name": "한스바이오메드",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "098070.KQ",
+   "code": "098070",
+   "name": "한텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "025770.KQ",
+   "code": "025770",
+   "name": "한국정보통신",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "034950.KQ",
+   "code": "034950",
+   "name": "한국기업평가",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "441270.KQ",
+   "code": "441270",
+   "name": "파인엠텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "215200.KQ",
+   "code": "215200",
+   "name": "메가스터디교육",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "180400.KQ",
+   "code": "180400",
+   "name": "DXVX",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "080580.KQ",
+   "code": "080580",
+   "name": "오킨스전자",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "091700.KQ",
+   "code": "091700",
+   "name": "파트론",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "378340.KQ",
+   "code": "378340",
+   "name": "필에너지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "418550.KQ",
+   "code": "418550",
+   "name": "제이오",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "089980.KQ",
+   "code": "089980",
+   "name": "상아프론테크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "046970.KQ",
+   "code": "046970",
+   "name": "우리로",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "073490.KQ",
+   "code": "073490",
+   "name": "LIG아큐버",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "450950.KQ",
+   "code": "450950",
+   "name": "아스테라시스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "228760.KQ",
+   "code": "228760",
+   "name": "지노믹트리",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "455900.KQ",
+   "code": "455900",
+   "name": "엔젤로보틱스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "482630.KQ",
+   "code": "482630",
+   "name": "삼양엔씨켐",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "069080.KQ",
+   "code": "069080",
+   "name": "웹젠",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "042370.KQ",
+   "code": "042370",
+   "name": "비츠로테크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "308430.KQ",
+   "code": "308430",
+   "name": "셀비온",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "318060.KQ",
+   "code": "318060",
+   "name": "그래피",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "078350.KQ",
+   "code": "078350",
+   "name": "한양디지텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "376270.KQ",
+   "code": "376270",
+   "name": "HEM파마",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "064820.KQ",
+   "code": "064820",
+   "name": "케이프",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "241770.KQ",
+   "code": "241770",
+   "name": "메카로",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "494120.KQ",
+   "code": "494120",
+   "name": "큐리오시스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "117730.KQ",
+   "code": "117730",
+   "name": "티로보틱스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "092870.KQ",
+   "code": "092870",
+   "name": "엑시콘",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "478340.KQ",
+   "code": "478340",
+   "name": "나라스페이스테크놀로지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "234340.KQ",
+   "code": "234340",
+   "name": "헥토파이낸셜",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "078020.KQ",
+   "code": "078020",
+   "name": "LS증권",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "179900.KQ",
+   "code": "179900",
+   "name": "유티아이",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "110990.KQ",
+   "code": "110990",
+   "name": "디아이티",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "220100.KQ",
+   "code": "220100",
+   "name": "퓨쳐켐",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "052710.KQ",
+   "code": "052710",
+   "name": "아모텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "389500.KQ",
+   "code": "389500",
+   "name": "에스비비테크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "078340.KQ",
+   "code": "078340",
+   "name": "컴투스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "114190.KQ",
+   "code": "114190",
+   "name": "강원에너지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "241520.KQ",
+   "code": "241520",
+   "name": "DSC인베스트먼트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "079940.KQ",
+   "code": "079940",
+   "name": "가비아",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "298830.KQ",
+   "code": "298830",
+   "name": "슈어소프트테크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "389260.KQ",
+   "code": "389260",
+   "name": "대명에너지",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "900290.KQ",
+   "code": "900290",
+   "name": "GRT",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "084850.KQ",
+   "code": "084850",
+   "name": "아이티엠반도체",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "091580.KQ",
+   "code": "091580",
+   "name": "상신이디피",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "356680.KQ",
+   "code": "356680",
+   "name": "엑스게이트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "086390.KQ",
+   "code": "086390",
+   "name": "유니테스트",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "144510.KQ",
+   "code": "144510",
+   "name": "지씨셀",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "094360.KQ",
+   "code": "094360",
+   "name": "칩스앤미디어",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "041830.KQ",
+   "code": "041830",
+   "name": "인바디",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "304360.KQ",
+   "code": "304360",
+   "name": "에스바이오메딕스",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "217730.KQ",
+   "code": "217730",
+   "name": "강스템바이오텍",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "394800.KQ",
+   "code": "394800",
+   "name": "쓰리빌리언",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  },
+  {
+   "ticker": "330860.KQ",
+   "code": "330860",
+   "name": "네패스아크",
+   "market_sub": "KOSDAQ",
+   "sector": ""
+  }
+ ]
+}
