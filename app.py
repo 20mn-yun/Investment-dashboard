@@ -435,90 +435,57 @@ def _calc_change(series, period):
         return (series.iloc[-1] - series.iloc[0]) / series.iloc[0] * 100
 
 
+_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
+
+
 @app.route("/api/top-gainers", methods=["GET"])
 def get_top_gainers():
-    """시장별 상승률 TOP 10 (확장 종목 대상)"""
+    """시장별 상승률 TOP 10 (배치 프리페치 파일 기반)"""
     market = request.args.get("market", "us")
     period = request.args.get("period", "1w")
 
-    # 결과 캐시 (5분)
-    cache_key = f"{market}_{period}"
-    now = time.time()
-    if cache_key in _top_gainers_cache:
-        cached_time, cached_data = _top_gainers_cache[cache_key]
-        if now - cached_time < 300:
-            return jsonify(cached_data)
+    if market != "us":
+        return jsonify({"error": "아직 구현되지 않음"}), 501
 
-    tickers = load_expanded_tickers(market)
-    if not tickers:
-        return jsonify([])
-
-    # 1d/1w 모두 5d 데이터로 충분, 1mo는 1mo
-    yf_period = "1mo" if period == "1mo" else "5d"
-
+    cache_path = os.path.join(_CACHE_DIR, f"top_gainers_{market}.json")
     try:
-        closes = _download_closes_chunked(tickers, yf_period)
-        if closes is None or closes.empty:
-            return jsonify([])
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"error": "아직 배치가 실행되지 않았습니다"}), 503
 
-        changes = []
+    items = cached.get("data", {}).get(period, [])
+    return jsonify({
+        "data": items,
+        "last_updated": cached.get("last_updated", ""),
+        "universe_size": cached.get("universe_size", 0),
+        "failed_count": cached.get("failed_count", 0),
+    })
 
-        if isinstance(closes, pd.Series):
-            series = closes.dropna()
-            if len(series) >= 2:
-                pct = _calc_change(series, period)
-                changes.append((tickers[0], float(pct), float(series.iloc[-1])))
-        else:
-            for ticker in closes.columns:
-                try:
-                    series = closes[ticker].dropna()
-                    if len(series) < 2:
-                        continue
-                    pct = _calc_change(series, period)
-                    changes.append((ticker, float(pct), float(series.iloc[-1])))
-                except Exception:
-                    continue
 
-        changes.sort(key=lambda x: x[1], reverse=True)
-        top = changes[:10]
+def _is_private_ip(addr):
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(addr)
+        if ip.is_loopback or ip.is_private:
+            return True
+        # Tailscale CGNAT: 100.64.0.0/10
+        return ipaddress.ip_address("100.64.0.0") <= ip <= ipaddress.ip_address("100.127.255.255")
+    except ValueError:
+        return False
 
-        # MARKET_STOCKS + US stock map 에서 메타데이터 조회
-        stock_info = {}
-        for s in MARKET_STOCKS.get(market, []):
-            stock_info[s[0]] = {"name": s[1], "sector": s[2], "industry": s[3]}
 
-        results = []
-        for ticker, pct, price in top:
-            if ticker in stock_info:
-                info = stock_info[ticker]
-                results.append({
-                    "ticker": ticker, "name": info["name"],
-                    "sector": info["sector"], "industry": info["industry"],
-                    "change_pct": round(pct, 2), "price": round(price, 2),
-                })
-            else:
-                name, sector, industry = ticker, "-", "-"
-                try:
-                    yf_info = yf.Ticker(ticker).info
-                    name = yf_info.get("shortName") or yf_info.get("longName") or ticker
-                    sector = yf_info.get("sector") or "-"
-                    industry = yf_info.get("industry") or "-"
-                except Exception:
-                    # US stock map 폴백 (이름만)
-                    if market == "us":
-                        us_map = load_us_stock_map()
-                        if ticker in us_map:
-                            name = us_map[ticker]["name"]
-                results.append({
-                    "ticker": ticker, "name": name,
-                    "sector": sector, "industry": industry,
-                    "change_pct": round(pct, 2), "price": round(price, 2),
-                })
-
-        _top_gainers_cache[cache_key] = (now, results)
-        return jsonify(results)
-    except Exception:
-        return jsonify([])
+@app.route("/api/top-gainers/refresh", methods=["POST"])
+def refresh_top_gainers():
+    if not _is_private_ip(request.remote_addr):
+        return jsonify({"error": "forbidden"}), 403
+    import subprocess, sys
+    market = request.args.get("market", "us")
+    subprocess.Popen(
+        [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "batch_top_gainers.py"), market],
+        cwd=os.path.dirname(os.path.abspath(__file__)),
+    )
+    return jsonify({"status": "triggered"})
 
 
 # 한국어 → 영어 키워드 매핑

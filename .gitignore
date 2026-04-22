@@ -1,0 +1,5 @@
+cache/
+!cache/.gitkeep
+*.log
+__pycache__/
+*.pyc

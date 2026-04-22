@@ -862,6 +862,7 @@
     <!-- 시장별 상승률 TOP 10 -->
     <div style="margin-bottom:24px;">
         <div class="section-title">🚀 시장별 상승률 TOP 10</div>
+        <div id="gainers-timestamp" style="font-size:12px; color:#8b949e; margin-bottom:8px;"></div>
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
             <button class="period-btn active" data-market="us" onclick="switchGainerMarket('us')">미장</button>
             <button class="period-btn" data-market="kr" onclick="switchGainerMarket('kr')">국장</button>
@@ -1331,13 +1332,37 @@
 
     async function loadTopGainers() {
         const container = document.getElementById('top-gainers-table');
-        container.innerHTML = '<div class="loading">데이터 로딩 중... (전체 시장 종목 분석 중, 최대 1분 소요)</div>';
+        const tsEl = document.getElementById('gainers-timestamp');
+        container.innerHTML = '<div class="loading">데이터 로딩 중...</div>';
         try {
             const res = await fetch(API_BASE + '/api/top-gainers?market=' + gainerMarket + '&period=' + gainerPeriod);
-            const data = await res.json();
-            if (!data.length) {
-                container.innerHTML = '<div class="loading">데이터 없음</div>';
+            const body = await res.json();
+            if (res.status === 503) {
+                container.innerHTML = '<div class="loading">데이터가 아직 생성되지 않았습니다. 다음 배치: 06:30</div>';
+                tsEl.textContent = '';
                 return;
+            }
+            if (res.status === 501) {
+                container.innerHTML = '<div class="loading">이 시장은 아직 구현되지 않았습니다</div>';
+                tsEl.textContent = '';
+                return;
+            }
+            const items = body.data || [];
+            if (!items.length) {
+                container.innerHTML = '<div class="loading">데이터 없음</div>';
+                tsEl.textContent = '';
+                return;
+            }
+            if (body.last_updated) {
+                const d = new Date(body.last_updated);
+                const fmt = d.getFullYear() + '-' +
+                    String(d.getMonth()+1).padStart(2,'0') + '-' +
+                    String(d.getDate()).padStart(2,'0') + ' ' +
+                    String(d.getHours()).padStart(2,'0') + ':' +
+                    String(d.getMinutes()).padStart(2,'0');
+                const ageH = (Date.now() - d.getTime()) / 3600000;
+                const style = ageH > 6 ? 'color:#e3b341;' : 'color:#8b949e;';
+                tsEl.innerHTML = `<span style="${style}">마지막 갱신: ${fmt}</span>`;
             }
             container.innerHTML = `
                 <div class="data-row" style="font-weight:bold; color:#58a6ff; border-bottom:1px solid #30363d;">
@@ -1347,7 +1372,7 @@
                     <span style="flex:1.2">업종</span>
                     <span style="flex:1; text-align:right">상승률</span>
                 </div>
-                ${data.map((d, i) => `
+                ${items.map((d, i) => `
                     <div class="data-row clickable" onclick="openChart('${d.ticker}','${d.name}')">
                         <span style="flex:0.4; color:#8b949e;">${i+1}</span>
                         <span style="flex:2">${d.name}</span>
