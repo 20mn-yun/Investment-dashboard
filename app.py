@@ -1620,6 +1620,11 @@ def _dart_loop():
     daily_sent = {}
     time.sleep(10)
     while True:
+        # 주말(토/일)에는 새 공시가 없으므로 스킵
+        if datetime.now().weekday() >= 5:
+            time.sleep(300)
+            continue
+
         try:
             cfg = load_dm_cfg()
             if cfg.get("monitor_enabled", True):
