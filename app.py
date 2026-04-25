@@ -6,6 +6,8 @@ import feedparser
 import anthropic
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import time
 import re
 import threading
@@ -523,7 +525,7 @@ TRUSTED_SOURCES = [
     "marketwatch", "economist", "associated press", "ap news",
 ]
 
-ANTHROPIC_API_KEY = "***REMOVED***"
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 claude_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
@@ -763,7 +765,7 @@ def load_us_stock_map():
 
 
 # DART API
-DART_API_KEY = "***REMOVED***"
+DART_API_KEY = os.environ.get("DART_API_KEY")
 DART_CORP_MAP_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dart_corp_map.json")
 _dart_corp_map = {}
 _dart_corp_map_time = 0
@@ -1126,9 +1128,9 @@ def stock_search():
 
 # ===== DART 공시 모니터링 =====
 
-GEMINI_API_KEY = "***REMOVED***"
-TELEGRAM_TOKEN_GENERAL = "***REMOVED***"
-TELEGRAM_TOKEN_EARNINGS = "***REMOVED***"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+TELEGRAM_TOKEN_GENERAL = os.environ.get("TELEGRAM_TOKEN_GENERAL")
+TELEGRAM_TOKEN_EARNINGS = os.environ.get("TELEGRAM_TOKEN_EARNINGS")
 
 _BD = os.path.dirname(os.path.abspath(__file__))
 DART_MON_CFG_FILE = os.path.join(_BD, "dart_monitor_config.json")
