@@ -1874,6 +1874,47 @@ def _start_monitor():
 _start_monitor()
 
 
+# --- Earnings tracker (잠정실적 추적) ---
+def _earnings_tracker_loop():
+    """매일 평일 20:00 KST에 잠정실적 트래커 실행."""
+    import earnings_tracker
+
+    while True:
+        try:
+            now = datetime.now()
+            target = now.replace(hour=20, minute=0, second=0, microsecond=0)
+            if now >= target:
+                target = target + timedelta(days=1)
+
+            sleep_sec = (target - now).total_seconds()
+            print(f"[earnings_tracker] 다음 실행까지 {int(sleep_sec)}초 대기 (target: {target})")
+            time.sleep(sleep_sec)
+
+            if datetime.now().weekday() >= 5:
+                continue
+
+            earnings_tracker.run_daily()
+
+        except Exception as e:
+            import traceback
+            print(f"[earnings_tracker_loop] 예상치 못한 에러: {e}")
+            traceback.print_exc()
+            time.sleep(3600)
+
+
+threading.Thread(target=_earnings_tracker_loop, daemon=True).start()
+
+
+@app.route("/api/earnings-tracker/run", methods=["POST"])
+def trigger_earnings_tracker():
+    if not _is_private_ip(request.remote_addr):
+        return jsonify({"error": "forbidden"}), 403
+    import earnings_tracker
+    force = request.args.get("force", "false").lower() == "true"
+    result = earnings_tracker.run_daily(force=force)
+    return jsonify(result)
+
+
 # --- DART Monitor API ---
 @app.route("/api/dart/monitor/config", methods=["GET"])
 def get_dm_cfg():

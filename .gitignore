@@ -11,4 +11,5 @@ dart_*.json
 calendar_watchlist.json
 expanded_stocks.json
 us_stock_map.json
+earnings_tracker_state.json
 DART_*.xlsx
