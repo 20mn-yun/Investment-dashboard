@@ -922,8 +922,24 @@
             <button class="period-btn" data-cperiod="6mo" onclick="loadChart('6mo')">6M</button>
             <button class="period-btn" data-cperiod="ytd" onclick="loadChart('ytd')">YTD</button>
         </div>
+        <div id="periodReturnDisplay" style="text-align:center; padding:8px 0 12px 0; border-bottom:1px solid #30363d; margin-bottom:12px;">
+            <div id="periodReturnValue" style="font-size:28px; font-weight:700; line-height:1.1; color:#c9d1d9;">—</div>
+            <div id="periodReturnLabel" style="font-size:12px; color:#8b949e; margin-top:4px;">기간 수익률</div>
+        </div>
         <div style="height:400px;">
             <canvas id="price-chart"></canvas>
+        </div>
+        <div id="stockDetailSection" style="display:none; margin-top:20px; border-top:1px solid #30363d; padding-top:16px;">
+            <div id="companyOverview">
+                <h3 style="font-size:16px; margin:0 0 8px 0; color:#f0f6fc;">기업 개요</h3>
+                <p id="companyOverviewText" style="color:#c9d1d9; line-height:1.5; margin:0;">로딩 중...</p>
+                <p id="companySectorIndustry" style="font-size:13px; color:#8b949e; margin:6px 0 0 0;"></p>
+            </div>
+            <div id="newsReason" style="margin-top:16px;">
+                <h3 style="font-size:16px; margin:0 0 8px 0; color:#f0f6fc;">📰 오늘의 움직임</h3>
+                <div id="newsReasonText" style="color:#c9d1d9; line-height:1.6;">로딩 중...</div>
+                <div id="newsSourcesList" style="margin-top:10px; font-size:13px;"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -1231,17 +1247,53 @@
     let chartInstance = null;
     let chartSymbol = '';
 
-    function openChart(symbol, title) {
+    function openChart(symbol, title, changePct) {
         chartSymbol = symbol;
         document.getElementById('chart-title').textContent = title;
         document.getElementById('chart-overlay').classList.add('active');
         // display:none→flex 전환 후 canvas 크기 인식을 위해 딜레이
         setTimeout(() => loadChart('1y'), 50);
+
+        const detailSection = document.getElementById('stockDetailSection');
+        if (changePct !== undefined) {
+            detailSection.style.display = 'block';
+            document.getElementById('companyOverviewText').textContent = '로딩 중...';
+            document.getElementById('companySectorIndustry').textContent = '';
+            document.getElementById('newsReasonText').textContent = '로딩 중...';
+            document.getElementById('newsSourcesList').innerHTML = '';
+            fetch(API_BASE + '/api/stock-detail/' + encodeURIComponent(symbol) + '?change_pct=' + encodeURIComponent(changePct))
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('companyOverviewText').textContent = data.overview || '정보 없음';
+                    document.getElementById('companySectorIndustry').textContent =
+                        [data.sector, data.industry].filter(Boolean).join(' · ');
+                    const newsHtml = (data.news_summary || []).map(line => '<div>' + line + '</div>').join('');
+                    document.getElementById('newsReasonText').innerHTML = newsHtml || '정보 없음';
+                    const sourcesHtml = (data.news_sources || []).map(s =>
+                        '<a href="' + s.url + '" target="_blank" rel="noopener" style="color:#58a6ff; text-decoration:none; margin-right:12px;">[' + s.source + '] ' + s.title + '</a>'
+                    ).join('<br>');
+                    document.getElementById('newsSourcesList').innerHTML = sourcesHtml;
+                })
+                .catch(() => {
+                    document.getElementById('companyOverviewText').textContent = '정보를 불러오지 못했습니다.';
+                    document.getElementById('newsReasonText').textContent = '';
+                });
+        } else {
+            detailSection.style.display = 'none';
+        }
     }
 
     function closeChart() {
         document.getElementById('chart-overlay').classList.remove('active');
         if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        document.getElementById('periodReturnValue').textContent = '—';
+        document.getElementById('periodReturnValue').style.color = '#c9d1d9';
+        document.getElementById('periodReturnLabel').textContent = '기간 수익률';
+        document.getElementById('stockDetailSection').style.display = 'none';
+        document.getElementById('companyOverviewText').textContent = '로딩 중...';
+        document.getElementById('companySectorIndustry').textContent = '';
+        document.getElementById('newsReasonText').textContent = '로딩 중...';
+        document.getElementById('newsSourcesList').innerHTML = '';
     }
 
     async function loadChart(period) {
@@ -1273,7 +1325,29 @@
                     }
                 }
             });
+            updatePeriodReturn(data.prices, period);
         } catch(e) { console.error('Chart load failed:', e); }
+    }
+
+    function updatePeriodReturn(prices, periodLabel) {
+        const valueEl = document.getElementById('periodReturnValue');
+        const labelEl = document.getElementById('periodReturnLabel');
+        if (!prices || prices.length < 2) {
+            valueEl.textContent = '—';
+            valueEl.style.color = '#c9d1d9';
+            labelEl.textContent = '데이터 없음';
+            return;
+        }
+        const start = prices[0];
+        const end = prices[prices.length - 1];
+        const returnPct = ((end - start) / start) * 100;
+        const sign = returnPct >= 0 ? '+' : '';
+        valueEl.textContent = sign + returnPct.toFixed(2) + '%';
+        if (returnPct > 0) valueEl.style.color = '#f85149';
+        else if (returnPct < 0) valueEl.style.color = '#58a6ff';
+        else valueEl.style.color = '#c9d1d9';
+        const labelMap = {'5y':'5년 수익률','2y':'2년 수익률','1y':'1년 수익률','6mo':'6개월 수익률','ytd':'연초 이후 수익률'};
+        labelEl.textContent = labelMap[periodLabel] || (periodLabel + ' 수익률');
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChart(); });
@@ -1375,7 +1449,7 @@
                     <span style="flex:1; text-align:right">상승률</span>
                 </div>
                 ${items.map((d, i) => `
-                    <div class="data-row clickable" onclick="openChart('${d.ticker}','${d.name}')">
+                    <div class="data-row clickable" onclick="openChart('${d.ticker}','${d.name}',${d.change_pct})">
                         <span style="flex:0.4; color:#8b949e;">${i+1}</span>
                         <span style="flex:2">${d.name}</span>
                         <span style="flex:1.2; color:#8b949e;">${d.sector}</span>

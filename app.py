@@ -156,6 +156,159 @@ def get_fear_greed():
         return jsonify({"value": 50, "rating": "데이터 없음"})
 
 
+_stock_detail_cache = {}
+
+
+def _find_in_market_stocks(ticker):
+    """MARKET_STOCKS에서 ticker에 해당하는 (name, sector, industry)를 찾는다."""
+    for market, stocks in MARKET_STOCKS.items():
+        for t, name, sector, industry in stocks:
+            if t == ticker:
+                return name, sector, industry
+    return None, None, None
+
+
+@app.route("/api/stock-detail/<ticker>", methods=["GET"])
+def get_stock_detail(ticker):
+    """종목 클릭 시 기업 개요 + 등락 이유 뉴스 요약."""
+    today_key = date.today().isoformat()
+    cache_key = (ticker, today_key)
+
+    stale = [k for k in _stock_detail_cache if k[1] != today_key]
+    for k in stale:
+        del _stock_detail_cache[k]
+
+    if cache_key in _stock_detail_cache:
+        return jsonify(_stock_detail_cache[cache_key])
+
+    change_pct = request.args.get("change_pct", "")
+    is_korean = ticker.endswith(".KS") or ticker.endswith(".KQ")
+    ms_name, ms_sector, ms_industry = _find_in_market_stocks(ticker)
+
+    # --- 기업 정보 조회 ---
+    yf_name, yf_summary, yf_sector, yf_industry = "", "", "", ""
+    try:
+        info = yf.Ticker(ticker).info
+        yf_name = info.get("longName") or info.get("shortName") or ""
+        yf_summary = info.get("longBusinessSummary") or ""
+        yf_sector = info.get("sector") or ""
+        yf_industry = info.get("industry") or ""
+    except Exception:
+        pass
+
+    display_name = ms_name or yf_name or ticker
+    sector = ms_sector or yf_sector
+    industry = ms_industry or yf_industry
+
+    SECTOR_KO = {
+        "Technology": "정보기술", "Information Technology": "정보기술",
+        "Healthcare": "헬스케어", "Health Care": "헬스케어",
+        "Financials": "금융", "Financial Services": "금융",
+        "Consumer Cyclical": "경기소비재", "Consumer Discretionary": "경기소비재",
+        "Consumer Defensive": "필수소비재", "Consumer Staples": "필수소비재",
+        "Energy": "에너지", "Industrials": "산업재",
+        "Communication Services": "통신서비스", "Materials": "소재",
+        "Real Estate": "부동산", "Utilities": "유틸리티",
+    }
+    if sector and not any(ord(c) > 127 for c in sector):
+        sector = SECTOR_KO.get(sector, sector)
+
+    overview = ""
+    try:
+        if yf_summary:
+            resp = claude_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=300,
+                messages=[{"role": "user", "content": (
+                    f"다음 영문 기업 소개를 한국어 2-3문장으로 요약해라. "
+                    f"회사명: {display_name}\n\n{yf_summary[:1500]}\n\n"
+                    f"답변에 마크다운 문법(#, *, **, -, 등)이나 제목/헤더를 절대 포함하지 마. 평문 한국어로만 답변해."
+                )}],
+            )
+            overview = resp.content[0].text.strip()
+        else:
+            ctx = f"회사명: {display_name}"
+            if sector:
+                ctx += f", 섹터: {sector}"
+            if industry:
+                ctx += f", 업종: {industry}"
+            resp = claude_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=300,
+                messages=[{"role": "user", "content": (
+                    f"{ctx}\n이 종목의 사업 개요를 한국어 2-3문장으로 작성해라.\n\n"
+                    f"답변에 마크다운 문법(#, *, **, -, 등)이나 제목/헤더를 절대 포함하지 마. 평문 한국어로만 답변해."
+                )}],
+            )
+            overview = resp.content[0].text.strip()
+    except Exception:
+        overview = "기업 정보를 불러올 수 없습니다"
+
+    overview = overview.strip()
+    lines = overview.split('\n')
+    lines = [l for l in lines if not l.strip().startswith('#')]
+    overview = '\n'.join(lines).strip()
+
+    # --- 뉴스 검색 ---
+    articles = []
+    try:
+        if is_korean:
+            ko_name = ms_name or yf_name or ticker
+            articles = fetch_stock_news(f"{ko_name} 주가", lang="ko")
+        else:
+            en_name = yf_name or ms_name or ticker
+            articles = fetch_stock_news(f"{en_name} stock", lang="en")
+    except Exception:
+        articles = []
+
+    # --- 뉴스 기반 등락 이유 요약 ---
+    news_summary = []
+    news_sources = []
+    if articles:
+        news_sources = [
+            {"title": a["title"], "url": a["url"], "source": a["source"]}
+            for a in articles[:3]
+        ]
+        article_text = "\n".join(
+            f"- [{a['source']}] {a['title']}" for a in articles[:5]
+        )
+        change_ctx = f"오늘 이 종목이 {change_pct}% 움직였는데, " if change_pct else ""
+        try:
+            resp = claude_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=400,
+                messages=[{"role": "user", "content": (
+                    f"다음은 {display_name} 관련 최근 뉴스다.\n{article_text}\n\n"
+                    f"{change_ctx}이 움직임의 이유로 가장 가능성이 높은 것을 한국어로 요약해라. "
+                    f"뉴스에 명확한 이유가 없으면 '- 특별한 뉴스 동인이 확인되지 않음'으로 답변.\n\n"
+                    f"답변은 반드시 다음 형식을 정확히 따라:\n"
+                    f"- 첫 번째 이유 한 문장\n"
+                    f"- 두 번째 이유 한 문장\n"
+                    f"- 세 번째 이유 한 문장 (선택)\n\n"
+                    f"각 줄은 정확히 '- '로 시작하고, 그 외에 #, *, **, 제목 같은 마크다운 문법이나 추가 설명은 절대 포함하지 마."
+                )}],
+            )
+            raw = resp.content[0].text.strip()
+            news_summary = [line.strip() for line in raw.split("\n")
+                           if line.strip() and not line.strip().startswith('#')]
+        except Exception:
+            news_summary = ["- 뉴스 요약을 생성할 수 없습니다"]
+    else:
+        news_summary = ["- 관련 뉴스를 찾을 수 없습니다"]
+
+    result = {
+        "ticker": ticker,
+        "name": display_name,
+        "sector": sector,
+        "industry": industry,
+        "overview": overview,
+        "news_summary": news_summary,
+        "news_sources": news_sources,
+    }
+    _stock_detail_cache[cache_key] = result
+    return jsonify(result)
+
+
 @app.route("/api/chart", methods=["GET"])
 def get_chart():
     """차트용 히스토리컬 데이터"""
@@ -571,6 +724,73 @@ def fetch_rss_articles(search_terms):
 
     articles.sort(key=lambda a: a.get("publishedAt", ""), reverse=True)
     return articles[:20]
+
+
+KO_TRUSTED_SOURCES = [
+    "한국경제", "매일경제", "연합뉴스", "조선비즈",
+    "머니투데이", "이데일리", "서울경제", "한겨레",
+    "동아일보", "중앙일보", "뉴스1", "뉴시스",
+]
+
+EN_STOCK_TRUSTED_SOURCES = [
+    "reuters", "bloomberg", "wsj", "wall street journal",
+    "cnbc", "barron", "marketwatch", "financial times", "ft.com",
+    "associated press", "ap news", "economist",
+    "yahoo finance", "seeking alpha", "marketbeat", "benzinga",
+    "investing.com", "motley fool", "investor's business daily",
+    "morningstar", "investopedia", "fortune", "business insider",
+    "24/7 wall st", "barchart", "thestreet", "zacks",
+]
+
+
+def fetch_stock_news(query, lang="en", max_results=10):
+    """종목 관련 뉴스를 언어별로 검색."""
+    from email.utils import parsedate_to_datetime
+
+    if lang == "ko":
+        url = ("https://news.google.com/rss/search?q="
+               + requests.utils.quote(query)
+               + "&hl=ko&gl=KR&ceid=KR:ko")
+        trusted = KO_TRUSTED_SOURCES
+    else:
+        url = ("https://news.google.com/rss/search?q="
+               + requests.utils.quote(query)
+               + "&hl=en-US&gl=US&ceid=US:en")
+        trusted = EN_STOCK_TRUSTED_SOURCES
+
+    cutoff = datetime.now().astimezone() - timedelta(hours=24)
+    articles = []
+    seen = set()
+
+    try:
+        feed = feedparser.parse(url)
+        for entry in feed.entries:
+            source = (entry.get("source", {}).get("title", "")
+                      if hasattr(entry, "source") else "")
+            if not any(t.lower() in source.lower() for t in trusted):
+                continue
+            title = entry.get("title", "")
+            if title in seen:
+                continue
+            published = entry.get("published", "")
+            if published:
+                try:
+                    if parsedate_to_datetime(published) < cutoff:
+                        continue
+                except Exception:
+                    pass
+            seen.add(title)
+            articles.append({
+                "title": title,
+                "source": source,
+                "url": entry.get("link", ""),
+                "publishedAt": published,
+            })
+    except Exception:
+        return []
+
+    articles.sort(key=lambda a: a.get("publishedAt", ""), reverse=True)
+    return articles[:max_results]
 
 
 def rank_group_articles(group_name, articles, top_n=3):
