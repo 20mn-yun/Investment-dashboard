@@ -8,11 +8,15 @@ Phase 1: 메타데이터(기업명, 공시일, 종목코드, DART 링크)만 기
 Phase 2~4에서 재무 수치 파싱, 과거 분기, 필터링 추가 예정.
 """
 
+import io
 import os
 import re
 import json
+import zipfile
 import requests
+import anthropic
 from datetime import datetime, date, timedelta
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from openpyxl import Workbook, load_workbook
 
@@ -27,7 +31,21 @@ STATE_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "earnings_tracker_state.json"
 )
 
-HEADERS = ["공시일자", "기업명", "종목코드", "보고서명", "DART 링크"]
+HEADERS = [
+    "공시일자", "기업명", "종목코드", "보고서명", "DART 링크",
+    "당분기 매출액(백만원)", "당분기 영업이익(백만원)", "당분기 순이익(백만원)",
+    "원본단위", "파싱상태",
+]
+
+DAILY_HAIKU_LIMIT = 300
+
+UNIT_TO_MILLION_KRW = {
+    "조원": 1_000_000,
+    "억원": 100,
+    "백만원": 1,
+    "천원": 0.001,
+    "원": 0.000001,
+}
 
 EARNINGS_PATTERN = re.compile(r"영업\s*\(\s*잠정\s*\)\s*실적")
 
@@ -36,6 +54,157 @@ def _is_earnings_filing(report_nm: str) -> bool:
     if not report_nm:
         return False
     return bool(EARNINGS_PATTERN.search(report_nm))
+
+
+_anthropic_client = None
+
+
+def _get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic(
+            api_key=os.environ.get("ANTHROPIC_API_KEY")
+        )
+    return _anthropic_client
+
+
+def fetch_filing_body(rcept_no: str) -> str:
+    if not DART_API_KEY:
+        return ""
+    try:
+        res = requests.get(
+            "https://opendart.fss.or.kr/api/document.xml",
+            params={"crtfc_key": DART_API_KEY, "rcept_no": rcept_no},
+            timeout=30,
+        )
+        if res.status_code != 200 or len(res.content) < 100:
+            return ""
+        zf = zipfile.ZipFile(io.BytesIO(res.content))
+        parts = []
+        for fname in sorted(zf.namelist()):
+            raw = zf.read(fname)
+            try:
+                text = raw.decode("euc-kr")
+            except UnicodeDecodeError:
+                text = raw.decode("utf-8", errors="replace")
+            parts.append(text)
+        return "\n".join(parts)
+    except Exception as e:
+        print(f"[earnings_tracker] 본문 fetch 실패 ({rcept_no}): {e}")
+        return ""
+
+
+def extract_earnings_tables(html: str) -> str:
+    if not html:
+        return ""
+    soup = BeautifulSoup(html, "html.parser")
+    keywords = ["매출", "영업이익", "당기순이익", "순이익", "영업수익"]
+    relevant = []
+    for table in soup.find_all("table"):
+        if any(k in table.get_text() for k in keywords):
+            relevant.append(table)
+    if not relevant:
+        return ""
+    parts = []
+    for ti, table in enumerate(relevant[:3]):
+        rows = []
+        for tr in table.find_all("tr"):
+            cells = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
+            if any(c for c in cells):
+                rows.append(" | ".join(cells))
+        parts.append(f"### Table {ti + 1}\n" + "\n".join(rows))
+    combined = "\n\n---\n\n".join(parts)
+    if len(combined) > 12000:
+        combined = combined[:12000]
+    return combined
+
+
+def normalize_to_million_krw(raw_value, unit):
+    if raw_value is None or unit is None:
+        return None
+    if unit not in UNIT_TO_MILLION_KRW:
+        return None
+    multiplier = UNIT_TO_MILLION_KRW[unit]
+    return int(round(raw_value * multiplier))
+
+
+def extract_financials_with_haiku(table_text: str, corp_name: str) -> dict:
+    empty = {"revenue": None, "op_income": None, "net_income": None, "currency_unit": None}
+    if not table_text:
+        return empty
+
+    prompt = f"""다음은 한국 기업 '{corp_name}'의 잠정실적 공시에 포함된 재무 표입니다.
+
+{table_text}
+
+위 표에서 **당기(=당해실적, 가장 최근 단일 분기) 단독 실적**의 다음 3개 수치와 표의 단위를 JSON으로 반환하라:
+
+[추출 항목]
+1. 매출액 (또는 영업수익, 수익) — revenue_raw
+2. 영업이익 — op_income_raw
+3. 당기순이익 (또는 순이익) — net_income_raw
+
+[중요 규칙 — 반드시 준수]
+- "당해실적" 또는 "당기실적" 컬럼만 사용. **"누계실적", "전기실적", "전년동기실적"은 절대 사용 금지**.
+- 한국 잠정실적 표는 보통 같은 행에 [당해실적, 전기실적, 전년동기실적, 당기누계, 전년동기누계] 컬럼이 나란히 있음. 그중 가장 첫 컬럼(당해실적)만.
+- 숫자는 표에 적힌 그대로. 단위 환산 X. 쉼표 제거. (예: "19,514" → 19514)
+- 음수(△ 또는 괄호)는 음수로.
+- 단위는 표 위/아래에 명시된 것만 인식: "백만원" / "천원" / "원" / "억원" / "조원" / null.
+- 값 못 찾으면 해당 raw 필드 null.
+- JSON 외 텍스트 금지. 마크다운 금지.
+
+[자릿수 sanity check — 답변 생성 후 스스로 검증]
+- 한국 상장사 분기 매출은 보통 100억~10조 사이. 단위 환산 후 환산값이 이 범위 밖이면 단위 인식이 잘못됐을 가능성. 그런 경우 단위를 다시 봐서 정정.
+
+JSON 형식:
+{{"revenue_raw": 19514, "op_income_raw": 2556, "net_income_raw": 1958, "currency_unit": "억원"}}"""
+
+    try:
+        client = _get_anthropic_client()
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        brace_start = text.find("{")
+        brace_end = text.rfind("}")
+        if brace_start != -1 and brace_end != -1:
+            text = text[brace_start:brace_end + 1]
+        data = json.loads(text)
+        unit = data.get("currency_unit")
+        return {
+            "revenue": normalize_to_million_krw(data.get("revenue_raw"), unit),
+            "op_income": normalize_to_million_krw(data.get("op_income_raw"), unit),
+            "net_income": normalize_to_million_krw(data.get("net_income_raw"), unit),
+            "currency_unit": unit,
+        }
+    except Exception as e:
+        print(f"[earnings_tracker] Haiku 파싱 실패 ({corp_name}): {e}")
+        return empty
+
+
+def _check_and_increment_haiku_counter(state):
+    today_str = date.today().isoformat()
+    counter_date = state.get("haiku_counter_date")
+    counter_value = state.get("haiku_counter_value", 0)
+    if counter_date != today_str:
+        counter_value = 0
+        counter_date = today_str
+    if counter_value >= DAILY_HAIKU_LIMIT:
+        return False, state
+    counter_value += 1
+    state["haiku_counter_date"] = counter_date
+    state["haiku_counter_value"] = counter_value
+    return True, state
+
+
+def _save_haiku_counter(state):
+    full_state = load_state()
+    full_state["haiku_counter_date"] = state.get("haiku_counter_date")
+    full_state["haiku_counter_value"] = state.get("haiku_counter_value", 0)
+    save_state(full_state)
 
 
 def load_state():
@@ -110,6 +279,11 @@ def append_rows(rows):
     if os.path.exists(EXCEL_PATH):
         wb = load_workbook(EXCEL_PATH)
         ws = wb.active
+        current_headers = [cell.value for cell in ws[1]]
+        if len(current_headers) < len(HEADERS):
+            for col_idx, header in enumerate(HEADERS, start=1):
+                ws.cell(row=1, column=col_idx, value=header)
+            print(f"[earnings_tracker] 헤더 마이그레이션: {len(current_headers)}컬럼 → {len(HEADERS)}컬럼")
         existing = {}
         for idx, r in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if r and len(r) >= 3 and r[0] and r[2]:
@@ -167,29 +341,60 @@ def run_daily(force=False, target_date=None):
         filings = fetch_filings(today)
         print(f"[earnings_tracker] {mode_label} {today} 공시 {len(filings)}건 발견")
 
+        state = load_state()
         rows = []
         for f in filings:
             rcept_no = f.get("rcept_no", "")
-            row = [
+            corp_name = f.get("corp_name", "")
+            meta = [
                 today.isoformat(),
-                f.get("corp_name", ""),
+                corp_name,
                 f.get("stock_code", ""),
                 f.get("report_nm", ""),
                 f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}",
             ]
+
+            can_call, state = _check_and_increment_haiku_counter(state)
+            if not can_call:
+                print(f"[earnings_tracker] Haiku 일일 상한({DAILY_HAIKU_LIMIT}) 도달, {corp_name} 파싱 skip")
+                financials = {"revenue": None, "op_income": None, "net_income": None, "currency_unit": None}
+                parse_status = "limit_reached"
+            else:
+                html = fetch_filing_body(rcept_no)
+                table_text = extract_earnings_tables(html)
+                if not table_text:
+                    financials = {"revenue": None, "op_income": None, "net_income": None, "currency_unit": None}
+                    parse_status = "no_table_found"
+                else:
+                    financials = extract_financials_with_haiku(table_text, corp_name)
+                    if financials["revenue"] is None and financials["op_income"] is None:
+                        parse_status = "haiku_failed"
+                    else:
+                        parse_status = "ok"
+
+            row = meta + [
+                financials["revenue"],
+                financials["op_income"],
+                financials["net_income"],
+                financials["currency_unit"],
+                parse_status,
+            ]
             rows.append(row)
+
+        _save_haiku_counter(state)
 
         result = append_rows(rows)
         print(f"[earnings_tracker] {mode_label} {today} 신규 {result['added']}건, 정정 {result['updated']}건")
 
         if not is_backfill:
-            state = {
+            state = load_state()
+            state.update({
                 "last_run_date": today.isoformat(),
                 "last_run_at": datetime.now().isoformat(),
                 "last_run_filings_found": len(filings),
                 "last_run_added": result["added"],
                 "last_run_updated": result["updated"],
-            }
+            })
             save_state(state)
 
         return {
