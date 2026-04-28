@@ -1910,6 +1910,12 @@ def trigger_earnings_tracker():
     if not _is_private_ip(request.remote_addr):
         return jsonify({"error": "forbidden"}), 403
     import earnings_tracker
+
+    backfill_days = request.args.get("backfill_days", type=int)
+    if backfill_days is not None:
+        results = earnings_tracker.run_backfill(backfill_days)
+        return jsonify({"mode": "backfill", "results": results})
+
     force = request.args.get("force", "false").lower() == "true"
     result = earnings_tracker.run_daily(force=force)
     return jsonify(result)

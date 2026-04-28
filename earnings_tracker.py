@@ -9,6 +9,7 @@ Phase 2~4에서 재무 수치 파싱, 과거 분기, 필터링 추가 예정.
 """
 
 import os
+import re
 import json
 import requests
 from datetime import datetime, date, timedelta
@@ -28,7 +29,13 @@ STATE_FILE = os.path.join(
 
 HEADERS = ["공시일자", "기업명", "종목코드", "보고서명", "DART 링크"]
 
-EARNINGS_KEYWORD = "연결재무제표 기준 영업(잠정)실적"
+EARNINGS_PATTERN = re.compile(r"영업\s*\(\s*잠정\s*\)\s*실적")
+
+
+def _is_earnings_filing(report_nm: str) -> bool:
+    if not report_nm:
+        return False
+    return bool(EARNINGS_PATTERN.search(report_nm))
 
 
 def load_state():
@@ -45,7 +52,7 @@ def save_state(state):
 
 
 def fetch_filings(target_date):
-    """target_date의 공시 중 EARNINGS_KEYWORD를 포함하는 것만 반환."""
+    """target_date의 공시 중 잠정실적 공시만 반환."""
     if not DART_API_KEY:
         raise RuntimeError("DART_API_KEY 환경변수가 설정되지 않았습니다.")
 
@@ -79,7 +86,7 @@ def fetch_filings(target_date):
 
         items = data.get("list", [])
         for item in items:
-            if EARNINGS_KEYWORD in item.get("report_nm", ""):
+            if _is_earnings_filing(item.get("report_nm", "")):
                 matched.append(item)
 
         total_page = data.get("total_page", 1)
@@ -91,61 +98,74 @@ def fetch_filings(target_date):
 
 
 def append_rows(rows):
-    """새 행들을 엑셀에 누적. 중복 방지: (공시일자, 종목코드) 기준."""
+    """
+    새 행들을 엑셀에 누적 기록.
+    같은 (공시일자, 종목코드) 키가 이미 있으면 새 데이터로 덮어쓰기 (정정공시 우선).
+    """
     if not rows:
-        return 0
+        return {"added": 0, "updated": 0}
 
     os.makedirs(os.path.dirname(EXCEL_PATH), exist_ok=True)
 
     if os.path.exists(EXCEL_PATH):
         wb = load_workbook(EXCEL_PATH)
         ws = wb.active
-        existing = set()
-        for r in ws.iter_rows(min_row=2, values_only=True):
+        existing = {}
+        for idx, r in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if r and len(r) >= 3 and r[0] and r[2]:
-                existing.add((str(r[0]), str(r[2])))
+                existing[(str(r[0]), str(r[2]))] = idx
     else:
         wb = Workbook()
         ws = wb.active
         ws.title = "잠정실적"
         ws.append(HEADERS)
-        existing = set()
+        existing = {}
 
     added = 0
+    updated = 0
     for row in rows:
         key = (str(row[0]), str(row[2]))
         if key in existing:
-            continue
-        ws.append(row)
-        existing.add(key)
-        added += 1
+            target_row = existing[key]
+            for col_idx, value in enumerate(row, start=1):
+                ws.cell(row=target_row, column=col_idx, value=value)
+            updated += 1
+        else:
+            ws.append(row)
+            existing[key] = ws.max_row
+            added += 1
 
     wb.save(EXCEL_PATH)
-    return added
+    return {"added": added, "updated": updated}
 
 
-def run_daily(force=False):
+def run_daily(force=False, target_date=None):
     """
     하루 1회 실행 진입점.
-    force=False: 오늘 이미 실행했으면 skip. 주말 skip.
-    force=True: 위 조건 무시하고 무조건 실행.
+    target_date=None이면 오늘 기준. 백필 시 특정 날짜 지정 가능 (state 미갱신).
     """
-    today = date.today()
+    is_backfill = target_date is not None
+    today = target_date or date.today()
 
-    if not force and today.weekday() >= 5:
-        print(f"[earnings_tracker] {today} 주말이므로 skip")
-        return {"status": "skipped_weekend"}
+    if today.weekday() >= 5:
+        msg = f"[earnings_tracker] {today} 주말이므로 skip"
+        if is_backfill:
+            msg += " (backfill)"
+        print(msg)
+        return {"status": "skipped_weekend", "date": today.isoformat()}
 
-    state = load_state()
-    if not force and state.get("last_run_date") == today.isoformat():
-        print(f"[earnings_tracker] {today} 이미 실행됨 skip")
-        return {"status": "skipped_already_run"}
+    if not is_backfill:
+        state = load_state()
+        if not force and state.get("last_run_date") == today.isoformat():
+            print(f"[earnings_tracker] {today} 이미 실행됨 skip")
+            return {"status": "skipped_already_run", "date": today.isoformat()}
 
-    print(f"[earnings_tracker] {today} 실행 시작")
+    mode_label = "[backfill]" if is_backfill else "[daily]"
+    print(f"[earnings_tracker] {mode_label} {today} 실행 시작")
 
     try:
         filings = fetch_filings(today)
-        print(f"[earnings_tracker] 공시 {len(filings)}건 발견")
+        print(f"[earnings_tracker] {mode_label} {today} 공시 {len(filings)}건 발견")
 
         rows = []
         for f in filings:
@@ -159,28 +179,75 @@ def run_daily(force=False):
             ]
             rows.append(row)
 
-        added = append_rows(rows)
-        print(f"[earnings_tracker] 엑셀에 {added}건 추가 (중복 제외)")
+        result = append_rows(rows)
+        print(f"[earnings_tracker] {mode_label} {today} 신규 {result['added']}건, 정정 {result['updated']}건")
 
-        state = {
-            "last_run_date": today.isoformat(),
-            "last_run_at": datetime.now().isoformat(),
-            "last_run_filings_found": len(filings),
-            "last_run_added": added,
+        if not is_backfill:
+            state = {
+                "last_run_date": today.isoformat(),
+                "last_run_at": datetime.now().isoformat(),
+                "last_run_filings_found": len(filings),
+                "last_run_added": result["added"],
+                "last_run_updated": result["updated"],
+            }
+            save_state(state)
+
+        return {
+            "status": "ok",
+            "date": today.isoformat(),
+            "filings_found": len(filings),
+            "added": result["added"],
+            "updated": result["updated"],
+            "mode": "backfill" if is_backfill else "daily",
         }
-        save_state(state)
-
-        return {"status": "ok", "filings_found": len(filings), "added": added}
 
     except Exception as e:
         import traceback
-        print(f"[earnings_tracker] 에러: {e}")
+        print(f"[earnings_tracker] {mode_label} {today} 에러: {e}")
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "date": today.isoformat(), "message": str(e)}
+
+
+def run_backfill(days):
+    """오늘 포함 N일치 백필. 주말 자동 skip."""
+    if days < 1:
+        return []
+
+    today = date.today()
+    results = []
+
+    print(f"[earnings_tracker] 백필 시작: {days}일")
+
+    for i in range(days):
+        target = today - timedelta(days=i)
+        result = run_daily(target_date=target)
+        results.append(result)
+
+    total_added = sum(r.get("added", 0) for r in results if r.get("status") == "ok")
+    total_updated = sum(r.get("updated", 0) for r in results if r.get("status") == "ok")
+    print(f"[earnings_tracker] 백필 완료: 총 신규 {total_added}건, 정정 {total_updated}건")
+
+    return results
 
 
 if __name__ == "__main__":
     import sys
-    force = "--force" in sys.argv
-    result = run_daily(force=force)
-    print(f"[earnings_tracker] 결과: {result}")
+
+    backfill_days = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--backfill-days="):
+            try:
+                backfill_days = int(arg.split("=", 1)[1])
+            except ValueError:
+                print(f"잘못된 값: {arg}. --backfill-days=숫자 형식 사용")
+                sys.exit(1)
+
+    if backfill_days is not None:
+        results = run_backfill(backfill_days)
+        print(f"[earnings_tracker] 백필 결과 (일자별):")
+        for r in results:
+            print(f"  {r.get('date')}: {r.get('status')} added={r.get('added', 0)} updated={r.get('updated', 0)}")
+    else:
+        force = "--force" in sys.argv
+        result = run_daily(force=force)
+        print(f"[earnings_tracker] 결과: {result}")
