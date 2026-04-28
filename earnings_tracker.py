@@ -13,6 +13,7 @@ import os
 import re
 import json
 import zipfile
+import xml.etree.ElementTree as ET
 import requests
 import anthropic
 from datetime import datetime, date, timedelta
@@ -35,9 +36,24 @@ HEADERS = [
     "공시일자", "기업명", "종목코드", "보고서명", "DART 링크",
     "당분기 매출액(백만원)", "당분기 영업이익(백만원)", "당분기 순이익(백만원)",
     "원본단위", "파싱상태",
+    "전분기 매출액(백만원)", "전전분기 매출액(백만원)", "전전전분기 매출액(백만원)",
+    "전분기 영업이익(백만원)", "전전분기 영업이익(백만원)", "전전전분기 영업이익(백만원)",
+    "전분기 순이익(백만원)", "전전분기 순이익(백만원)", "전전전분기 순이익(백만원)",
 ]
 
 DAILY_HAIKU_LIMIT = 300
+
+CORP_CODE_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "dart_corp_codes.json"
+)
+CORP_CODE_CACHE_TTL_DAYS = 7
+
+REPORT_CODES = {
+    "Q1": "11013",
+    "H1": "11012",
+    "3Q": "11014",
+    "ANN": "11011",
+}
 
 UNIT_TO_MILLION_KRW = {
     "조원": 1_000_000,
@@ -207,6 +223,188 @@ def _save_haiku_counter(state):
     save_state(full_state)
 
 
+def _fetch_and_cache_corp_codes() -> dict:
+    if os.path.exists(CORP_CODE_CACHE_FILE):
+        try:
+            mtime = datetime.fromtimestamp(os.path.getmtime(CORP_CODE_CACHE_FILE))
+            if (datetime.now() - mtime).days < CORP_CODE_CACHE_TTL_DAYS:
+                with open(CORP_CODE_CACHE_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+    if not DART_API_KEY:
+        return {}
+    print("[earnings_tracker] DART corpCode.xml 다운로드 중...")
+    res = requests.get(
+        "https://opendart.fss.or.kr/api/corpCode.xml",
+        params={"crtfc_key": DART_API_KEY},
+        timeout=30,
+    )
+    with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
+        with zf.open("CORPCODE.xml") as xf:
+            tree = ET.parse(xf)
+    mapping = {}
+    for elem in tree.getroot().findall("list"):
+        stock_code = (elem.findtext("stock_code") or "").strip()
+        corp_code = (elem.findtext("corp_code") or "").strip()
+        if stock_code and corp_code:
+            mapping[stock_code] = corp_code
+    with open(CORP_CODE_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(mapping, f)
+    print(f"[earnings_tracker] DART corpCode 매핑 {len(mapping)}건 캐시 저장")
+    return mapping
+
+
+def get_corp_code(stock_code: str) -> str | None:
+    if not stock_code:
+        return None
+    mapping = _fetch_and_cache_corp_codes()
+    return mapping.get(stock_code.strip())
+
+
+def _fetch_fnltt_raw(corp_code: str, year: int, reprt_code: str) -> dict | None:
+    for fs_div in ("CFS", "OFS"):
+        try:
+            res = requests.get(
+                "https://opendart.fss.or.kr/api/fnlttSinglAcntAll.json",
+                params={
+                    "crtfc_key": DART_API_KEY,
+                    "corp_code": corp_code,
+                    "bsns_year": str(year),
+                    "reprt_code": reprt_code,
+                    "fs_div": fs_div,
+                },
+                timeout=15,
+            )
+            data = res.json()
+        except Exception as e:
+            print(f"[earnings_tracker] fnltt fetch 실패 ({corp_code} {year} {reprt_code} {fs_div}): {e}")
+            return None
+        if data.get("status") == "000":
+            return data
+    return None
+
+
+def _extract_amounts(data: dict, amount_field: str, sub_field: str | None = None) -> dict:
+    """CIS 항목에서 매출/영업이익/순이익 추출. sub_field로 차감도 가능."""
+    revenue_keys = ["매출액", "수익(매출액)", "영업수익", "수익"]
+    op_income_keys = ["영업이익", "영업이익(손실)", "영업손익"]
+    net_income_keys = ["당기순이익", "당기순이익(손실)", "당기순손익",
+                       "분기순이익", "분기순이익(손실)", "분기순손익",
+                       "반기순이익", "반기순이익(손실)", "반기순손익",
+                       "연결당기순이익"]
+    result = {"revenue": None, "op_income": None, "net_income": None}
+    for item in data.get("list", []):
+        if item.get("sj_div") not in ("CIS", "IS"):
+            continue
+        account_nm = item.get("account_nm", "")
+        val_str = (item.get(amount_field) or "").replace(",", "").strip()
+        if not val_str or val_str == "-":
+            continue
+        try:
+            val = int(val_str)
+        except ValueError:
+            continue
+        if sub_field:
+            sub_str = (item.get(sub_field) or "").replace(",", "").strip()
+            if not sub_str or sub_str == "-":
+                continue
+            try:
+                val = val - int(sub_str)
+            except ValueError:
+                continue
+        amount_million = val // 1_000_000
+        if result["revenue"] is None and account_nm in revenue_keys:
+            result["revenue"] = amount_million
+        elif result["op_income"] is None and account_nm in op_income_keys:
+            result["op_income"] = amount_million
+        elif result["net_income"] is None and account_nm in net_income_keys:
+            result["net_income"] = amount_million
+    return result
+
+
+def get_quarter_standalone(stock_code: str, year: int, quarter: str) -> dict:
+    """
+    특정 기업의 특정 분기 단독 매출/영업이익/순이익 (백만원).
+    Q1/Q2/Q3: thstrm_amount가 이미 단독값.
+    Q4: ANN.thstrm_amount(연간) - 3Q.thstrm_add_amount(3Q누적) 차감.
+    """
+    empty = {"revenue": None, "op_income": None, "net_income": None}
+    corp_code = get_corp_code(stock_code)
+    if not corp_code:
+        print(f"[earnings_tracker] corp_code 없음: {stock_code}")
+        return empty
+    if quarter not in ("Q1", "Q2", "Q3", "Q4"):
+        return empty
+    if not DART_API_KEY:
+        return empty
+
+    if quarter == "Q4":
+        ann_data = _fetch_fnltt_raw(corp_code, year, REPORT_CODES["ANN"])
+        q3_data = _fetch_fnltt_raw(corp_code, year, REPORT_CODES["3Q"])
+        if not ann_data or not q3_data:
+            return empty
+        ann_vals = _extract_amounts(ann_data, "thstrm_amount")
+        q3_cum = _extract_amounts(q3_data, "thstrm_add_amount")
+        result = {}
+        for k in ("revenue", "op_income", "net_income"):
+            a = ann_vals.get(k)
+            c = q3_cum.get(k)
+            result[k] = (a - c) if (a is not None and c is not None) else None
+        return result
+
+    period_map = {"Q1": "Q1", "Q2": "H1", "Q3": "3Q"}
+    reprt_code = REPORT_CODES[period_map[quarter]]
+    data = _fetch_fnltt_raw(corp_code, year, reprt_code)
+    if not data:
+        return empty
+    return _extract_amounts(data, "thstrm_amount")
+
+
+def infer_target_quarter(filing_date) -> tuple:
+    if isinstance(filing_date, str):
+        filing_date = date.fromisoformat(filing_date)
+    month = filing_date.month
+    year = filing_date.year
+    if 1 <= month <= 3:
+        return year - 1, "Q4"
+    elif 4 <= month <= 6:
+        return year, "Q1"
+    elif 7 <= month <= 9:
+        return year, "Q2"
+    else:
+        return year, "Q3"
+
+
+def get_prev_three_quarters(target_year: int, target_quarter: str) -> list:
+    order = ["Q1", "Q2", "Q3", "Q4"]
+    idx = order.index(target_quarter)
+    result = []
+    y, q_idx = target_year, idx
+    for _ in range(3):
+        q_idx -= 1
+        if q_idx < 0:
+            q_idx = 3
+            y -= 1
+        result.append((y, order[q_idx]))
+    return result
+
+
+def fetch_historical_quarters(stock_code: str, filing_date) -> dict:
+    empty = {"revenue": None, "op_income": None, "net_income": None}
+    target_year, target_quarter = infer_target_quarter(filing_date)
+    prev_quarters = get_prev_three_quarters(target_year, target_quarter)
+    result = {"target_quarter_label": f"{target_year}{target_quarter}"}
+    for i, (year, quarter) in enumerate(prev_quarters, start=1):
+        try:
+            data = get_quarter_standalone(stock_code, year, quarter)
+        except Exception as e:
+            print(f"[earnings_tracker] {stock_code} {year}{quarter} fetch 에러: {e}")
+            data = empty
+        result[f"prev{i}"] = data
+    return result
+
+
 def load_state():
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
@@ -372,12 +570,23 @@ def run_daily(force=False, target_date=None):
                     else:
                         parse_status = "ok"
 
+            historical = fetch_historical_quarters(f.get("stock_code", ""), today)
+
             row = meta + [
                 financials["revenue"],
                 financials["op_income"],
                 financials["net_income"],
                 financials["currency_unit"],
                 parse_status,
+                historical["prev1"]["revenue"],
+                historical["prev2"]["revenue"],
+                historical["prev3"]["revenue"],
+                historical["prev1"]["op_income"],
+                historical["prev2"]["op_income"],
+                historical["prev3"]["op_income"],
+                historical["prev1"]["net_income"],
+                historical["prev2"]["net_income"],
+                historical["prev3"]["net_income"],
             ]
             rows.append(row)
 
@@ -437,6 +646,46 @@ def run_backfill(days):
 
 if __name__ == "__main__":
     import sys
+
+    if "--verify-q-semantics" in sys.argv:
+        quarters = {}
+        for q in ["Q1", "Q2", "Q3", "Q4"]:
+            quarters[q] = get_quarter_standalone("006400", 2025, q)
+        corp_code = get_corp_code("006400")
+        ann_data = _fetch_fnltt_raw(corp_code, 2025, REPORT_CODES["ANN"])
+        ann_amounts = _extract_amounts(ann_data, "thstrm_amount") if ann_data else None
+        total = {"revenue": 0, "op_income": 0, "net_income": 0}
+        valid = True
+        for q in ["Q1", "Q2", "Q3", "Q4"]:
+            for k in total:
+                v = quarters[q].get(k)
+                if v is None:
+                    valid = False
+                else:
+                    total[k] += v
+        print(f"\n=== 삼성SDI 006400 2025 분기 검증 ===")
+        print(f"{'분기':<10} {'매출액':>15} {'영업이익':>15} {'순이익':>15}")
+        for q in ["Q1", "Q2", "Q3", "Q4"]:
+            d = quarters[q]
+            print(f"{q:<10} {str(d.get('revenue')):>15} {str(d.get('op_income')):>15} {str(d.get('net_income')):>15}")
+        if valid:
+            print(f"{'합계':<10} {total['revenue']:>15} {total['op_income']:>15} {total['net_income']:>15}")
+        else:
+            print(f"{'합계':<10} {'(일부 None)':>15}")
+        a = ann_amounts or {}
+        print(f"{'ANN':<10} {str(a.get('revenue', '?')):>15} {str(a.get('op_income', '?')):>15} {str(a.get('net_income', '?')):>15}")
+        sys.exit(0)
+
+    for arg in sys.argv[1:]:
+        if arg.startswith("--test-quarter="):
+            parts = arg.split("=", 1)[1].split(",")
+            if len(parts) != 3:
+                print("형식: --test-quarter=종목코드,연도,분기 (예: --test-quarter=047040,2025,Q4)")
+                sys.exit(1)
+            stock_code, year, quarter = parts
+            result = get_quarter_standalone(stock_code, int(year), quarter)
+            print(f"[test] {stock_code} {year} {quarter}: {result}")
+            sys.exit(0)
 
     backfill_days = None
     for arg in sys.argv[1:]:
