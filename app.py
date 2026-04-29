@@ -1427,17 +1427,64 @@ def _alog(cat, msg):
 
 
 # --- Telegram ---
+TG_MAX_LEN = 4000
+
+
+def _tg_split_message(text, max_len=TG_MAX_LEN):
+    if len(text) <= max_len:
+        return [text]
+    chunks = []
+    current = ""
+    for para in text.split("\n\n"):
+        if len(para) > max_len:
+            if current:
+                chunks.append(current)
+                current = ""
+            for line in para.split("\n"):
+                if len(line) > max_len:
+                    while line:
+                        space = max_len if not current else max_len - len(current) - 1
+                        if current:
+                            current += "\n" + line[:space]
+                            chunks.append(current)
+                            current = ""
+                        else:
+                            chunks.append(line[:space])
+                        line = line[space:]
+                elif current and len(current) + 1 + len(line) > max_len:
+                    chunks.append(current)
+                    current = line
+                else:
+                    current = current + "\n" + line if current else line
+        elif current and len(current) + 2 + len(para) > max_len:
+            chunks.append(current)
+            current = para
+        else:
+            current = current + "\n\n" + para if current else para
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def _tg_send(token, chat_id, text):
     if not chat_id:
         return False
     try:
-        for i in range(0, len(text), 4000):
+        chunks = _tg_split_message(text)
+        total = len(chunks)
+        if total > 1:
+            print(f"[TG] 메시지 분할 전송: {total}개 청크")
+        for idx, chunk in enumerate(chunks, 1):
+            if total > 1:
+                chunk += f"\n\n({idx}/{total})"
             requests.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text[i:i + 4000],
+                json={"chat_id": chat_id, "text": chunk,
                       "parse_mode": "HTML", "disable_web_page_preview": True},
                 timeout=10,
             )
+            if idx < total:
+                time.sleep(0.3)
         return True
     except Exception:
         return False
@@ -1763,7 +1810,7 @@ def _send_daily_slot(slot):
     for i, it in enumerate(filtered, 1):
         msg += f"{i}. <b>{it['corp_name']}</b>\n   📋 {it['title']}\n"
         msg += f"   🔗 https://dart.fss.or.kr/dsaf001/main.do?rcpNo={it['rcept_no']}\n\n"
-    _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg[:4000])
+    _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg)
     _alog("일일", f"{slot['key']}시 공시 {len(filtered)}건 전송")
 
 
