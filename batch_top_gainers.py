@@ -15,6 +15,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TICKERS_DIR = os.path.join(BASE_DIR, "tickers")
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
 
+OUTLIER_THRESHOLDS = {
+    "1d": 50.0,
+    "1w": 100.0,
+    "1mo": 200.0,
+}
+
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
@@ -479,6 +485,7 @@ def calc_rankings(price_data, ticker_meta):
     meta_map = {t["ticker"]: t for t in ticker_meta}
     periods = {"1d": 1, "1w": 5, "1mo": 21}
     result = {}
+    excluded_counts = {}
 
     for period_key, lookback in periods.items():
         changes = []
@@ -493,7 +500,14 @@ def calc_rankings(price_data, ticker_meta):
             changes.append((sym, pct))
 
         changes.sort(key=lambda x: x[1], reverse=True)
-        top = changes[:10]
+        threshold = OUTLIER_THRESHOLDS.get(period_key, float("inf"))
+        filtered_changes = [(s, p) for s, p in changes if p <= threshold]
+        excluded = [(s, p) for s, p in changes if p > threshold]
+        if excluded:
+            excluded_str = ", ".join(f"{s}({p:+.1f}%)" for s, p in excluded[:5])
+            log(f"  [{period_key}] outlier 제외 {len(excluded)}개: {excluded_str}{'...' if len(excluded) > 5 else ''}")
+        excluded_counts[period_key] = len(excluded)
+        top = filtered_changes[:10]
 
         items = []
         for sym, pct in top:
@@ -507,7 +521,7 @@ def calc_rankings(price_data, ticker_meta):
             })
         result[period_key] = items
 
-    return result
+    return result, excluded_counts
 
 
 def main():
@@ -543,7 +557,7 @@ def main():
     if fail_rate > 15:
         print(f"WARNING: high failure rate {fail_rate:.1f}% ({len(failed)}/{len(tickers)})", file=sys.stderr)
 
-    rankings = calc_rankings(price_data, tickers)
+    rankings, excluded_counts = calc_rankings(price_data, tickers)
 
     from zoneinfo import ZoneInfo
     tz_map = {"us": "America/New_York", "kr": "Asia/Seoul", "jp": "Asia/Tokyo", "eu": "Europe/Berlin"}
@@ -557,6 +571,7 @@ def main():
         "failed_tickers": failed[:50],
         "failed_count": len(failed),
         "data": rankings,
+        "excluded_counts": excluded_counts,
     }
 
     os.makedirs(CACHE_DIR, exist_ok=True)
