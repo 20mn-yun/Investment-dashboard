@@ -87,6 +87,73 @@ def load_russell1000():
     return tickers
 
 
+def load_russell3000():
+    path = os.path.join(TICKERS_DIR, "us_russell3000.json")
+    if os.path.exists(path):
+        age_days = (time.time() - os.path.getmtime(path)) / 86400
+        if age_days < 7:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            log(f"Cached ticker list loaded: {len(data)} tickers (age: {age_days:.1f}d)")
+            return data
+
+    log("Downloading Russell 3000 holdings from iShares...")
+    url = (
+        "https://www.ishares.com/us/products/239714/"
+        "ishares-russell-3000-etf/1467271812596.ajax"
+        "?fileType=csv&fileName=IWV_holdings&dataType=fund"
+    )
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "text/csv,text/plain,*/*",
+    }
+    resp = req.get(url, headers=headers, timeout=30)
+    if resp.status_code != 200:
+        print(f"ERROR: iShares returned HTTP {resp.status_code}", file=sys.stderr)
+        print(f"Response headers: {dict(resp.headers)}", file=sys.stderr)
+        print(f"Body preview: {resp.text[:500]}", file=sys.stderr)
+        sys.exit(1)
+
+    lines = resp.text.splitlines()
+    header_idx = None
+    for i, line in enumerate(lines):
+        if line.startswith("Ticker,") or line.startswith('"Ticker"'):
+            header_idx = i
+            break
+    if header_idx is None:
+        print("ERROR: Could not find CSV header row", file=sys.stderr)
+        print(f"First 15 lines:\n" + "\n".join(lines[:15]), file=sys.stderr)
+        sys.exit(1)
+
+    csv_text = "\n".join(lines[header_idx:])
+    df = pd.read_csv(io.StringIO(csv_text))
+
+    if "Asset Class" in df.columns:
+        df = df[df["Asset Class"] == "Equity"]
+
+    tickers = []
+    for _, row in df.iterrows():
+        t = str(row.get("Ticker", "")).strip()
+        if not t or t == "-" or t == "nan":
+            continue
+        t = t.replace(".", "-")
+        name = str(row.get("Name", "")).strip()
+        sector = str(row.get("Sector", "")).strip()
+        if name == "nan":
+            name = t
+        if sector == "nan":
+            sector = "-"
+        tickers.append({"ticker": t, "name": name, "sector": sector})
+
+    os.makedirs(TICKERS_DIR, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(tickers, f, ensure_ascii=False, indent=1)
+    log(f"Saved {len(tickers)} tickers to {path}")
+    return tickers
+
+
 def load_kr_top600(top_n=300):
     path = os.path.join(TICKERS_DIR, "kr_top600.json")
     if os.path.exists(path):
@@ -456,8 +523,8 @@ def main():
     log(f"=== Batch top gainers: {market} ===")
 
     if market == "us":
-        tickers = load_russell1000()
-        universe_label = "Russell 1000"
+        tickers = load_russell3000()
+        universe_label = "Russell 3000"
     elif market == "kr":
         tickers = load_kr_top600()
         universe_label = "KOSPI top 300 + KOSDAQ top 300"
