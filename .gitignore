@@ -13,4 +13,7 @@ expanded_stocks.json
 us_stock_map.json
 earnings_tracker_state.json
 dart_corp_codes.json
+dart_industry_cache.json
+dart_industry_name_cache.json
+business_overview_cache.json
 DART_*.xlsx

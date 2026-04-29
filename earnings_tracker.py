@@ -33,12 +33,13 @@ STATE_FILE = os.path.join(
 )
 
 HEADERS = [
-    "공시일자", "기업명", "종목코드", "보고서명", "DART 링크",
-    "당분기 매출액(백만원)", "당분기 영업이익(백만원)", "당분기 순이익(백만원)",
-    "원본단위", "파싱상태",
-    "전분기 매출액(백만원)", "전전분기 매출액(백만원)", "전전전분기 매출액(백만원)",
-    "전분기 영업이익(백만원)", "전전분기 영업이익(백만원)", "전전전분기 영업이익(백만원)",
-    "전분기 순이익(백만원)", "전전분기 순이익(백만원)", "전전전분기 순이익(백만원)",
+    "공시일자", "기업명", "업종", "종목코드",
+    "당분기 매출액(억원)", "당분기 영업이익(억원)", "당분기 순이익(억원)",
+    "매출 QoQ %", "영업이익 QoQ %",
+    "전전전분기 매출액(억원)", "전전분기 매출액(억원)", "전분기 매출액(억원)",
+    "전전전분기 영업이익(억원)", "전전분기 영업이익(억원)", "전분기 영업이익(억원)",
+    "전전전분기 순이익(억원)", "전전분기 순이익(억원)", "전분기 순이익(억원)",
+    "기업개요", "DART 링크", "파싱상태",
 ]
 
 DAILY_HAIKU_LIMIT = 300
@@ -48,6 +49,17 @@ CORP_CODE_CACHE_FILE = os.path.join(
 )
 CORP_CODE_CACHE_TTL_DAYS = 7
 
+INDUSTRY_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "dart_industry_cache.json"
+)
+INDUSTRY_NAME_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "dart_industry_name_cache.json"
+)
+BUSINESS_OVERVIEW_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "business_overview_cache.json"
+)
+BUSINESS_OVERVIEW_TTL_DAYS = 30
+
 REPORT_CODES = {
     "Q1": "11013",
     "H1": "11012",
@@ -55,12 +67,12 @@ REPORT_CODES = {
     "ANN": "11011",
 }
 
-UNIT_TO_MILLION_KRW = {
-    "조원": 1_000_000,
-    "억원": 100,
-    "백만원": 1,
-    "천원": 0.001,
-    "원": 0.000001,
+UNIT_TO_HUNDRED_MILLION_KRW = {
+    "조원": 10_000,
+    "억원": 1,
+    "백만원": 0.01,
+    "천원": 0.00001,
+    "원": 0.00000001,
 }
 
 EARNINGS_PATTERN = re.compile(r"영업\s*\(\s*잠정\s*\)\s*실적")
@@ -135,12 +147,12 @@ def extract_earnings_tables(html: str) -> str:
     return combined
 
 
-def normalize_to_million_krw(raw_value, unit):
+def normalize_to_hundred_million_krw(raw_value, unit):
     if raw_value is None or unit is None:
         return None
-    if unit not in UNIT_TO_MILLION_KRW:
+    if unit not in UNIT_TO_HUNDRED_MILLION_KRW:
         return None
-    multiplier = UNIT_TO_MILLION_KRW[unit]
+    multiplier = UNIT_TO_HUNDRED_MILLION_KRW[unit]
     return int(round(raw_value * multiplier))
 
 
@@ -191,9 +203,9 @@ JSON 형식:
         data = json.loads(text)
         unit = data.get("currency_unit")
         return {
-            "revenue": normalize_to_million_krw(data.get("revenue_raw"), unit),
-            "op_income": normalize_to_million_krw(data.get("op_income_raw"), unit),
-            "net_income": normalize_to_million_krw(data.get("net_income_raw"), unit),
+            "revenue": normalize_to_hundred_million_krw(data.get("revenue_raw"), unit),
+            "op_income": normalize_to_hundred_million_krw(data.get("op_income_raw"), unit),
+            "net_income": normalize_to_hundred_million_krw(data.get("net_income_raw"), unit),
             "currency_unit": unit,
         }
     except Exception as e:
@@ -262,6 +274,251 @@ def get_corp_code(stock_code: str) -> str | None:
     return mapping.get(stock_code.strip())
 
 
+def get_corp_industry(corp_code: str) -> str | None:
+    if not DART_API_KEY or not corp_code:
+        return None
+    try:
+        res = requests.get(
+            "https://opendart.fss.or.kr/api/company.json",
+            params={"crtfc_key": DART_API_KEY, "corp_code": corp_code},
+            timeout=15,
+        )
+        data = res.json()
+    except Exception as e:
+        print(f"[earnings_tracker] corpInfo fetch 실패 ({corp_code}): {e}")
+        return None
+    if data.get("status") != "000":
+        return None
+    return data.get("induty_code") or None
+
+
+def get_corp_industry_cached(corp_code: str) -> str | None:
+    cache = {}
+    if os.path.exists(INDUSTRY_CACHE_FILE):
+        try:
+            with open(INDUSTRY_CACHE_FILE, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+        except Exception:
+            pass
+    if corp_code in cache:
+        return cache[corp_code]
+    industry = get_corp_industry(corp_code)
+    cache[corp_code] = industry
+    try:
+        with open(INDUSTRY_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False)
+    except Exception:
+        pass
+    return industry
+
+
+def _translate_industry_code_with_haiku(industry_code: str) -> str | None:
+    if not industry_code:
+        return None
+    prompt = f"""한국표준산업분류(KSIC) 코드 "{industry_code}"에 해당하는 한글 업종명을 반환하라.
+
+규칙:
+- 2~5자리 숫자 코드. 예: 264 = 반도체 제조업, 2612 = 평판디스플레이 제조업, 27192 = 측정용기 제조업
+- 업종명만 반환. 설명·따옴표·마크다운 금지.
+- 코드를 모르면 "기타"라고만 답하라.
+- 응답은 JSON 형식: {{"industry_name": "..."}}
+
+답변:"""
+    try:
+        client = _get_anthropic_client()
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=80,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        data = json.loads(text)
+        return data.get("industry_name")
+    except Exception as e:
+        print(f"[earnings_tracker] 업종명 변환 실패 ({industry_code}): {e}")
+        return None
+
+
+def get_industry_name_cached(industry_code: str, state: dict = None) -> str | None:
+    if not industry_code:
+        return None
+    cache = {}
+    if os.path.exists(INDUSTRY_NAME_CACHE_FILE):
+        try:
+            with open(INDUSTRY_NAME_CACHE_FILE, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+        except Exception:
+            pass
+    if industry_code in cache:
+        return cache[industry_code]
+    if state is not None:
+        can_call, _ = _check_and_increment_haiku_counter(state)
+        if not can_call:
+            return None
+    name = _translate_industry_code_with_haiku(industry_code)
+    cache[industry_code] = name
+    try:
+        with open(INDUSTRY_NAME_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return name
+
+
+def fetch_business_section_from_dart(corp_code: str) -> str | None:
+    if not corp_code or not DART_API_KEY:
+        return None
+    end_dt = date.today()
+    bgn_dt = end_dt.replace(year=end_dt.year - 2)
+    try:
+        res = requests.get(
+            "https://opendart.fss.or.kr/api/list.json",
+            params={
+                "crtfc_key": DART_API_KEY,
+                "corp_code": corp_code,
+                "bgn_de": bgn_dt.strftime("%Y%m%d"),
+                "end_de": end_dt.strftime("%Y%m%d"),
+                "pblntf_ty": "A",
+                "page_count": 20,
+            },
+            timeout=15,
+        )
+        data = res.json()
+    except Exception as e:
+        print(f"[earnings_tracker] 사업보고서 검색 실패 ({corp_code}): {e}")
+        return None
+    if data.get("status") != "000":
+        return None
+    items = data.get("list", [])
+    rcept_no = None
+    for item in items:
+        if "사업보고서" in (item.get("report_nm") or ""):
+            rcept_no = item.get("rcept_no")
+            break
+    if not rcept_no:
+        return None
+    html = fetch_filing_body(rcept_no)
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text(separator="\n", strip=True)
+    start_patterns = [
+        r"II\.?\s*사업의\s*내용",
+        r"Ⅱ\.?\s*사업의\s*내용",
+        r"2\.\s*사업의\s*내용",
+    ]
+    end_patterns = [
+        r"III\.?\s*재무에\s*관한\s*사항",
+        r"Ⅲ\.?\s*재무에\s*관한\s*사항",
+        r"3\.\s*재무에\s*관한\s*사항",
+    ]
+    start_idx = None
+    for p in start_patterns:
+        m = re.search(p, text)
+        if m:
+            start_idx = m.end()
+            break
+    if start_idx is None:
+        return None
+    end_idx = len(text)
+    for p in end_patterns:
+        m = re.search(p, text[start_idx:])
+        if m:
+            end_idx = start_idx + m.start()
+            break
+    section = text[start_idx:end_idx].strip()
+    if len(section) > 5000:
+        section = section[:5000]
+    return section if len(section) > 100 else None
+
+
+def _summarize_business_with_haiku(corp_name: str, business_section: str) -> str | None:
+    if not business_section:
+        return None
+    prompt = f"""다음은 한국 기업 '{corp_name}'의 사업보고서 '사업의 내용' 섹션입니다.
+
+{business_section}
+
+위 내용을 바탕으로, 이 회사가 무슨 사업을 하는지 **한국어 평문 2~3줄**로 요약하라.
+
+규칙:
+- 마크다운(#, *, -, 등) 금지. 평문만.
+- 회사 이름은 다시 적지 말것 (이미 컨텍스트에서 알려져 있음).
+- 사업 영역, 주요 제품/서비스, 매출 비중이 큰 분야 위주.
+- 2~3 문장. 80~150자 정도.
+
+답변:"""
+    try:
+        client = _get_anthropic_client()
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip()
+        text = re.sub(r"^[#*\-\s]+", "", text)
+        return text if text else None
+    except Exception as e:
+        print(f"[earnings_tracker] 기업개요 요약 실패 ({corp_name}): {e}")
+        return None
+
+
+def get_business_overview_cached(stock_code: str, corp_name: str, corp_code: str, state: dict = None) -> str | None:
+    if not stock_code:
+        return None
+    cache = {}
+    if os.path.exists(BUSINESS_OVERVIEW_CACHE_FILE):
+        try:
+            with open(BUSINESS_OVERVIEW_CACHE_FILE, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+        except Exception:
+            pass
+    if stock_code in cache:
+        try:
+            cached_at = date.fromisoformat(cache[stock_code]["cached_at"])
+            if (date.today() - cached_at).days < BUSINESS_OVERVIEW_TTL_DAYS:
+                return cache[stock_code].get("overview")
+        except Exception:
+            pass
+    if state is not None:
+        can_call, _ = _check_and_increment_haiku_counter(state)
+        if not can_call:
+            return None
+    section = fetch_business_section_from_dart(corp_code)
+    if not section:
+        return None
+    overview = _summarize_business_with_haiku(corp_name, section)
+    cache[stock_code] = {
+        "overview": overview,
+        "cached_at": date.today().isoformat(),
+    }
+    try:
+        with open(BUSINESS_OVERVIEW_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return overview
+
+
+def compute_qoq_pct(current, previous) -> float | None:
+    if current is None or previous is None:
+        return None
+    if previous == 0:
+        return None
+    return round((current - previous) / abs(previous) * 100, 2)
+
+
+def passes_filter(financials: dict, prev1: dict) -> bool:
+    cur_rev = financials.get("revenue")
+    prev_rev = prev1.get("revenue")
+    cur_op = financials.get("op_income")
+    prev_op = prev1.get("op_income")
+    rev_up = (cur_rev is not None and prev_rev is not None and cur_rev > prev_rev)
+    op_up = (cur_op is not None and prev_op is not None and cur_op > prev_op)
+    return rev_up or op_up
+
+
 def _fetch_fnltt_raw(corp_code: str, year: int, reprt_code: str) -> dict | None:
     for fs_div in ("CFS", "OFS"):
         try:
@@ -313,13 +570,13 @@ def _extract_amounts(data: dict, amount_field: str, sub_field: str | None = None
                 val = val - int(sub_str)
             except ValueError:
                 continue
-        amount_million = val // 1_000_000
+        amount_eokwon = val // 100_000_000
         if result["revenue"] is None and account_nm in revenue_keys:
-            result["revenue"] = amount_million
+            result["revenue"] = amount_eokwon
         elif result["op_income"] is None and account_nm in op_income_keys:
-            result["op_income"] = amount_million
+            result["op_income"] = amount_eokwon
         elif result["net_income"] is None and account_nm in net_income_keys:
-            result["net_income"] = amount_million
+            result["net_income"] = amount_eokwon
     return result
 
 
@@ -484,8 +741,8 @@ def append_rows(rows):
             print(f"[earnings_tracker] 헤더 마이그레이션: {len(current_headers)}컬럼 → {len(HEADERS)}컬럼")
         existing = {}
         for idx, r in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            if r and len(r) >= 3 and r[0] and r[2]:
-                existing[(str(r[0]), str(r[2]))] = idx
+            if r and len(r) >= 4 and r[0] and r[3]:
+                existing[(str(r[0]), str(r[3]))] = idx
     else:
         wb = Workbook()
         ws = wb.active
@@ -496,7 +753,7 @@ def append_rows(rows):
     added = 0
     updated = 0
     for row in rows:
-        key = (str(row[0]), str(row[2]))
+        key = (str(row[0]), str(row[3]))
         if key in existing:
             target_row = existing[key]
             for col_idx, value in enumerate(row, start=1):
@@ -541,16 +798,13 @@ def run_daily(force=False, target_date=None):
 
         state = load_state()
         rows = []
+        filtered_out = 0
         for f in filings:
             rcept_no = f.get("rcept_no", "")
             corp_name = f.get("corp_name", "")
-            meta = [
-                today.isoformat(),
-                corp_name,
-                f.get("stock_code", ""),
-                f.get("report_nm", ""),
-                f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}",
-            ]
+            stock_code = f.get("stock_code", "")
+            corp_code = get_corp_code(stock_code)
+            industry_code = get_corp_industry_cached(corp_code) if corp_code else None
 
             can_call, state = _check_and_increment_haiku_counter(state)
             if not can_call:
@@ -570,30 +824,48 @@ def run_daily(force=False, target_date=None):
                     else:
                         parse_status = "ok"
 
-            historical = fetch_historical_quarters(f.get("stock_code", ""), today)
+            historical = fetch_historical_quarters(stock_code, today)
+            prev1 = historical["prev1"]
 
-            row = meta + [
+            if not passes_filter(financials, prev1):
+                print(f"[earnings_tracker] 필터 미통과 skip: {corp_name}")
+                filtered_out += 1
+                continue
+
+            qoq_revenue = compute_qoq_pct(financials.get("revenue"), prev1.get("revenue"))
+            qoq_op = compute_qoq_pct(financials.get("op_income"), prev1.get("op_income"))
+            industry_name = get_industry_name_cached(industry_code, state)
+            overview = get_business_overview_cached(stock_code, corp_name, corp_code, state)
+
+            row = [
+                today.isoformat(),
+                corp_name,
+                industry_name or industry_code,
+                stock_code,
                 financials["revenue"],
                 financials["op_income"],
                 financials["net_income"],
-                financials["currency_unit"],
-                parse_status,
-                historical["prev1"]["revenue"],
-                historical["prev2"]["revenue"],
+                qoq_revenue,
+                qoq_op,
                 historical["prev3"]["revenue"],
-                historical["prev1"]["op_income"],
-                historical["prev2"]["op_income"],
+                historical["prev2"]["revenue"],
+                historical["prev1"]["revenue"],
                 historical["prev3"]["op_income"],
-                historical["prev1"]["net_income"],
-                historical["prev2"]["net_income"],
+                historical["prev2"]["op_income"],
+                historical["prev1"]["op_income"],
                 historical["prev3"]["net_income"],
+                historical["prev2"]["net_income"],
+                historical["prev1"]["net_income"],
+                overview,
+                f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}",
+                parse_status,
             ]
             rows.append(row)
 
         _save_haiku_counter(state)
 
         result = append_rows(rows)
-        print(f"[earnings_tracker] {mode_label} {today} 신규 {result['added']}건, 정정 {result['updated']}건")
+        print(f"[earnings_tracker] {mode_label} {today} 신규 {result['added']}건, 정정 {result['updated']}건, 필터제외 {filtered_out}건")
 
         if not is_backfill:
             state = load_state()
