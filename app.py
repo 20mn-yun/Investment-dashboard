@@ -16,6 +16,7 @@ import io
 import xml.etree.ElementTree as ET
 from datetime import date, timedelta, datetime
 import pandas as pd
+import telegram_report
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -1352,6 +1353,10 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_TOKEN_GENERAL = os.environ.get("TELEGRAM_TOKEN_GENERAL")
 TELEGRAM_TOKEN_EARNINGS = os.environ.get("TELEGRAM_TOKEN_EARNINGS")
 
+TG_API_ID = os.environ.get("TG_API_ID")
+TG_API_HASH = os.environ.get("TG_API_HASH")
+TG_SESSION_PATH = os.environ.get("TG_SESSION_PATH", "sessions/tg_report")
+
 _BD = os.path.dirname(os.path.abspath(__file__))
 DART_MON_CFG_FILE = os.path.join(_BD, "dart_monitor_config.json")
 DART_SEEN_FILE = os.path.join(_BD, "dart_seen.json")
@@ -2029,6 +2034,53 @@ def trigger_daily():
         return jsonify({"ok": True, "msg": "전체 공시 정리 및 엑셀 저장 완료"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
+
+
+# ===== 증권사 Report =====
+
+@app.route("/api/report/channels", methods=["GET"])
+def get_report_channels():
+    return jsonify(telegram_report.get_config()["channels"])
+
+
+@app.route("/api/report/channels", methods=["POST"])
+def update_report_channels():
+    body = request.json
+    action = body.get("action")
+    channel = body.get("channel", "").strip()
+    cfg = telegram_report.get_config()
+    channels = cfg.get("channels", [])
+    if action == "add" and channel and channel not in channels:
+        channels.append(channel)
+    elif action == "remove" and channel in channels:
+        channels.remove(channel)
+    cfg["channels"] = channels
+    telegram_report.save_config(cfg)
+    return jsonify(channels)
+
+
+@app.route("/api/report/search", methods=["POST"])
+def start_report_search():
+    body = request.json
+    channel = body.get("channel", "")
+    keyword = body.get("keyword", "")
+    date_from = datetime.strptime(body.get("date_from", "2020-01-01"), "%Y-%m-%d")
+    date_to = datetime.strptime(body.get("date_to", datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d")
+    cfg = telegram_report.get_config()
+    download_base = cfg.get("download_base", telegram_report.DEFAULT_CONFIG["download_base"])
+    job_id = telegram_report.start_search_job(
+        channel, keyword, date_from, date_to,
+        TG_API_ID, TG_API_HASH, TG_SESSION_PATH, download_base,
+    )
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/api/report/status/<job_id>", methods=["GET"])
+def get_report_status(job_id):
+    job = telegram_report.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
 
 
 if __name__ == "__main__":

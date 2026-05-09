@@ -680,6 +680,57 @@
         .dart-log-type.엑셀 { background: #8b949e; }
         .dart-log-empty { color: #8b949e; text-align: center; padding: 20px; font-size: 13px; }
 
+        /* 증권사 Report 탭 */
+        .rpt-channels { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .rpt-ch-tag {
+            background: #21262d; border: 1px solid #30363d; border-radius: 20px;
+            padding: 4px 12px; font-size: 12px; color: #58a6ff;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .rpt-ch-tag .remove { cursor: pointer; color: #8b949e; font-size: 14px; }
+        .rpt-ch-tag .remove:hover { color: #f85149; }
+        .rpt-add-row { display: flex; gap: 6px; margin-bottom: 24px; }
+        .rpt-add-row input {
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 6px 12px; color: #e6edf3; font-size: 13px; outline: none; flex: 1;
+        }
+        .rpt-add-row input:focus { border-color: #58a6ff; }
+        .rpt-search-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            margin-bottom: 12px;
+        }
+        .rpt-field { display: flex; flex-direction: column; gap: 4px; }
+        .rpt-field label { font-size: 12px; color: #8b949e; }
+        .rpt-field input, .rpt-field select {
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 8px 12px; color: #e6edf3; font-size: 13px; outline: none;
+        }
+        .rpt-field input:focus, .rpt-field select:focus { border-color: #58a6ff; }
+        .rpt-progress {
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            padding: 16px; margin-bottom: 16px;
+        }
+        .rpt-progress-text { font-size: 13px; color: #e6edf3; margin-bottom: 6px; }
+        .rpt-progress-path { font-size: 12px; color: #8b949e; word-break: break-all; }
+        .rpt-dots { display: inline-block; }
+        .rpt-dots::after {
+            content: ''; animation: rptDots 1.5s steps(4, end) infinite;
+        }
+        @keyframes rptDots {
+            0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; }
+        }
+        .rpt-result-table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        .rpt-result-table th {
+            text-align: left; padding: 8px 12px; color: #8b949e;
+            border-bottom: 1px solid #30363d; font-weight: normal; font-size: 12px;
+        }
+        .rpt-result-table td {
+            padding: 8px 12px; border-bottom: 1px solid #21262d; color: #e6edf3;
+        }
+        .rpt-result-table tr:last-child td { border-bottom: none; }
+
         /* 모바일 반응형 */
         @media (max-width: 768px) {
             .header { padding: 12px 16px; }
@@ -748,6 +799,7 @@
             .dart-sections { grid-template-columns: 1fr; }
             .dart-status-bar { padding: 10px 14px; }
             .dart-section { padding: 12px; }
+            .rpt-search-grid { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 480px) {
@@ -771,6 +823,7 @@
     <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
     <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
     <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
+    <div class="tab" onclick="switchTab('report')">📄 증권사 Report</div>
 </div>
 
 <!-- 글로벌 마켓 탭 -->
@@ -1066,6 +1119,54 @@
     </div>
 </div>
 
+<!-- 증권사 Report 탭 -->
+<div class="tab-content" id="tab-report">
+    <!-- 채널 설정 -->
+    <div class="section-title">📡 텔레그램 채널</div>
+    <div class="rpt-channels" id="rpt-channels"></div>
+    <div class="rpt-add-row">
+        <input type="text" id="rpt-ch-input" placeholder="채널 username (@ 제외)">
+        <button class="btn" onclick="addReportChannel()">추가</button>
+    </div>
+
+    <!-- 검색 섹션 -->
+    <div class="section-title">🔍 리포트 검색</div>
+    <div class="rpt-search-grid">
+        <div class="rpt-field">
+            <label>채널</label>
+            <select id="rpt-ch-select"></select>
+        </div>
+        <div class="rpt-field">
+            <label>검색어</label>
+            <input type="text" id="rpt-keyword" placeholder="종목명 입력 예: 삼성전자">
+        </div>
+        <div class="rpt-field">
+            <label>시작일</label>
+            <input type="date" id="rpt-date-from">
+        </div>
+        <div class="rpt-field">
+            <label>종료일</label>
+            <input type="date" id="rpt-date-to">
+        </div>
+    </div>
+    <button class="btn" onclick="reportSearchJob()" style="margin-top:8px;margin-bottom:16px;">검색 + 다운로드</button>
+
+    <!-- 진행상황 -->
+    <div id="rpt-progress" class="rpt-progress" style="display:none;">
+        <div class="rpt-progress-text" id="rpt-progress-text"></div>
+        <div class="rpt-progress-path" id="rpt-progress-path"></div>
+    </div>
+
+    <!-- 결과 -->
+    <div id="rpt-result" class="data-table" style="display:none;">
+        <div class="section-title">📁 다운로드 파일</div>
+        <table class="rpt-result-table">
+            <thead><tr><th>파일명</th><th>날짜</th><th>크기</th></tr></thead>
+            <tbody id="rpt-result-body"></tbody>
+        </table>
+    </div>
+</div>
+
 <script>
     const API_BASE = '';
 
@@ -1081,6 +1182,7 @@
     // 탭 전환
     let calLoaded = false;
     let dartLoaded = false;
+    let reportLoaded = false;
     function switchTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -1093,6 +1195,10 @@
         if (tabName === 'dart' && !dartLoaded) {
             dartLoaded = true;
             initDart();
+        }
+        if (tabName === 'report' && !reportLoaded) {
+            reportLoaded = true;
+            initReport();
         }
     }
 
@@ -2118,6 +2224,131 @@
                 </div>`
             ).join('');
         } catch(e) {}
+    }
+
+    // ===== 증권사 Report =====
+    let _rptChannels = [];
+    let _rptJobId = null;
+    let _rptPollTimer = null;
+
+    function initReport() {
+        const today = new Date();
+        const fiveYearsAgo = new Date(today);
+        fiveYearsAgo.setFullYear(today.getFullYear() - 5);
+        document.getElementById('rpt-date-from').value = fiveYearsAgo.toISOString().slice(0, 10);
+        document.getElementById('rpt-date-to').value = today.toISOString().slice(0, 10);
+        loadReportChannels();
+    }
+
+    async function loadReportChannels() {
+        try {
+            const res = await fetch(API_BASE + '/api/report/channels');
+            _rptChannels = await res.json();
+        } catch(e) { _rptChannels = []; }
+        renderReportChannels();
+    }
+
+    function renderReportChannels() {
+        const container = document.getElementById('rpt-channels');
+        container.innerHTML = _rptChannels.map(ch =>
+            `<span class="rpt-ch-tag">${ch}<span class="remove" onclick="removeReportChannel('${ch}')">&times;</span></span>`
+        ).join('');
+        const sel = document.getElementById('rpt-ch-select');
+        sel.innerHTML = _rptChannels.map(ch => `<option value="${ch}">${ch}</option>`).join('');
+    }
+
+    async function addReportChannel() {
+        const input = document.getElementById('rpt-ch-input');
+        const ch = input.value.trim().replace(/^@/, '');
+        if (!ch) return;
+        try {
+            const res = await fetch(API_BASE + '/api/report/channels', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'add', channel: ch})
+            });
+            _rptChannels = await res.json();
+            renderReportChannels();
+            input.value = '';
+        } catch(e) {}
+    }
+
+    async function removeReportChannel(ch) {
+        try {
+            const res = await fetch(API_BASE + '/api/report/channels', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'remove', channel: ch})
+            });
+            _rptChannels = await res.json();
+            renderReportChannels();
+        } catch(e) {}
+    }
+
+    async function reportSearchJob() {
+        const channel = document.getElementById('rpt-ch-select').value;
+        const keyword = document.getElementById('rpt-keyword').value.trim();
+        const dateFrom = document.getElementById('rpt-date-from').value;
+        const dateTo = document.getElementById('rpt-date-to').value;
+        if (!channel || !keyword) { alert('채널과 검색어를 입력하세요'); return; }
+
+        document.getElementById('rpt-progress').style.display = 'block';
+        document.getElementById('rpt-result').style.display = 'none';
+        document.getElementById('rpt-progress-text').innerHTML = '검색 준비 중<span class="rpt-dots"></span>';
+        document.getElementById('rpt-progress-path').textContent = '';
+
+        try {
+            const res = await fetch(API_BASE + '/api/report/search', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({channel, keyword, date_from: dateFrom, date_to: dateTo})
+            });
+            const data = await res.json();
+            _rptJobId = data.job_id;
+            pollReportStatus();
+        } catch(e) {
+            document.getElementById('rpt-progress-text').textContent = '검색 시작 실패: ' + e.message;
+        }
+    }
+
+    function pollReportStatus() {
+        if (_rptPollTimer) clearInterval(_rptPollTimer);
+        _rptPollTimer = setInterval(async () => {
+            try {
+                const res = await fetch(API_BASE + '/api/report/status/' + _rptJobId);
+                const job = await res.json();
+                const txt = document.getElementById('rpt-progress-text');
+                const pathEl = document.getElementById('rpt-progress-path');
+
+                if (job.status === 'searching') {
+                    txt.innerHTML = `검색 중<span class="rpt-dots"></span> 메시지 ${job.msg_count}개 확인 / 발견 ${job.found}개 / 다운로드 완료 ${job.downloaded}개`;
+                } else if (job.status === 'done') {
+                    clearInterval(_rptPollTimer);
+                    txt.textContent = `완료! 메시지 ${job.msg_count}개 확인 / 발견 ${job.found}개 / 다운로드 ${job.downloaded}개`;
+                    if (job.download_path) pathEl.textContent = '저장 경로: ' + job.download_path;
+                    showReportResult(job.files);
+                } else if (job.status === 'error') {
+                    clearInterval(_rptPollTimer);
+                    txt.textContent = '오류: ' + (job.error || '알 수 없는 오류');
+                }
+            } catch(e) {
+                clearInterval(_rptPollTimer);
+                document.getElementById('rpt-progress-text').textContent = '상태 조회 실패';
+            }
+        }, 2000);
+    }
+
+    function showReportResult(files) {
+        const container = document.getElementById('rpt-result');
+        const tbody = document.getElementById('rpt-result-body');
+        if (!files || files.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        tbody.innerHTML = files.map(f =>
+            `<tr><td>${f.filename}</td><td>${f.date}</td><td>${f.size_kb} KB</td></tr>`
+        ).join('');
+        container.style.display = 'block';
     }
 </script>
 
