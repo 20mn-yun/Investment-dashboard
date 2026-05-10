@@ -11,7 +11,7 @@ from telethon.tl.types import MessageMediaDocument, DocumentAttributeFilename
 CONFIG_PATH = "report_config.json"
 DEFAULT_CONFIG = {
     "channels": [],
-    "download_base": "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/내 드라이브/증권사레포트",
+    "download_base": "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/내 드라이브/Analysis",
 }
 
 _jobs = {}
@@ -46,6 +46,7 @@ def start_search_job(channel_username, keyword, date_from, date_to,
         "error": None,
         "files": [],
         "download_path": "",
+        "stop_requested": False,
     }
 
     def _run():
@@ -91,7 +92,13 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
 
         channel = await client.get_entity(channel_username)
 
+        pending = []
+
         async for message in client.iter_messages(channel, offset_date=date_to_utc, reverse=False):
+            if job.get("stop_requested"):
+                job["status"] = "stopping"
+                break
+
             if message.date.replace(tzinfo=timezone.utc) < date_from_utc:
                 break
 
@@ -120,6 +127,9 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             job["total_found"] += 1
             job["found"] = job["total_found"]
 
+            pending.append((message, filename))
+
+        for message, filename in pending:
             file_path = _unique_path(download_path, filename)
             await client.download_media(message, file=file_path)
 

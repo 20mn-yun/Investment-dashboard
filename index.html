@@ -1153,8 +1153,13 @@
 
     <!-- 진행상황 -->
     <div id="rpt-progress" class="rpt-progress" style="display:none;">
-        <div class="rpt-progress-text" id="rpt-progress-text"></div>
-        <div class="rpt-progress-path" id="rpt-progress-path"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+                <div class="rpt-progress-text" id="rpt-progress-text"></div>
+                <div class="rpt-progress-path" id="rpt-progress-path"></div>
+            </div>
+            <button class="btn" id="rpt-stop-btn" onclick="stopReportSearch()" style="background:#da3633;white-space:nowrap;display:none;">⏹ 중단</button>
+        </div>
     </div>
 
     <!-- 결과 -->
@@ -2296,6 +2301,9 @@
         document.getElementById('rpt-result').style.display = 'none';
         document.getElementById('rpt-progress-text').innerHTML = '검색 준비 중<span class="rpt-dots"></span>';
         document.getElementById('rpt-progress-path').textContent = '';
+        const stopBtn = document.getElementById('rpt-stop-btn');
+        stopBtn.style.display = 'inline-block';
+        stopBtn.disabled = false;
 
         try {
             const res = await fetch(API_BASE + '/api/report/search', {
@@ -2308,7 +2316,18 @@
             pollReportStatus();
         } catch(e) {
             document.getElementById('rpt-progress-text').textContent = '검색 시작 실패: ' + e.message;
+            stopBtn.style.display = 'none';
         }
+    }
+
+    async function stopReportSearch() {
+        if (!_rptJobId) return;
+        const btn = document.getElementById('rpt-stop-btn');
+        btn.disabled = true;
+        document.getElementById('rpt-progress-text').innerHTML = '중단 요청됨 — 현재까지 찾은 파일 다운로드 중<span class="rpt-dots"></span>';
+        try {
+            await fetch(API_BASE + '/api/report/stop/' + _rptJobId, {method: 'POST'});
+        } catch(e) {}
     }
 
     function pollReportStatus() {
@@ -2319,21 +2338,27 @@
                 const job = await res.json();
                 const txt = document.getElementById('rpt-progress-text');
                 const pathEl = document.getElementById('rpt-progress-path');
+                const stopBtn = document.getElementById('rpt-stop-btn');
 
                 if (job.status === 'searching') {
                     txt.innerHTML = `검색 중<span class="rpt-dots"></span> 메시지 ${job.msg_count}개 확인 / 발견 ${job.found}개 / 다운로드 완료 ${job.downloaded}개`;
+                } else if (job.status === 'stopping') {
+                    txt.innerHTML = `중단 요청됨 — 현재까지 찾은 파일 다운로드 중<span class="rpt-dots"></span> (${job.downloaded}/${job.found})`;
                 } else if (job.status === 'done') {
                     clearInterval(_rptPollTimer);
                     txt.textContent = `완료! 메시지 ${job.msg_count}개 확인 / 발견 ${job.found}개 / 다운로드 ${job.downloaded}개`;
                     if (job.download_path) pathEl.textContent = '저장 경로: ' + job.download_path;
+                    stopBtn.style.display = 'none';
                     showReportResult(job.files);
                 } else if (job.status === 'error') {
                     clearInterval(_rptPollTimer);
                     txt.textContent = '오류: ' + (job.error || '알 수 없는 오류');
+                    stopBtn.style.display = 'none';
                 }
             } catch(e) {
                 clearInterval(_rptPollTimer);
                 document.getElementById('rpt-progress-text').textContent = '상태 조회 실패';
+                document.getElementById('rpt-stop-btn').style.display = 'none';
             }
         }, 2000);
     }

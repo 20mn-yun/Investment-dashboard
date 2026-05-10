@@ -2083,5 +2083,14 @@ def get_report_status(job_id):
     return jsonify(job)
 
 
+@app.route("/api/report/stop/<job_id>", methods=["POST"])
+def stop_report_search(job_id):
+    job = telegram_report.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    job["stop_requested"] = True
+    return jsonify({"ok": True})
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8000, debug=False)
