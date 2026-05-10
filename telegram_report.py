@@ -420,13 +420,16 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
                 "size_kb": size_kb,
             })
 
-        try:
+        def _copy_to_drive():
             os.makedirs(final_path, exist_ok=True)
             for fname in os.listdir(local_staging):
                 src = os.path.join(local_staging, fname)
                 dst = os.path.join(final_path, fname)
                 shutil.copy2(src, dst)
             shutil.rmtree(local_staging)
+
+        try:
+            await asyncio.to_thread(_copy_to_drive)
         except Exception as e:
             job["error"] = f"Google Drive 복사 실패 (로컬 staging에 파일 보존됨: {local_staging}): {e}"
             job["status"] = "error"
