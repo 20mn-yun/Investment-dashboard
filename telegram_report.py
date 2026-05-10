@@ -4,6 +4,7 @@ import threading
 import asyncio
 import uuid
 import sqlite3
+import shutil
 from datetime import datetime, timezone
 
 from telethon import TelegramClient, events
@@ -383,9 +384,10 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
 
         now = datetime.now()
         subfolder = f"{keyword} {now.strftime('%y.%m')}"
-        download_path = os.path.join(os.path.expanduser(download_base), subfolder)
-        os.makedirs(download_path, exist_ok=True)
-        job["download_path"] = download_path
+        local_staging = os.path.join("downloads", subfolder)
+        final_path = os.path.join(os.path.expanduser(download_base), subfolder)
+        os.makedirs(local_staging, exist_ok=True)
+        job["download_path"] = final_path
 
         channel = await client.get_entity(channel_username)
 
@@ -407,7 +409,7 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             if not filename:
                 filename = r["filename"]
 
-            file_path = _unique_path(download_path, filename)
+            file_path = _unique_path(local_staging, filename)
             await client.download_media(msg, file=file_path)
 
             size_kb = round(os.path.getsize(file_path) / 1024, 1)
@@ -417,6 +419,18 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
                 "date": r["date"],
                 "size_kb": size_kb,
             })
+
+        try:
+            os.makedirs(final_path, exist_ok=True)
+            for fname in os.listdir(local_staging):
+                src = os.path.join(local_staging, fname)
+                dst = os.path.join(final_path, fname)
+                shutil.copy2(src, dst)
+            shutil.rmtree(local_staging)
+        except Exception as e:
+            job["error"] = f"Google Drive 복사 실패 (로컬 staging에 파일 보존됨: {local_staging}): {e}"
+            job["status"] = "error"
+            return
 
         job["status"] = "done"
     except Exception as e:
