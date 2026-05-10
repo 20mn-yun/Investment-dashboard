@@ -383,12 +383,26 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             job["status"] = "done"
             return
 
-        now = datetime.now()
-        subfolder = f"{keyword} {now.strftime('%y.%m')}"
-        local_staging = os.path.join("downloads", subfolder)
-        final_path = os.path.join(os.path.expanduser(download_base), subfolder)
+        stock_root = os.path.join(os.path.expanduser(download_base), keyword)
+        subfolder_name = f"{date_from.strftime('%y%m%d')}~{date_to.strftime('%y%m%d')}"
+        final_path = os.path.join(stock_root, subfolder_name)
+        local_staging = os.path.join("downloads", keyword, subfolder_name)
         os.makedirs(local_staging, exist_ok=True)
         job["download_path"] = final_path
+
+        def _collect_existing_filenames(root):
+            existing = set()
+            if not os.path.exists(root):
+                return existing
+            for sub in os.listdir(root):
+                sub_path = os.path.join(root, sub)
+                if os.path.isdir(sub_path):
+                    for f in os.listdir(sub_path):
+                        existing.add(f)
+            return existing
+
+        existing_files = _collect_existing_filenames(stock_root)
+        job["skipped"] = 0
 
         channel = await client.get_entity(channel_username)
 
@@ -410,6 +424,10 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             if not filename:
                 filename = r["filename"]
 
+            if filename in existing_files:
+                job["skipped"] += 1
+                continue
+
             file_path = _unique_path(local_staging, filename)
             await client.download_media(msg, file=file_path)
 
@@ -420,6 +438,18 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
                 "date": r["date"],
                 "size_kb": size_kb,
             })
+
+        staging_files = os.listdir(local_staging) if os.path.exists(local_staging) else []
+        if not staging_files:
+            shutil.rmtree(local_staging, ignore_errors=True)
+            parent = os.path.dirname(local_staging)
+            if os.path.isdir(parent) and not os.listdir(parent):
+                shutil.rmtree(parent, ignore_errors=True)
+            job["status"] = "done"
+            job["error"] = None
+            if job["skipped"] > 0:
+                job["error"] = f"신규 파일 없음 (전부 중복, {job['skipped']}건 스킵)"
+            return
 
         def _copy_to_drive():
             result_mkdir = subprocess.run(["/bin/mkdir", "-p", final_path], capture_output=True, text=True)
@@ -434,6 +464,9 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
                 raise RuntimeError(f"cp 실패: {result_cp.stderr}")
 
             subprocess.run(["/bin/rm", "-rf", local_staging], capture_output=True)
+            parent = os.path.dirname(local_staging)
+            if os.path.isdir(parent) and not os.listdir(parent):
+                subprocess.run(["/bin/rm", "-rf", parent], capture_output=True)
 
         try:
             await asyncio.to_thread(_copy_to_drive)
