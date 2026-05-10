@@ -1940,8 +1940,20 @@ _start_monitor()
 
 # --- Earnings tracker (잠정실적 추적) ---
 def _earnings_tracker_loop():
-    """매일 평일 20:00 KST에 잠정실적 트래커 실행."""
+    """매일 평일 20:00 KST에 잠정실적 트래커 실행. 시작 시 catch-up 포함."""
     import earnings_tracker
+
+    try:
+        state = earnings_tracker.load_state()
+        today = date.today()
+        last_run_str = state.get("last_run_date")
+        if today.weekday() < 5 and last_run_str != today.isoformat():
+            print(f"[earnings_tracker] 시작 시 catch-up: last_run={last_run_str}, today={today.isoformat()}", flush=True)
+            earnings_tracker.run_daily()
+    except Exception as e:
+        import traceback
+        print(f"[earnings_tracker_loop] catch-up 에러: {e}", flush=True)
+        traceback.print_exc()
 
     while True:
         try:
@@ -1951,7 +1963,7 @@ def _earnings_tracker_loop():
                 target = target + timedelta(days=1)
 
             sleep_sec = (target - now).total_seconds()
-            print(f"[earnings_tracker] 다음 실행까지 {int(sleep_sec)}초 대기 (target: {target})")
+            print(f"[earnings_tracker] 다음 실행까지 {int(sleep_sec)}초 대기 (target: {target})", flush=True)
             time.sleep(sleep_sec)
 
             if datetime.now().weekday() >= 5:
@@ -1961,7 +1973,7 @@ def _earnings_tracker_loop():
 
         except Exception as e:
             import traceback
-            print(f"[earnings_tracker_loop] 예상치 못한 에러: {e}")
+            print(f"[earnings_tracker_loop] 예상치 못한 에러: {e}", flush=True)
             traceback.print_exc()
             time.sleep(3600)
 
