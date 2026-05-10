@@ -42,7 +42,8 @@ HEADERS = [
     "기업개요", "DART 링크", "파싱상태",
 ]
 
-DAILY_HAIKU_LIMIT = 300
+# 임시: 4/30 백필 누락분 메꾸기 위해 일시 상향. 백필 완료 후 300으로 원복
+DAILY_HAIKU_LIMIT = 1500
 
 CORP_CODE_CACHE_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "dart_corp_codes.json"
