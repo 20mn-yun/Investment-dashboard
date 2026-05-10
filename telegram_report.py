@@ -5,6 +5,7 @@ import asyncio
 import uuid
 import sqlite3
 import shutil
+import subprocess
 from datetime import datetime, timezone
 
 from telethon import TelegramClient, events
@@ -421,12 +422,18 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             })
 
         def _copy_to_drive():
-            os.makedirs(final_path, exist_ok=True)
-            for fname in os.listdir(local_staging):
-                src = os.path.join(local_staging, fname)
-                dst = os.path.join(final_path, fname)
-                shutil.copy2(src, dst)
-            shutil.rmtree(local_staging)
+            result_mkdir = subprocess.run(["/bin/mkdir", "-p", final_path], capture_output=True, text=True)
+            if result_mkdir.returncode != 0:
+                raise RuntimeError(f"mkdir 실패: {result_mkdir.stderr}")
+
+            result_cp = subprocess.run(
+                ["/bin/cp", "-R", local_staging + "/.", final_path + "/"],
+                capture_output=True, text=True,
+            )
+            if result_cp.returncode != 0:
+                raise RuntimeError(f"cp 실패: {result_cp.stderr}")
+
+            subprocess.run(["/bin/rm", "-rf", local_staging], capture_output=True)
 
         try:
             await asyncio.to_thread(_copy_to_drive)
