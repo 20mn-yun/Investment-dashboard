@@ -5,6 +5,7 @@ cache/
 __pycache__/
 *.pyc
 .DS_Store
+.env
 
 # 런타임 생성 데이터
 dart_*.json
