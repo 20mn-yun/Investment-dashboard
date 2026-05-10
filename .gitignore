@@ -20,3 +20,5 @@ business_overview_cache.json
 DART_*.xlsx
 sessions/
 report_config.json
+report_index.db
+report_index.db-journal
