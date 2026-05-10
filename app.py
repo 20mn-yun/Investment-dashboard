@@ -19,6 +19,18 @@ import pandas as pd
 import telegram_report
 
 app = Flask(__name__)
+
+if os.environ.get("TG_API_ID") and os.environ.get("TG_API_HASH"):
+    telegram_report.start_realtime_watcher(
+        os.environ.get("TG_API_ID"),
+        os.environ.get("TG_API_HASH"),
+        os.environ.get("TG_SESSION_PATH", "sessions/tg_report"),
+    )
+    telegram_report.start_index_scheduler(
+        os.environ.get("TG_API_ID"),
+        os.environ.get("TG_API_HASH"),
+        os.environ.get("TG_SESSION_PATH", "sessions/tg_report"),
+    )
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # 티커 매핑
@@ -2090,6 +2102,64 @@ def stop_report_search(job_id):
         return jsonify({"error": "Job not found"}), 404
     job["stop_requested"] = True
     return jsonify({"ok": True})
+
+
+@app.route("/api/report/config", methods=["GET"])
+def get_report_config():
+    return jsonify(telegram_report.get_config())
+
+
+@app.route("/api/report/index-status", methods=["GET"])
+def get_report_index_status():
+    cfg = telegram_report.get_config()
+    channels = cfg.get("channels", [])
+    if not channels:
+        return jsonify([])
+    result = []
+    for ch in channels:
+        result.append(telegram_report.get_index_status(ch))
+    return jsonify(result)
+
+
+@app.route("/api/report/watchlist", methods=["POST"])
+def update_report_watchlist():
+    body = request.json
+    action = body.get("action")
+    stock = body.get("stock", "").strip()
+    cfg = telegram_report.get_config()
+    wl = cfg.get("watchlist", [])
+    if action == "add" and stock and stock not in wl:
+        wl.append(stock)
+    elif action == "remove" and stock in wl:
+        wl.remove(stock)
+    cfg["watchlist"] = wl
+    telegram_report.save_config(cfg)
+    return jsonify(wl)
+
+
+@app.route("/api/report/settings", methods=["GET"])
+def get_report_settings():
+    cfg = telegram_report.get_config()
+    return jsonify({
+        "personal_channels": cfg.get("personal_channels", []),
+        "forward_enabled": cfg.get("forward_enabled", True),
+    })
+
+
+@app.route("/api/report/settings", methods=["POST"])
+def update_report_settings():
+    body = request.json
+    action = body.get("action")
+    channel = body.get("channel", "").strip()
+    cfg = telegram_report.get_config()
+    channels = cfg.get("personal_channels", [])
+    if action == "add" and channel and channel not in channels:
+        channels.append(channel)
+    elif action == "remove" and channel in channels:
+        channels.remove(channel)
+    cfg["personal_channels"] = channels
+    telegram_report.save_config(cfg)
+    return jsonify(channels)
 
 
 if __name__ == "__main__":

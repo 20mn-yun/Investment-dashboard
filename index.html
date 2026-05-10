@@ -1129,6 +1129,28 @@
         <button class="btn" onclick="addReportChannel()">추가</button>
     </div>
 
+    <!-- 인덱스 현황 -->
+    <div class="section-title">📦 메시지 인덱스 현황</div>
+    <div id="rpt-index-status" class="data-table" style="margin-bottom:24px;">
+        <div style="color:#8b949e;font-size:13px;padding:8px 0;">로딩 중...</div>
+    </div>
+
+    <!-- 워치리스트 -->
+    <div class="section-title">🔔 신규 알림 종목</div>
+    <div class="rpt-channels" id="rpt-watchlist"></div>
+    <div class="rpt-add-row">
+        <input type="text" id="rpt-wl-input" placeholder="종목명 입력">
+        <button class="btn" onclick="addWatchlistStock()">추가</button>
+    </div>
+
+    <!-- 포워딩 설정 -->
+    <div class="section-title">📨 포워딩 설정</div>
+    <div id="rpt-fwd-channels" class="rpt-channels"></div>
+    <div class="rpt-add-row" style="margin-bottom:24px;">
+        <input type="text" id="rpt-fwd-input" placeholder="t.me/+XXXX 또는 @username">
+        <button class="btn" onclick="addForwardingChannel()">추가</button>
+    </div>
+
     <!-- 검색 섹션 -->
     <div class="section-title">🔍 리포트 검색</div>
     <div class="rpt-search-grid">
@@ -1149,7 +1171,8 @@
             <input type="date" id="rpt-date-to">
         </div>
     </div>
-    <button class="btn" onclick="reportSearchJob()" style="margin-top:8px;margin-bottom:16px;">검색 + 다운로드</button>
+    <div id="rpt-index-hint" style="display:none;color:#e3b341;font-size:12px;margin-top:4px;">⚠️ 선택된 채널이 아직 인덱싱 중입니다...</div>
+    <button class="btn" onclick="reportSearchJob()" style="margin-top:8px;margin-bottom:16px;">🔍 검색 (인덱스 사용)</button>
 
     <!-- 진행상황 -->
     <div id="rpt-progress" class="rpt-progress" style="display:none;">
@@ -2236,6 +2259,8 @@
     let _rptJobId = null;
     let _rptPollTimer = null;
 
+    let _rptIndexStatus = {};
+
     function initReport() {
         const today = new Date();
         const fiveYearsAgo = new Date(today);
@@ -2243,6 +2268,9 @@
         document.getElementById('rpt-date-from').value = fiveYearsAgo.toISOString().slice(0, 10);
         document.getElementById('rpt-date-to').value = today.toISOString().slice(0, 10);
         loadReportChannels();
+        loadIndexStatus();
+        loadWatchlist();
+        loadReportSettings();
     }
 
     async function loadReportChannels() {
@@ -2260,6 +2288,8 @@
         ).join('');
         const sel = document.getElementById('rpt-ch-select');
         sel.innerHTML = _rptChannels.map(ch => `<option value="${ch}">${ch}</option>`).join('');
+        sel.onchange = checkChannelIndex;
+        checkChannelIndex();
     }
 
     async function addReportChannel() {
@@ -2374,6 +2404,124 @@
             `<tr><td>${f.filename}</td><td>${f.date}</td><td>${f.size_kb} KB</td></tr>`
         ).join('');
         container.style.display = 'block';
+    }
+
+    async function loadIndexStatus() {
+        try {
+            const res = await fetch(API_BASE + '/api/report/index-status');
+            _rptIndexStatus = await res.json();
+        } catch(e) { _rptIndexStatus = []; }
+        const container = document.getElementById('rpt-index-status');
+        if (!Array.isArray(_rptIndexStatus) || _rptIndexStatus.length === 0) {
+            container.innerHTML = '<div style="color:#8b949e;font-size:13px;padding:8px 0;">등록된 채널이 없습니다</div>';
+            return;
+        }
+        container.innerHTML = _rptIndexStatus.map(s => {
+            const ch = s.channel || '';
+            const count = s.total_count || 0;
+            let detail;
+            if (count === 0) {
+                detail = '인덱싱 준비 중...';
+            } else {
+                detail = `총 ${count.toLocaleString()}개 메시지 / 마지막 업데이트: ${s.last_updated || '없음'}`;
+            }
+            return `<div class="data-row"><span class="data-label">${ch}</span><span class="data-value">${detail}</span></div>`;
+        }).join('');
+        checkChannelIndex();
+    }
+
+    function checkChannelIndex() {
+        const sel = document.getElementById('rpt-ch-select');
+        const hint = document.getElementById('rpt-index-hint');
+        if (!sel.value || !hint) return;
+        const status = Array.isArray(_rptIndexStatus) && _rptIndexStatus.find(s => s.channel === sel.value);
+        hint.style.display = (!status || status.total_count === 0) ? 'block' : 'none';
+    }
+
+    async function loadWatchlist() {
+        try {
+            const res = await fetch(API_BASE + '/api/report/config');
+            const cfg = await res.json();
+            renderWatchlist(cfg.watchlist || []);
+        } catch(e) {}
+    }
+
+    async function addWatchlistStock() {
+        const input = document.getElementById('rpt-wl-input');
+        const stock = input.value.trim();
+        if (!stock) return;
+        try {
+            const res = await fetch(API_BASE + '/api/report/watchlist', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'add', stock})
+            });
+            const wl = await res.json();
+            renderWatchlist(wl);
+            input.value = '';
+        } catch(e) {}
+    }
+
+    async function removeWatchlistStock(stock) {
+        try {
+            const res = await fetch(API_BASE + '/api/report/watchlist', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'remove', stock})
+            });
+            const wl = await res.json();
+            renderWatchlist(wl);
+        } catch(e) {}
+    }
+
+    function renderWatchlist(wl) {
+        const container = document.getElementById('rpt-watchlist');
+        container.innerHTML = wl.map(s =>
+            `<span class="rpt-ch-tag">${s}<span class="remove" onclick="removeWatchlistStock('${s}')">&times;</span></span>`
+        ).join('');
+    }
+
+    async function loadReportSettings() {
+        try {
+            const res = await fetch(API_BASE + '/api/report/settings');
+            const cfg = await res.json();
+            renderForwardingChannels(cfg.personal_channels || []);
+        } catch(e) { renderForwardingChannels([]); }
+    }
+
+    function renderForwardingChannels(channels) {
+        const container = document.getElementById('rpt-fwd-channels');
+        container.innerHTML = channels.map(ch =>
+            `<span class="rpt-ch-tag">${ch}<span class="remove" onclick="removeForwardingChannel('${ch}')">&times;</span></span>`
+        ).join('');
+    }
+
+    async function addForwardingChannel() {
+        const input = document.getElementById('rpt-fwd-input');
+        const ch = input.value.trim();
+        if (!ch) return;
+        try {
+            const res = await fetch(API_BASE + '/api/report/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'add', channel: ch})
+            });
+            const channels = await res.json();
+            renderForwardingChannels(channels);
+            input.value = '';
+        } catch(e) {}
+    }
+
+    async function removeForwardingChannel(ch) {
+        try {
+            const res = await fetch(API_BASE + '/api/report/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'remove', channel: ch})
+            });
+            const channels = await res.json();
+            renderForwardingChannels(channels);
+        } catch(e) {}
     }
 </script>
 
