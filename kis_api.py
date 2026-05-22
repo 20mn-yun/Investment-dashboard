@@ -355,6 +355,311 @@ def get_daily_price_history(ticker, period_days=90):
     return series
 
 
+def get_investor_trend_history(ticker):
+    code = _extract_ticker_code(ticker)
+    token = get_access_token()
+
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "FHKST01010900",
+    }
+
+    params = {
+        "FID_COND_MRKT_DIV_CODE": "J",
+        "FID_INPUT_ISCD": code,
+    }
+
+    resp = requests.get(
+        f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-investor",
+        headers=headers,
+        params=params,
+    )
+
+    body = resp.json()
+    if body.get("rt_cd") != "0":
+        raise ValueError(
+            f"KIS investor trend failed for {code}: {body.get('msg1', resp.text)}"
+        )
+
+    records = body.get("output", [])
+    if not records:
+        return pd.DataFrame()
+
+    _M = 1_000_000
+
+    rows = []
+    for rec in records:
+        dt_str = rec.get("stck_bsop_date", "")
+        if not dt_str or not rec.get("frgn_ntby_tr_pbmn"):
+            continue
+        rows.append({
+            "date": pd.Timestamp(dt_str),
+            "foreign_net_value": int(rec["frgn_ntby_tr_pbmn"]) * _M,
+            "institution_net_value": int(rec["orgn_ntby_tr_pbmn"]) * _M,
+            "individual_net_value": int(rec["prsn_ntby_tr_pbmn"]) * _M,
+            "foreign_net_qty": int(rec["frgn_ntby_qty"]),
+            "institution_net_qty": int(rec["orgn_ntby_qty"]),
+            "individual_net_qty": int(rec["prsn_ntby_qty"]),
+        })
+
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows).set_index("date").sort_index()
+    return df
+
+
+def get_estimate_perform(ticker):
+    code = _extract_ticker_code(ticker)
+    token = get_access_token()
+
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "HHKST668300C0",
+    }
+
+    params = {"SHT_CD": code}
+
+    resp = requests.get(
+        f"{BASE_URL}/uapi/domestic-stock/v1/quotations/estimate-perform",
+        headers=headers,
+        params=params,
+    )
+
+    body = resp.json()
+    if body.get("rt_cd") != "0":
+        raise ValueError(
+            f"KIS estimate-perform failed for {code}: {body.get('msg1', resp.text)}"
+        )
+
+    output1 = body.get("output1") or {}
+    output2 = body.get("output2") or []
+    output3 = body.get("output3") or []
+    output4 = body.get("output4") or []
+
+    periods = [item["dt"] for item in output4] if output4 else []
+    n = len(periods)
+
+    def _row_floats(rows, idx):
+        if idx >= len(rows):
+            return []
+        row = rows[idx]
+        return [float(row.get(f"data{i}", 0) or 0) for i in range(1, n + 1)]
+
+    result = {
+        "code": (output1.get("sht_cd") or "").lstrip("A"),
+        "name": output1.get("item_kor_nm") or "",
+        "analyst": output1.get("name1") or "",
+        "report_date": output1.get("estdate") or "",
+        "recommendation": output1.get("rcmd_name") or "",
+        "periods": periods,
+        "revenue": _row_floats(output2, 0),
+        "revenue_growth": [v / 10 for v in _row_floats(output2, 1)],
+        "operating_profit": _row_floats(output2, 2),
+        "op_growth": [v / 10 for v in _row_floats(output2, 3)],
+        "net_income": _row_floats(output2, 4),
+        "ni_growth": [v / 10 for v in _row_floats(output2, 5)],
+        "ebitda": _row_floats(output3, 0) if len(output3) > 0 else [],
+        "eps": [v / 10 for v in _row_floats(output3, 1)] if len(output3) > 1 else [],
+        "eps_growth": [v / 10 for v in _row_floats(output3, 2)] if len(output3) > 2 else [],
+    }
+
+    return result
+
+
+def get_invest_opinion(ticker, months=6):
+    code = _extract_ticker_code(ticker)
+    token = get_access_token()
+
+    from datetime import datetime, timedelta
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=months * 30)
+
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "FHKST663300C0",
+    }
+
+    params = {
+        "FID_COND_MRKT_DIV_CODE": "J",
+        "FID_COND_SCR_DIV_CODE": "16633",
+        "FID_INPUT_ISCD": code,
+        "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+        "FID_INPUT_DATE_2": end_date.strftime("%Y%m%d"),
+    }
+
+    resp = requests.get(
+        f"{BASE_URL}/uapi/domestic-stock/v1/quotations/invest-opinion",
+        headers=headers,
+        params=params,
+    )
+
+    body = resp.json()
+    if body.get("rt_cd") != "0":
+        raise ValueError(
+            f"KIS invest-opinion failed for {code}: {body.get('msg1', resp.text)}"
+        )
+
+    records = body.get("output") or []
+    if not records:
+        return pd.DataFrame()
+
+    rows = []
+    for rec in records:
+        dt_str = rec.get("stck_bsop_date", "")
+        if not dt_str:
+            continue
+        rows.append({
+            "date": pd.Timestamp(dt_str),
+            "broker": rec.get("mbcr_name", ""),
+            "opinion": rec.get("invt_opnn", ""),
+            "target_price": int(rec.get("hts_goal_prc") or 0),
+            "close_price": int(rec.get("stck_prdy_clpr") or 0),
+            "gap": int(rec.get("stck_nday_esdg") or 0),
+            "gap_pct": float(rec.get("nday_dprt") or 0),
+        })
+
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows).set_index("date").sort_index(ascending=False)
+    return df
+
+
+_KRX_SECTOR_CODES = {
+    "0005", "0006", "0007", "0008", "0009",
+    "0010", "0011", "0012", "0013", "0014",
+    "0015", "0016", "0017", "0018", "0019",
+    "0020", "0021", "0024", "0025", "0026",
+}
+
+
+def get_sector_codes():
+    cache_dir = Path("cache")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / "sector_codes.pkl"
+
+    if cache_path.exists() and time.time() - cache_path.stat().st_mtime < 86400 * 30:
+        print("[KIS] Using cached sector codes")
+        return pd.read_pickle(cache_path)
+
+    print("[KIS] Downloading sector code master file...")
+    ssl._create_default_https_context = ssl._create_unverified_context
+
+    zip_path = cache_dir / "idxcode.zip"
+    urllib.request.urlretrieve(
+        "https://new.real.download.dws.co.kr/common/master/idxcode.mst.zip",
+        str(zip_path),
+    )
+
+    with zipfile.ZipFile(str(zip_path)) as zf:
+        zf.extractall(str(cache_dir))
+    zip_path.unlink()
+
+    mst_path = cache_dir / "idxcode.mst"
+    result = []
+
+    with open(str(mst_path), "r", encoding="cp949") as f:
+        for row in f:
+            if row[0] != "0":
+                continue
+            code = row[1:5]
+            if code not in _KRX_SECTOR_CODES:
+                continue
+            name = row[5:].strip()
+            result.append({"code": code, "name": name, "market": "KOSPI"})
+
+    mst_path.unlink()
+    result.sort(key=lambda x: x["code"])
+    pd.to_pickle(result, str(cache_path))
+    print(f"[KIS] Sector codes: {len(result)} KOSPI sectors cached")
+
+    return result
+
+
+def get_sector_index_history(sector_code, period_days=90):
+    if period_days > 100:
+        raise ValueError(f"period_days={period_days} exceeds limit of 100")
+
+    token = get_access_token()
+
+    from datetime import datetime, timedelta
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(period_days * 1.5))
+
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "FHKUP03500100",
+    }
+
+    all_dates = []
+    all_closes = []
+    cur_end = end_date
+
+    for _ in range(3):
+        params = {
+            "FID_COND_MRKT_DIV_CODE": "U",
+            "FID_INPUT_ISCD": sector_code,
+            "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+            "FID_INPUT_DATE_2": cur_end.strftime("%Y%m%d"),
+            "FID_PERIOD_DIV_CODE": "D",
+        }
+
+        resp = requests.get(
+            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice",
+            headers=headers,
+            params=params,
+        )
+
+        body = resp.json()
+        if body.get("rt_cd") != "0":
+            raise ValueError(
+                f"KIS index chart failed for {sector_code}: {body.get('msg1', resp.text)}"
+            )
+
+        records = body.get("output2") or []
+        if not records:
+            break
+
+        for rec in records:
+            dt_str = rec.get("stck_bsop_date", "")
+            close_str = rec.get("bstp_nmix_prpr", "")
+            if not dt_str or not close_str:
+                continue
+            all_dates.append(pd.Timestamp(dt_str))
+            all_closes.append(float(close_str))
+
+        if len(records) < 50:
+            break
+
+        earliest = min(pd.Timestamp(r["stck_bsop_date"]) for r in records)
+        cur_end = earliest - timedelta(days=1)
+        if cur_end < start_date:
+            break
+        time.sleep(0.05)
+
+    if not all_dates:
+        return pd.Series(dtype=float, name=sector_code)
+
+    series = pd.Series(all_closes, index=pd.DatetimeIndex(all_dates), name=sector_code)
+    series = series[~series.index.duplicated(keep="first")].sort_index()
+    return series
+
+
 if __name__ == "__main__":
     print("=== KIS API Test ===")
     print()
