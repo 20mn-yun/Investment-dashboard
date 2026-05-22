@@ -10,6 +10,7 @@ from datetime import datetime
 import pandas as pd
 import yfinance as yf
 import requests as req
+from kis_api import get_market_cap_ranking, get_daily_price_history
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TICKERS_DIR = os.path.join(BASE_DIR, "tickers")
@@ -171,42 +172,20 @@ def load_kr_top600(top_n=300):
             log(f"Cached KR ticker list loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
             return tickers
 
-    log("Downloading KR top stocks from Naver Finance...")
-    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+    log("Downloading KR top stocks from KIS Stock Master File...")
     tickers = []
 
     for market, suffix in [("KOSPI", ".KS"), ("KOSDAQ", ".KQ")]:
-        market_tickers = []
-        for page in range(1, (top_n // 100) + 2):
-            url = (f"https://m.stock.naver.com/api/stocks/marketValue/{market}"
-                   f"?page={page}&pageSize=100")
-            resp = req.get(url, headers=headers, timeout=15)
-            if resp.status_code != 200:
-                break
-            stocks = resp.json().get("stocks", [])
-            if not stocks:
-                break
-            for s in stocks:
-                code = s.get("itemCode", "")
-                name = s.get("stockName", "")
-                stock_end_type = s.get("stockEndType", "")
-                if stock_end_type != "stock":
-                    continue
-                if not code or not code.isdigit():
-                    continue
-                market_tickers.append({
-                    "ticker": code + suffix,
-                    "code": code,
-                    "name": name,
-                    "market_sub": market,
-                    "sector": "",
-                })
-                if len(market_tickers) >= top_n:
-                    break
-            if len(market_tickers) >= top_n:
-                break
-        tickers.extend(market_tickers[:top_n])
-        log(f"  {market}: {len(market_tickers[:top_n])} stocks")
+        ranking = get_market_cap_ranking(market, top_n)
+        for s in ranking:
+            tickers.append({
+                "ticker": s["code"] + suffix,
+                "code": s["code"],
+                "name": s["name"],
+                "market_sub": market,
+                "sector": "",
+            })
+        log(f"  {market}: {len(ranking)} stocks")
 
     from zoneinfo import ZoneInfo
     now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
@@ -214,7 +193,7 @@ def load_kr_top600(top_n=300):
     with open(path, "w", encoding="utf-8") as f:
         json.dump({
             "last_updated": now_kst.isoformat(),
-            "source": "Naver Finance",
+            "source": "KIS Stock Master File",
             "universe": f"KOSPI top {top_n} + KOSDAQ top {top_n}",
             "tickers": tickers,
         }, f, ensure_ascii=False, indent=1)
@@ -430,55 +409,86 @@ def _download_chunk(chunk):
     return got, missed
 
 
+def _download_kr_via_kis(kr_ticker_list):
+    got = {}
+    missed = []
+    total = len(kr_ticker_list)
+    for i, ticker in enumerate(kr_ticker_list):
+        try:
+            series = get_daily_price_history(ticker, 90)
+            if len(series) >= 2:
+                got[ticker] = series
+            else:
+                missed.append(ticker)
+        except Exception:
+            missed.append(ticker)
+        if (i + 1) % 50 == 0 or i + 1 == total:
+            log(f"KR KIS: {i + 1}/{total} done")
+        time.sleep(0.05)
+    return got, missed
+
+
 def download_prices(ticker_list, chunk_size=50):
     symbols = [t["ticker"] for t in ticker_list]
+
+    kr_symbols = [s for s in symbols if s.endswith(".KS") or s.endswith(".KQ")]
+    other_symbols = [s for s in symbols if not (s.endswith(".KS") or s.endswith(".KQ"))]
+
     all_data = {}
-    total_chunks = (len(symbols) + chunk_size - 1) // chunk_size
+    all_failed = []
 
-    # 1차: 50개씩 다운로드
-    retry_queue = []
-    for ci in range(0, len(symbols), chunk_size):
-        chunk = symbols[ci:ci + chunk_size]
-        chunk_num = ci // chunk_size + 1
-        log(f"Downloading chunk {chunk_num}/{total_chunks} ({len(chunk)} tickers)")
-        got, missed = _download_chunk(chunk)
-        all_data.update(got)
-        retry_queue.extend(missed)
-        if ci + chunk_size < len(symbols):
-            time.sleep(2)
+    if kr_symbols:
+        log(f"Downloading {len(kr_symbols)} KR tickers via KIS API...")
+        kr_got, kr_missed = _download_kr_via_kis(kr_symbols)
+        all_data.update(kr_got)
+        all_failed.extend(kr_missed)
 
-    # 2차: 실패 티커를 20개씩 재시도 (sleep 길게)
-    if retry_queue:
-        log(f"Retrying {len(retry_queue)} failed tickers (20/chunk, 5s gap)...")
-        time.sleep(10)
-        still_failed = []
-        for ci in range(0, len(retry_queue), 20):
-            chunk = retry_queue[ci:ci + 20]
+    if other_symbols:
+        total_chunks = (len(other_symbols) + chunk_size - 1) // chunk_size
+
+        retry_queue = []
+        for ci in range(0, len(other_symbols), chunk_size):
+            chunk = other_symbols[ci:ci + chunk_size]
+            chunk_num = ci // chunk_size + 1
+            log(f"Downloading chunk {chunk_num}/{total_chunks} ({len(chunk)} tickers)")
             got, missed = _download_chunk(chunk)
             all_data.update(got)
-            still_failed.extend(missed)
-            if ci + 20 < len(retry_queue):
-                time.sleep(5)
-    else:
-        still_failed = []
+            retry_queue.extend(missed)
+            if ci + chunk_size < len(other_symbols):
+                time.sleep(2)
 
-    # 3차: 아직 실패한 것 10개씩 마지막 시도
-    if still_failed:
-        log(f"Final retry for {len(still_failed)} tickers (10/chunk, 8s gap)...")
-        time.sleep(15)
-        final_failed = []
-        for ci in range(0, len(still_failed), 10):
-            chunk = still_failed[ci:ci + 10]
-            got, missed = _download_chunk(chunk)
-            all_data.update(got)
-            final_failed.extend(missed)
-            if ci + 10 < len(still_failed):
-                time.sleep(8)
-    else:
-        final_failed = []
+        if retry_queue:
+            log(f"Retrying {len(retry_queue)} failed tickers (20/chunk, 5s gap)...")
+            time.sleep(10)
+            still_failed = []
+            for ci in range(0, len(retry_queue), 20):
+                chunk = retry_queue[ci:ci + 20]
+                got, missed = _download_chunk(chunk)
+                all_data.update(got)
+                still_failed.extend(missed)
+                if ci + 20 < len(retry_queue):
+                    time.sleep(5)
+        else:
+            still_failed = []
 
-    log(f"Downloaded {len(all_data)} tickers, {len(final_failed)} failed")
-    return all_data, final_failed
+        if still_failed:
+            log(f"Final retry for {len(still_failed)} tickers (10/chunk, 8s gap)...")
+            time.sleep(15)
+            final_failed = []
+            for ci in range(0, len(still_failed), 10):
+                chunk = still_failed[ci:ci + 10]
+                got, missed = _download_chunk(chunk)
+                all_data.update(got)
+                final_failed.extend(missed)
+                if ci + 10 < len(still_failed):
+                    time.sleep(8)
+        else:
+            final_failed = []
+
+        all_failed.extend(final_failed)
+
+    log(f"Downloaded {len(all_data)} tickers, {len(all_failed)} failed")
+    return all_data, all_failed
 
 
 def calc_rankings(price_data, ticker_meta):
