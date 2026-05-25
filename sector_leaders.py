@@ -1,4 +1,5 @@
 import json
+import math
 import sys
 import time
 from datetime import datetime, timedelta
@@ -22,43 +23,102 @@ US_BENCHMARK_TICKER = "^GSPC"
 PERIODS = {"1w": 5, "1m": 21, "3m": 63, "6m": 126, "1y": 252}
 
 US_SECTORS = {
-    "XLK": "기술",
+    "SOXX": "반도체",
     "XLF": "금융",
-    "XLV": "헬스케어",
-    "XLE": "에너지",
+    "IAI": "증권/자산운용",
+    "KIE": "보험",
+    "IHE": "제약",
+    "IHI": "의료기기",
     "XLY": "임의소비재",
-    "XLP": "필수소비재",
+    "XRT": "소매유통",
+    "CARZ": "자동차",
+    "PBJ": "식음료",
     "XLI": "산업재",
+    "IYT": "운송",
     "XLB": "소재",
+    "SLX": "철강",
+    "XME": "광물",
+    "WOOD": "목재",
     "XLU": "유틸리티",
-    "XLRE": "부동산",
+    "ITB": "주택건설",
     "XLC": "통신서비스",
 }
 
 SECTOR_MAPPING = {
-    "음식료·담배": "XLP",
+    "음식료·담배": "PBJ",
     "섬유·의류": "XLY",
-    "종이·목재": "XLB",
+    "종이·목재": "WOOD",
     "화학": "XLB",
-    "제약": "XLV",
-    "비금속": "XLB",
-    "금속": "XLB",
+    "제약": "IHE",
+    "비금속": "XME",
+    "금속": "SLX",
     "기계·장비": "XLI",
-    "전기·전자": "XLK",
-    "의료·정밀기기": "XLV",
-    "운송장비·부품": "XLY",
-    "유통": "XLY",
+    "전기·전자": "SOXX",
+    "의료·정밀기기": "IHI",
+    "운송장비·부품": "CARZ",
+    "유통": "XRT",
     "전기·가스": "XLU",
-    "건설": "XLRE",
-    "운송·창고": "XLI",
+    "건설": "ITB",
+    "운송·창고": "IYT",
     "통신": "XLC",
     "금융": "XLF",
-    "증권": "XLF",
-    "보험": "XLF",
+    "증권": "IAI",
+    "보험": "KIE",
     "일반서비스": "XLC",
 }
 
 CACHE_PATH = Path("cache/sector_leaders.json")
+
+KR_THEMES = {
+    "4412": "2차전지 TOP10",
+    "4413": "바이오 TOP10",
+    "4414": "인터넷 TOP10",
+    "4415": "게임 TOP10",
+    "4421": "전기차 Top15",
+    "4422": "반도체 Top15",
+}
+
+KR_SIZES = {
+    "4448": "전체 TMI",
+    "4449": "중대형 TMI",
+    "4450": "중형 TMI",
+    "4451": "소형 TMI",
+    "4452": "초소형 TMI",
+}
+
+US_THEMES = {
+    "LIT": "리튬·배터리",
+    "XBI": "바이오테크",
+    "FDN": "인터넷",
+    "HERO": "게임·e스포츠",
+    "DRIV": "자율주행·전기차",
+    "SOXX": "반도체",
+}
+
+US_SIZES = {
+    "IWV": "Russell 3000",
+    "IWB": "Russell 1000",
+    "IWR": "Russell Midcap",
+    "IWM": "Russell 2000",
+    "IWC": "Micro-Cap",
+}
+
+THEME_MAPPING = {
+    "2차전지 TOP10": "LIT",
+    "바이오 TOP10": "XBI",
+    "인터넷 TOP10": "FDN",
+    "게임 TOP10": "HERO",
+    "전기차 Top15": "DRIV",
+    "반도체 Top15": "SOXX",
+}
+
+SIZE_MAPPING = {
+    "전체 TMI": "IWV",
+    "중대형 TMI": "IWB",
+    "중형 TMI": "IWR",
+    "소형 TMI": "IWM",
+    "초소형 TMI": "IWC",
+}
 
 
 def _fetch_kr_index_long(sector_code, total_trading_days=260):
@@ -187,6 +247,47 @@ def fetch_us_benchmark_series():
         return pd.Series(dtype=float)
 
 
+def _fetch_kr_group_series(code_dict, label):
+    result = {}
+    items = list(code_dict.items())
+    for i, (code, name) in enumerate(items):
+        try:
+            s = _fetch_kr_index_long(code)
+            if len(s) > 0:
+                result[name] = s
+                print(f"  {label} [{i+1}/{len(items)}] {name}: {len(s)} days")
+            else:
+                print(f"  {label} [{i+1}/{len(items)}] {name}: empty")
+        except Exception as e:
+            print(f"  {label} [{i+1}/{len(items)}] {name}: ERROR {e}")
+        time.sleep(0.05)
+    return result
+
+
+def _fetch_us_etfs(ticker_dict, label):
+    tickers = list(ticker_dict.keys())
+    print(f"  {label}: downloading {len(tickers)} ETFs...")
+    try:
+        df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)
+        if isinstance(df.columns, pd.MultiIndex):
+            closes = df["Close"]
+        else:
+            closes = df
+    except Exception as e:
+        print(f"  {label} download failed: {e}")
+        return {}
+    result = {}
+    for ticker in tickers:
+        try:
+            s = closes[ticker].dropna()
+            if len(s) > 0:
+                result[ticker] = s
+                print(f"    {ticker} ({ticker_dict[ticker]}): {len(s)} days")
+        except Exception as e:
+            print(f"    {ticker}: ERROR {e}")
+    return result
+
+
 def compute_rs(series, benchmark, period_days):
     min_required = max(period_days - 5, int(period_days * 0.95))
     if len(series) < min_required or len(benchmark) < min_required:
@@ -210,14 +311,90 @@ def _reverse_mapping():
     return rev
 
 
+def _safe_float(v):
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f):
+        return None
+    return round(f, 2)
+
+
+def _build_series(sectors, benchmark):
+    dates = benchmark.index.sort_values()
+    out = {
+        "_benchmark": {
+            "dates": [d.strftime("%Y-%m-%d") for d in dates],
+            "values": [_safe_float(v) for v in benchmark.reindex(dates).values],
+        }
+    }
+    for name, s in sectors.items():
+        aligned = s.reindex(dates)
+        out[name] = {
+            "values": [_safe_float(v) for v in aligned.values],
+        }
+    return out
+
+
+def _compute_kr_group(series_dict, benchmark, mapping):
+    result = {}
+    for period_name, period_days in PERIODS.items():
+        rows = []
+        for name, s in series_dict.items():
+            rs, s_ret, b_ret = compute_rs(s, benchmark, period_days)
+            rows.append({
+                "sector": name,
+                "rs": rs,
+                "sector_return": s_ret,
+                "benchmark_return": b_ret,
+                "mapped_us": mapping.get(name),
+            })
+        rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
+        result[period_name] = rows
+    result["series"] = _build_series(series_dict, benchmark)
+    return result
+
+
+def _compute_us_group(series_dict, benchmark, names, kr_to_us_mapping):
+    rev = {}
+    for kr_name, us_ticker in kr_to_us_mapping.items():
+        rev.setdefault(us_ticker, []).append(kr_name)
+    result = {}
+    for period_name, period_days in PERIODS.items():
+        rows = []
+        for ticker, s in series_dict.items():
+            rs, s_ret, b_ret = compute_rs(s, benchmark, period_days)
+            rows.append({
+                "ticker": ticker,
+                "name": names.get(ticker, ""),
+                "rs": rs,
+                "sector_return": s_ret,
+                "benchmark_return": b_ret,
+                "mapped_kr": rev.get(ticker, []),
+            })
+        rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
+        result[period_name] = rows
+    result["series"] = _build_series(series_dict, benchmark)
+    return result
+
+
 def compute_all_scores():
-    print("[1/4] Fetching KR sector data...")
+    print("[1/6] Fetching KR sector data...")
     kr_sectors = fetch_kr_sector_series()
     kr_bench = fetch_kr_benchmark_series()
 
-    print("[2/4] Fetching US sector data...")
+    print("[2/6] Fetching KR themes + sizes...")
+    kr_themes = _fetch_kr_group_series(KR_THEMES, "KR theme")
+    kr_sizes = _fetch_kr_group_series(KR_SIZES, "KR size")
+
+    print("[3/6] Fetching US sector data...")
     us_sectors = fetch_us_sector_series()
     us_bench = fetch_us_benchmark_series()
+
+    print("[4/6] Fetching US themes + sizes...")
+    us_themes = _fetch_us_etfs(US_THEMES, "US themes")
+    us_sizes = _fetch_us_etfs(US_SIZES, "US sizes")
 
     rev_map = _reverse_mapping()
 
@@ -227,7 +404,7 @@ def compute_all_scores():
         "us": {},
     }
 
-    print("[3/4] Computing KR RS scores...")
+    print("[5/6] Computing KR RS scores...")
     for period_name, period_days in PERIODS.items():
         rows = []
         for sector_name, series in kr_sectors.items():
@@ -242,7 +419,7 @@ def compute_all_scores():
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result["kr"][period_name] = rows
 
-    print("[4/4] Computing US RS scores...")
+    print("[6/6] Computing US RS scores...")
     for period_name, period_days in PERIODS.items():
         rows = []
         for ticker, series in us_sectors.items():
@@ -257,6 +434,13 @@ def compute_all_scores():
             })
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result["us"][period_name] = rows
+
+    result["kr"]["series"] = _build_series(kr_sectors, kr_bench)
+    result["us"]["series"] = _build_series(us_sectors, us_bench)
+    result["kr"]["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING)
+    result["kr"]["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING)
+    result["us"]["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING)
+    result["us"]["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING)
 
     return result
 
@@ -285,6 +469,9 @@ def main(argv):
         print("[KR only] Fetching KR sector data...")
         kr_sectors = fetch_kr_sector_series()
         kr_bench = fetch_kr_benchmark_series()
+        print("[KR only] Fetching KR themes + sizes...")
+        kr_themes = _fetch_kr_group_series(KR_THEMES, "KR theme")
+        kr_sizes = _fetch_kr_group_series(KR_SIZES, "KR size")
         kr_result = {}
         for period_name, period_days in PERIODS.items():
             rows = []
@@ -299,6 +486,9 @@ def main(argv):
                 })
             rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
             kr_result[period_name] = rows
+        kr_result["series"] = _build_series(kr_sectors, kr_bench)
+        kr_result["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING)
+        kr_result["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING)
         data = {
             "last_updated": datetime.now().isoformat(timespec="seconds"),
             "kr": kr_result,
@@ -308,6 +498,9 @@ def main(argv):
         print("[US only] Fetching US sector data...")
         us_sectors = fetch_us_sector_series()
         us_bench = fetch_us_benchmark_series()
+        print("[US only] Fetching US themes + sizes...")
+        us_themes = _fetch_us_etfs(US_THEMES, "US themes")
+        us_sizes = _fetch_us_etfs(US_SIZES, "US sizes")
         rev_map = _reverse_mapping()
         us_result = {}
         for period_name, period_days in PERIODS.items():
@@ -324,6 +517,9 @@ def main(argv):
                 })
             rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
             us_result[period_name] = rows
+        us_result["series"] = _build_series(us_sectors, us_bench)
+        us_result["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING)
+        us_result["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING)
         data = {
             "last_updated": datetime.now().isoformat(timespec="seconds"),
             "kr": existing.get("kr", {}),

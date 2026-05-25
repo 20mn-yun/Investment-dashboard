@@ -331,6 +331,139 @@
         .data-row .data-label { color: #8b949e; }
         .data-row .data-value { font-weight: bold; }
 
+        .sector-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .sector-panel-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #58a6ff;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #30363d;
+        }
+        .sector-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .sector-table th {
+            text-align: left;
+            padding: 8px 10px;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+            font-weight: normal;
+            font-size: 12px;
+        }
+        .sector-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #21262d;
+            color: #e6edf3;
+        }
+        .sector-table tr:last-child td { border-bottom: none; }
+        .sector-table tr {
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+        .sector-table tr:hover { background-color: rgba(88, 166, 255, 0.06); }
+        .rs-positive { color: #f85149; }
+        .rs-negative { color: #58a6ff; }
+        .sync-ok { color: #3fb950; font-size: 12px; }
+        .sync-warn { color: #d29922; font-size: 12px; }
+        .sync-none { color: #484f58; font-size: 12px; }
+        .mapped-info {
+            font-size: 11px;
+            color: #8b949e;
+            margin-left: 4px;
+        }
+        .period-selector {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        .period-selector .period-btn {
+            padding: 5px 14px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+            background: #161b22;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+        .period-selector .period-btn:hover { color: #e6edf3; border-color: #58a6ff; }
+        .period-selector .period-btn.active {
+            background: #58a6ff;
+            color: #0d1117;
+            border-color: #58a6ff;
+            font-weight: bold;
+        }
+        .leaders-updated {
+            font-size: 11px;
+            color: #484f58;
+            margin-left: auto;
+        }
+        .leaders-loading {
+            text-align: center;
+            color: #8b949e;
+            padding: 40px 0;
+            font-size: 14px;
+        }
+        .leaders-group {
+            margin-top: 24px;
+        }
+        .group-header {
+            font-size: 15px;
+            font-weight: bold;
+            color: #e6edf3;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #30363d;
+        }
+        .group-header .group-sub {
+            font-size: 12px;
+            font-weight: normal;
+            color: #8b949e;
+            margin-left: 8px;
+        }
+        .mapped-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .mapped-table th {
+            text-align: left;
+            padding: 8px 10px;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+            font-weight: normal;
+            font-size: 12px;
+        }
+        .mapped-table th.col-rs,
+        .mapped-table td.col-rs {
+            text-align: right;
+        }
+        .mapped-table th.col-sync,
+        .mapped-table td.col-sync {
+            text-align: center;
+            width: 30px;
+        }
+        .mapped-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #21262d;
+            color: #e6edf3;
+        }
+        .mapped-table tr:last-child td { border-bottom: none; }
+        .mapped-table .arrow-col {
+            text-align: center;
+            color: #484f58;
+            width: 24px;
+            font-size: 12px;
+        }
+
         /* 그룹 카드 */
         .group-card {
             background-color: #21262d;
@@ -800,6 +933,11 @@
             .dart-status-bar { padding: 10px 14px; }
             .dart-section { padding: 12px; }
             .rpt-search-grid { grid-template-columns: 1fr; }
+            .sector-grid { grid-template-columns: 1fr; }
+            .sector-table th, .sector-table td { padding: 6px 8px; font-size: 12px; }
+            .mapped-table th, .mapped-table td { padding: 6px 6px; font-size: 11px; }
+            .mapped-table .arrow-col { display: none; }
+            .period-selector .period-btn { padding: 4px 10px; font-size: 12px; }
         }
 
         @media (max-width: 480px) {
@@ -821,6 +959,7 @@
 <!-- 탭 -->
 <div class="tabs">
     <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
+    <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
     <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
     <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
     <div class="tab" onclick="switchTab('report')">📄 증권사 Report</div>
@@ -1005,6 +1144,49 @@
                 <div id="newsReasonText" style="color:#c9d1d9; line-height:1.6;">로딩 중...</div>
                 <div id="newsSourcesList" style="margin-top:10px; font-size:13px;"></div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- 주도섹터 탭 -->
+<div class="tab-content" id="tab-leaders">
+    <div class="leaders-loading" id="leaders-loading">데이터를 불러오는 중...</div>
+    <div id="leaders-content" style="display:none;">
+        <div class="period-selector">
+            <span class="period-btn" onclick="changePeriod('1w')">1W</span>
+            <span class="period-btn" onclick="changePeriod('1m')">1M</span>
+            <span class="period-btn active" onclick="changePeriod('3m')">3M</span>
+            <span class="period-btn" onclick="changePeriod('6m')">6M</span>
+            <span class="period-btn" onclick="changePeriod('1y')">1Y</span>
+            <span class="leaders-updated" id="leaders-updated"></span>
+        </div>
+        <div class="sector-grid">
+            <div>
+                <div class="sector-panel-title">🇰🇷 한국 (KRX 업종)</div>
+                <div class="data-table">
+                    <table class="sector-table">
+                        <thead><tr><th>섹터</th><th>수익률</th><th title="시장대비 상대강도 (벤치마크 대비 초과수익률)">상대강도</th><th>매핑</th></tr></thead>
+                        <tbody id="sector-tbody-kr"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <div class="sector-panel-title">🇺🇸 미국 (SPDR ETF)</div>
+                <div class="data-table">
+                    <table class="sector-table">
+                        <thead><tr><th>섹터</th><th>수익률</th><th title="시장대비 상대강도 (벤치마크 대비 초과수익률)">상대강도</th><th>매핑</th></tr></thead>
+                        <tbody id="sector-tbody-us"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="leaders-group" id="theme-group">
+            <div class="group-header">🔥 KRX 테마 (6)<span class="group-sub">시장 narrative 추적</span></div>
+            <div class="mapped-table" id="theme-table"></div>
+        </div>
+        <div class="leaders-group" id="size-group">
+            <div class="group-header">📐 KRX 사이즈 로테이션 (5)<span class="group-sub">시장 국면 시그널</span></div>
+            <div class="mapped-table" id="size-table"></div>
         </div>
     </div>
 </div>
@@ -1211,6 +1393,7 @@
     let calLoaded = false;
     let dartLoaded = false;
     let reportLoaded = false;
+    let leadersLoaded = false;
     function switchTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -1228,6 +1411,148 @@
             reportLoaded = true;
             initReport();
         }
+        if (tabName === 'leaders' && !leadersLoaded) {
+            leadersLoaded = true;
+            loadLeadersData();
+        }
+    }
+
+    // 주도섹터
+    let leadersData = null;
+    let currentPeriod = '3m';
+
+    async function loadLeadersData() {
+        try {
+            const res = await fetch(API_BASE + '/api/sector-leaders');
+            leadersData = await res.json();
+            renderLeadersTab();
+        } catch (e) {
+            console.error('Sector leaders fetch failed:', e);
+            document.getElementById('leaders-loading').textContent = '데이터 로드 실패';
+        }
+    }
+
+    function renderLeadersTab() {
+        document.getElementById('leaders-loading').style.display = 'none';
+        document.getElementById('leaders-content').style.display = 'block';
+        const updated = leadersData.last_updated || '';
+        if (updated) {
+            const d = new Date(updated);
+            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            document.getElementById('leaders-updated').textContent =
+                kst.toISOString().slice(0, 16).replace('T', ' ') + ' KST';
+        }
+        renderSectorTable('kr');
+        renderSectorTable('us');
+        renderMappedTable('theme-table',
+            (leadersData.kr.themes || {})[currentPeriod],
+            (leadersData.us.themes || {})[currentPeriod],
+            leadersData.us.themes);
+        renderMappedTable('size-table',
+            (leadersData.kr.sizes || {})[currentPeriod],
+            (leadersData.us.sizes || {})[currentPeriod],
+            leadersData.us.sizes);
+    }
+
+    function findMappedRs(region, row) {
+        if (!leadersData) return null;
+        if (region === 'kr') {
+            const usTicker = row.mapped_us;
+            if (!usTicker) return null;
+            const usRows = leadersData.us[currentPeriod] || [];
+            return usRows.find(r => r.ticker === usTicker) || null;
+        }
+        const krNames = row.mapped_kr || [];
+        if (krNames.length === 0) return null;
+        const krRows = leadersData.kr[currentPeriod] || [];
+        return krRows.find(r => krNames.includes(r.sector)) || null;
+    }
+
+    function syncMarker(myRs, theirRs) {
+        if (myRs == null || theirRs == null) return '<span class="sync-none">—</span>';
+        if (myRs > 0 && theirRs > 0) return '<span class="sync-ok">✓</span>';
+        if (myRs > 0 || theirRs > 0) return '<span class="sync-warn">⚠</span>';
+        return '<span class="sync-none">—</span>';
+    }
+
+    function formatPct(v) {
+        if (v == null || isNaN(v)) return '<span class="sync-none">—</span>';
+        const cls = v >= 0 ? 'rs-positive' : 'rs-negative';
+        const sign = v >= 0 ? '+' : '';
+        return `<span class="${cls}">${sign}${v.toFixed(1)}%</span>`;
+    }
+
+    function renderSectorTable(region) {
+        const rows = (leadersData[region] || {})[currentPeriod] || [];
+        const tbody = document.getElementById('sector-tbody-' + region);
+        let html = '';
+        for (const row of rows) {
+            const name = region === 'kr' ? row.sector : `${row.name}`;
+            const ticker = region === 'us' ? `<span class="mapped-info">${row.ticker}</span>` : '';
+
+            const mapped = findMappedRs(region, row);
+            let mappedStr = '';
+            if (mapped) {
+                const mName = region === 'kr' ? mapped.ticker : mapped.sector;
+                const sync = syncMarker(row.rs, mapped.rs);
+                mappedStr = `${formatPct(mapped.rs)}<span class="mapped-info">${mName}</span> ${sync}`;
+            } else {
+                mappedStr = '<span class="sync-none">—</span>';
+            }
+
+            html += `<tr onclick="console.log('sector click', '${region}', '${name}')">
+                <td>${name}${ticker}</td>
+                <td>${formatPct(row.sector_return)}</td>
+                <td>${formatPct(row.rs)}</td>
+                <td>${mappedStr}</td>
+            </tr>`;
+        }
+        tbody.innerHTML = html;
+    }
+
+    function renderMappedTable(containerId, krItems, usItems, usNames) {
+        const container = document.getElementById(containerId);
+        if (!krItems || !usItems) { container.innerHTML = ''; return; }
+        let html = '<table><thead><tr>';
+        html += '<th>KRX</th><th class="col-rs">상대강도</th>';
+        html += '<th class="arrow-col"></th>';
+        html += '<th>US ETF</th><th class="col-rs">상대강도</th>';
+        html += '<th class="col-sync">동조</th>';
+        html += '</tr></thead><tbody>';
+        for (const kr of krItems) {
+            const usTicker = kr.mapped_us;
+            const us = usTicker ? usItems.find(r => r.ticker === usTicker) : null;
+            const usLabel = us ? `${us.name} <span class="mapped-info">${us.ticker}</span>` : '<span class="sync-none">—</span>';
+            const usRs = us ? formatPct(us.rs) : '<span class="sync-none">—</span>';
+            const sync = us ? syncMarker(kr.rs, us.rs) : '<span class="sync-none">—</span>';
+            html += `<tr>
+                <td>${kr.sector}</td>
+                <td class="col-rs">${formatPct(kr.rs)}</td>
+                <td class="arrow-col">→</td>
+                <td>${usLabel}</td>
+                <td class="col-rs">${usRs}</td>
+                <td class="col-sync">${sync}</td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function changePeriod(period) {
+        currentPeriod = period;
+        document.querySelectorAll('.period-selector .period-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.textContent.trim() === period.toUpperCase());
+        });
+        renderSectorTable('kr');
+        renderSectorTable('us');
+        renderMappedTable('theme-table',
+            (leadersData.kr.themes || {})[currentPeriod],
+            (leadersData.us.themes || {})[currentPeriod],
+            leadersData.us.themes);
+        renderMappedTable('size-table',
+            (leadersData.kr.sizes || {})[currentPeriod],
+            (leadersData.us.sizes || {})[currentPeriod],
+            leadersData.us.sizes);
     }
 
     // 그룹 관리 (서버 저장)
