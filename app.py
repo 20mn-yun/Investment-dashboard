@@ -656,6 +656,47 @@ def refresh_top_gainers():
     return jsonify({"status": "triggered"})
 
 
+@app.route("/api/sector-leaders", methods=["GET"])
+def get_sector_leaders():
+    cache_path = os.path.join(_CACHE_DIR, "sector_leaders.json")
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"error": "아직 배치가 실행되지 않았습니다"}), 503
+    return jsonify(cached)
+
+
+@app.route("/api/sector-leaders/<region>", methods=["GET"])
+def get_sector_leaders_by_region(region):
+    if region not in ("kr", "us"):
+        return jsonify({"error": "지원하지 않는 지역입니다 (kr, us)"}), 400
+    cache_path = os.path.join(_CACHE_DIR, "sector_leaders.json")
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"error": "아직 배치가 실행되지 않았습니다"}), 503
+    result = cached.get(region, {})
+    result["last_updated"] = cached.get("last_updated", "")
+    return jsonify(result)
+
+
+@app.route("/api/sector-leaders/refresh", methods=["POST"])
+def refresh_sector_leaders():
+    if not _is_private_ip(request.remote_addr):
+        return jsonify({"error": "forbidden"}), 403
+    import subprocess, sys
+    region = request.args.get("region", "all")
+    if region not in ("kr", "us", "all"):
+        return jsonify({"error": "지원하지 않는 지역입니다 (kr, us, all)"}), 400
+    subprocess.Popen(
+        [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "sector_leaders.py"), region],
+        cwd=os.path.dirname(os.path.abspath(__file__)),
+    )
+    return jsonify({"status": "triggered"}), 202
+
+
 # 한국어 → 영어 키워드 매핑
 KO_TO_EN = {
     "반도체": "semiconductor",
