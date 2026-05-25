@@ -70,12 +70,15 @@ SECTOR_MAPPING = {
 CACHE_PATH = Path("cache/sector_leaders.json")
 
 KR_THEMES = {
-    "4412": "2차전지 TOP10",
-    "4413": "바이오 TOP10",
-    "4414": "인터넷 TOP10",
-    "4415": "게임 TOP10",
-    "4421": "전기차 Top15",
-    "4422": "반도체 Top15",
+    "4412": {"name": "2차전지 TOP10", "source": "index"},
+    "4413": {"name": "바이오 TOP10", "source": "index"},
+    "4414": {"name": "인터넷 TOP10", "source": "index"},
+    "4415": {"name": "게임 TOP10", "source": "index"},
+    "4421": {"name": "전기차 Top15", "source": "index"},
+    "4422": {"name": "반도체 Top15", "source": "index"},
+    "0080G0": {"name": "KODEX 방산TOP10", "source": "etf"},
+    "421320": {"name": "PLUS 우주항공&UAM", "source": "etf"},
+    "0148J0": {"name": "TIGER 휴머노이드로봇", "source": "etf"},
 }
 
 KR_SIZES = {
@@ -93,6 +96,9 @@ US_THEMES = {
     "HERO": "게임·e스포츠",
     "DRIV": "자율주행·전기차",
     "SOXX": "반도체",
+    "ITA": "방산",
+    "ARKX": "우주항공",
+    "BOTZ": "로봇·AI",
 }
 
 US_SIZES = {
@@ -110,6 +116,9 @@ THEME_MAPPING = {
     "게임 TOP10": "HERO",
     "전기차 Top15": "DRIV",
     "반도체 Top15": "SOXX",
+    "KODEX 방산TOP10": "ITA",
+    "PLUS 우주항공&UAM": "ARKX",
+    "TIGER 휴머노이드로봇": "BOTZ",
 }
 
 SIZE_MAPPING = {
@@ -185,6 +194,71 @@ def _fetch_kr_index_long(sector_code, total_trading_days=260):
     return series[~series.index.duplicated(keep="first")].sort_index()
 
 
+def _fetch_kr_etf_long(stock_code, total_trading_days=260):
+    token = get_access_token()
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "FHKST03010100",
+    }
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(total_trading_days * 1.6))
+
+    all_dates = []
+    all_closes = []
+    cur_end = end_date
+
+    for _ in range(8):
+        if cur_end < start_date:
+            break
+
+        params = {
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": stock_code,
+            "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+            "FID_INPUT_DATE_2": cur_end.strftime("%Y%m%d"),
+            "FID_PERIOD_DIV_CODE": "D",
+            "FID_ORG_ADJ_PRC": "0",
+        }
+
+        resp = requests.get(
+            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+            headers=headers,
+            params=params,
+        )
+
+        body = resp.json()
+        if body.get("rt_cd") != "0":
+            break
+
+        records = body.get("output2") or []
+        if not records:
+            break
+
+        for rec in records:
+            dt_str = rec.get("stck_bsop_date", "")
+            close_str = rec.get("stck_clpr", "")
+            if dt_str and close_str:
+                all_dates.append(pd.Timestamp(dt_str))
+                all_closes.append(float(close_str))
+
+        if len(records) < 50:
+            break
+
+        earliest = min(pd.Timestamp(r["stck_bsop_date"]) for r in records)
+        cur_end = earliest - timedelta(days=1)
+        time.sleep(0.05)
+
+    if not all_dates:
+        return pd.Series(dtype=float, name=stock_code)
+
+    series = pd.Series(all_closes, index=pd.DatetimeIndex(all_dates), name=stock_code)
+    return series[~series.index.duplicated(keep="first")].sort_index()
+
+
 def fetch_kr_sector_series():
     codes = get_sector_codes()
     result = {}
@@ -250,9 +324,18 @@ def fetch_us_benchmark_series():
 def _fetch_kr_group_series(code_dict, label):
     result = {}
     items = list(code_dict.items())
-    for i, (code, name) in enumerate(items):
+    for i, (code, entry) in enumerate(items):
+        if isinstance(entry, dict):
+            name = entry["name"]
+            source = entry.get("source", "index")
+        else:
+            name = entry
+            source = "index"
         try:
-            s = _fetch_kr_index_long(code)
+            if source == "etf":
+                s = _fetch_kr_etf_long(code)
+            else:
+                s = _fetch_kr_index_long(code)
             if len(s) > 0:
                 result[name] = s
                 print(f"  {label} [{i+1}/{len(items)}] {name}: {len(s)} days")

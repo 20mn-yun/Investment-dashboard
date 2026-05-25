@@ -433,6 +433,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
+            table-layout: fixed;
         }
         .mapped-table th {
             text-align: left;
@@ -443,13 +444,15 @@
             font-size: 12px;
         }
         .mapped-table th.col-rs,
-        .mapped-table td.col-rs {
+        .mapped-table td.col-rs,
+        .mapped-table th.col-return,
+        .mapped-table td.col-return {
             text-align: right;
         }
         .mapped-table th.col-sync,
         .mapped-table td.col-sync {
             text-align: center;
-            width: 30px;
+            white-space: nowrap;
         }
         .mapped-table td {
             padding: 8px 10px;
@@ -937,6 +940,7 @@
             .sector-table th, .sector-table td { padding: 6px 8px; font-size: 12px; }
             .mapped-table th, .mapped-table td { padding: 6px 6px; font-size: 11px; }
             .mapped-table .arrow-col { display: none; }
+            .mapped-table .col-return { display: none; }
             .period-selector .period-btn { padding: 4px 10px; font-size: 12px; }
         }
 
@@ -1513,23 +1517,31 @@
     function renderMappedTable(containerId, krItems, usItems, usNames) {
         const container = document.getElementById(containerId);
         if (!krItems || !usItems) { container.innerHTML = ''; return; }
-        let html = '<table><thead><tr>';
-        html += '<th>KRX</th><th class="col-rs">상대강도</th>';
+        let html = '<table><colgroup>';
+        html += '<col style="width:20%"><col class="col-return" style="width:10%"><col style="width:10%">';
+        html += '<col class="arrow-col" style="width:4%">';
+        html += '<col style="width:22%"><col class="col-return" style="width:10%"><col style="width:10%">';
+        html += '<col style="width:8%">';
+        html += '</colgroup><thead><tr>';
+        html += '<th>KRX</th><th class="col-return">수익률</th><th class="col-rs">상대강도</th>';
         html += '<th class="arrow-col"></th>';
-        html += '<th>US ETF</th><th class="col-rs">상대강도</th>';
+        html += '<th>US ETF</th><th class="col-return">수익률</th><th class="col-rs">상대강도</th>';
         html += '<th class="col-sync">동조</th>';
         html += '</tr></thead><tbody>';
         for (const kr of krItems) {
             const usTicker = kr.mapped_us;
             const us = usTicker ? usItems.find(r => r.ticker === usTicker) : null;
             const usLabel = us ? `${us.name} <span class="mapped-info">${us.ticker}</span>` : '<span class="sync-none">—</span>';
+            const usReturn = us ? formatPct(us.sector_return) : '<span class="sync-none">—</span>';
             const usRs = us ? formatPct(us.rs) : '<span class="sync-none">—</span>';
             const sync = us ? syncMarker(kr.rs, us.rs) : '<span class="sync-none">—</span>';
             html += `<tr>
                 <td>${kr.sector}</td>
+                <td class="col-return">${formatPct(kr.sector_return)}</td>
                 <td class="col-rs">${formatPct(kr.rs)}</td>
                 <td class="arrow-col">→</td>
                 <td>${usLabel}</td>
+                <td class="col-return">${usReturn}</td>
                 <td class="col-rs">${usRs}</td>
                 <td class="col-sync">${sync}</td>
             </tr>`;
