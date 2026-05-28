@@ -18,6 +18,7 @@ dart_industry_cache.json
 dart_industry_name_cache.json
 business_overview_cache.json
 DART_*.xlsx
+*.bak*
 sessions/
 report_config.json
 report_index.db

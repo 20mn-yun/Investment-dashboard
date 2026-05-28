@@ -1414,6 +1414,7 @@ _BD = os.path.dirname(os.path.abspath(__file__))
 DART_MON_CFG_FILE = os.path.join(_BD, "dart_monitor_config.json")
 DART_SEEN_FILE = os.path.join(_BD, "dart_seen.json")
 DART_DAILY_FILE = os.path.join(_BD, "dart_daily.json")
+DART_SENT_FILE = os.path.join(_BD, "dart_sent.json")
 EXCEL_PATH = os.path.expanduser(
     "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/내 드라이브/공시정리/DART_공시_누적.xlsx"
 )
@@ -1476,6 +1477,14 @@ def _load_daily():
 
 def _save_daily(d):
     _sj(DART_DAILY_FILE, d)
+
+
+def _load_sent():
+    return _lj(DART_SENT_FILE, {"date": "", "sent": []})
+
+
+def _save_sent(d):
+    _sj(DART_SENT_FILE, d)
 
 
 def _alog(cat, msg):
@@ -1942,10 +1951,8 @@ def _save_excel():
 
 # --- Background monitor ---
 def _dart_loop():
-    daily_sent = {}
     time.sleep(10)
     while True:
-        # 주말(토/일)에는 새 공시가 없으므로 스킵
         if datetime.now().weekday() >= 5:
             time.sleep(300)
             continue
@@ -1957,10 +1964,15 @@ def _dart_loop():
                 _ck_earnings()
                 _ck_major()
                 now = datetime.now()
+                today_iso = now.date().isoformat()
+                sent_state = _load_sent()
+                if sent_state.get("date") != today_iso:
+                    sent_state = {"date": today_iso, "sent": []}
                 for slot in _DAILY_SLOTS:
-                    if now.hour == slot["hour"] and daily_sent.get(slot["key"]) != now.date():
+                    if now.hour == slot["hour"] and slot["key"] not in sent_state["sent"]:
                         _send_daily_slot(slot)
-                        daily_sent[slot["key"]] = now.date()
+                        sent_state["sent"].append(slot["key"])
+                        _save_sent(sent_state)
                         if slot["key"] == "22":
                             _save_excel()
         except Exception as e:
