@@ -469,6 +469,56 @@
             width: 24px;
             font-size: 12px;
         }
+        .mapped-table th.col-volume,
+        .mapped-table td.col-volume {
+            text-align: right;
+        }
+        .weight-slider-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #8b949e;
+        }
+        .weight-slider-wrap input[type=range] {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: linear-gradient(to right, #f85149, #484f58 50%, #58a6ff);
+            border-radius: 3px;
+            outline: none;
+        }
+        .weight-slider-wrap input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e6edf3;
+            border: 2px solid #30363d;
+            cursor: pointer;
+        }
+        .weight-slider-wrap .slider-label {
+            white-space: nowrap;
+            min-width: 50px;
+        }
+        .weight-slider-wrap .slider-label-left { text-align: right; color: #f85149; }
+        .weight-slider-wrap .slider-label-right { text-align: left; color: #58a6ff; }
+        .weight-slider-status {
+            text-align: center;
+            font-size: 11px;
+            color: #8b949e;
+            margin-top: -10px;
+            margin-bottom: 12px;
+        }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: #e6edf3; }
+        th.sort-active { color: #58a6ff; }
 
         /* 그룹 카드 */
         .group-card {
@@ -944,6 +994,7 @@
             .mapped-table th, .mapped-table td { padding: 6px 6px; font-size: 11px; }
             .mapped-table .arrow-col { display: none; }
             .mapped-table .col-return { display: none; }
+            .mapped-table .col-volume { display: none; }
             .period-selector .period-btn { padding: 4px 10px; font-size: 12px; }
         }
 
@@ -1167,24 +1218,20 @@
             <span class="period-btn" onclick="changePeriod('1y')">1Y</span>
             <span class="leaders-updated" id="leaders-updated"></span>
         </div>
+        <div class="weight-slider-wrap">
+            <span class="slider-label slider-label-left">상대강도</span>
+            <input type="range" min="0" max="100" value="50" id="weight-slider">
+            <span class="slider-label slider-label-right">거래대금</span>
+        </div>
+        <div class="weight-slider-status" id="weight-status">상대강도 50% · 거래대금 50%</div>
         <div class="sector-grid">
             <div>
                 <div class="sector-panel-title">🇰🇷 한국 (KRX 업종)</div>
-                <div class="data-table">
-                    <table class="sector-table">
-                        <thead><tr><th>섹터</th><th>수익률</th><th title="시장대비 상대강도 (벤치마크 대비 초과수익률)">상대강도</th><th>매핑</th></tr></thead>
-                        <tbody id="sector-tbody-kr"></tbody>
-                    </table>
-                </div>
+                <div class="data-table" id="sector-container-kr"></div>
             </div>
             <div>
                 <div class="sector-panel-title">🇺🇸 미국 (SPDR ETF)</div>
-                <div class="data-table">
-                    <table class="sector-table">
-                        <thead><tr><th>섹터</th><th>수익률</th><th title="시장대비 상대강도 (벤치마크 대비 초과수익률)">상대강도</th><th>매핑</th></tr></thead>
-                        <tbody id="sector-tbody-us"></tbody>
-                    </table>
-                </div>
+                <div class="data-table" id="sector-container-us"></div>
             </div>
         </div>
         <div class="leaders-group" id="theme-group">
@@ -1429,7 +1476,48 @@
     let currentPeriod = '3m';
     let activeChartRow = null;
     let activeChartInstance = null;
+    let rsWeight = 50;
+    let sortColumn = 'score';
+    let sortDir = 'desc';
     const PERIOD_DAYS = {'1w':5, '1m':21, '3m':63, '6m':126, '1y':252};
+
+    function computeScore(item) {
+        const wRs = rsWeight / 100;
+        const wVc = (100 - rsWeight) / 100;
+        const rsZ = (item.rs_z == null) ? 0 : item.rs_z;
+        const vcZ = (item.vc_z == null) ? 0 : item.vc_z;
+        return rsZ * wRs + vcZ * wVc;
+    }
+
+    function formatScore(item) {
+        const s = computeScore(item);
+        const cls = s >= 0 ? 'rs-positive' : 'rs-negative';
+        const sign = s >= 0 ? '+' : '';
+        return `<span class="${cls}">${sign}${s.toFixed(2)}</span>`;
+    }
+
+    function sortItems(items) {
+        const arr = [...items];
+        arr.sort((a, b) => {
+            let av, bv;
+            if (sortColumn === 'score') { av = computeScore(a); bv = computeScore(b); }
+            else { av = a[sortColumn] ?? -Infinity; bv = b[sortColumn] ?? -Infinity; }
+            return sortDir === 'desc' ? bv - av : av - bv;
+        });
+        return arr;
+    }
+
+    function handleSort(col) {
+        if (sortColumn === col) { sortDir = sortDir === 'desc' ? 'asc' : 'desc'; }
+        else { sortColumn = col; sortDir = 'desc'; }
+        closeSectorChart();
+        reRenderAllTables();
+    }
+
+    function sortArrow(col) {
+        if (sortColumn !== col) return '';
+        return sortDir === 'desc' ? ' ▼' : ' ▲';
+    }
 
     function normalizeBase100(values) {
         const first = values.find(v => v !== null && v !== undefined && !isNaN(v));
@@ -1478,16 +1566,7 @@
         }
     }
 
-    function renderLeadersTab() {
-        document.getElementById('leaders-loading').style.display = 'none';
-        document.getElementById('leaders-content').style.display = 'block';
-        const updated = leadersData.last_updated || '';
-        if (updated) {
-            const d = new Date(updated);
-            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-            document.getElementById('leaders-updated').textContent =
-                kst.toISOString().slice(0, 16).replace('T', ' ') + ' KST';
-        }
+    function reRenderAllTables() {
         renderSectorTable('kr');
         renderSectorTable('us');
         renderMappedTable('theme-table',
@@ -1498,6 +1577,28 @@
             (leadersData.kr.sizes || {})[currentPeriod],
             (leadersData.us.sizes || {})[currentPeriod],
             leadersData.us.sizes, 'sizes');
+    }
+
+    function renderLeadersTab() {
+        document.getElementById('leaders-loading').style.display = 'none';
+        document.getElementById('leaders-content').style.display = 'block';
+        const updated = leadersData.last_updated || '';
+        if (updated) {
+            const d = new Date(updated);
+            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            document.getElementById('leaders-updated').textContent =
+                kst.toISOString().slice(0, 16).replace('T', ' ') + ' KST';
+        }
+        const slider = document.getElementById('weight-slider');
+        slider.value = rsWeight;
+        slider.addEventListener('input', function() {
+            rsWeight = parseInt(this.value);
+            document.getElementById('weight-status').textContent =
+                `상대강도 ${rsWeight}% · 거래대금 ${100 - rsWeight}%`;
+            closeSectorChart();
+            reRenderAllTables();
+        });
+        reRenderAllTables();
     }
 
     function findMappedRs(region, row) {
@@ -1555,7 +1656,7 @@
         chartTr.className = 'chart-row';
         chartTr.dataset.chartKey = region + ':' + sectorKey;
         const chartTd = document.createElement('td');
-        chartTd.colSpan = 4;
+        chartTd.colSpan = 6;
         const container = document.createElement('div');
         container.className = 'chart-container';
         const canvas = document.createElement('canvas');
@@ -1610,7 +1711,7 @@
         chartTr.className = 'chart-row';
         chartTr.dataset.chartKey = chartKey;
         const chartTd = document.createElement('td');
-        chartTd.colSpan = 8;
+        chartTd.colSpan = 11;
         const container = document.createElement('div');
         container.className = 'chart-container';
         const canvas = document.createElement('canvas');
@@ -1636,11 +1737,27 @@
         XLP:'필수소비재', XLI:'산업재', XLB:'소재', XLU:'유틸리티', XLRE:'부동산', XLC:'통신서비스'
     };
 
+    function sectorTheadHtml() {
+        const cols = [
+            ['섹터', ''],
+            ['수익률', 'sector_return'],
+            ['상대강도', 'rs'],
+            ['거래대금', 'volume_change'],
+            ['점수', 'score'],
+            ['매핑', ''],
+        ];
+        return '<thead><tr>' + cols.map(([label, key]) => {
+            if (!key) return `<th>${label}</th>`;
+            const cls = 'sortable' + (sortColumn === key ? ' sort-active' : '');
+            return `<th class="${cls}" data-sort="${key}">${label}${sortArrow(key)}</th>`;
+        }).join('') + '</tr></thead>';
+    }
+
     function renderSectorTable(region) {
         closeSectorChart();
-        const rows = (leadersData[region] || {})[currentPeriod] || [];
-        const tbody = document.getElementById('sector-tbody-' + region);
-        let html = '';
+        const rows = sortItems((leadersData[region] || {})[currentPeriod] || []);
+        const container = document.getElementById('sector-container-' + region);
+        let html = '<table class="sector-table">' + sectorTheadHtml() + '<tbody>';
         for (const row of rows) {
             const name = region === 'kr' ? row.sector : `${row.name}`;
             const ticker = region === 'us' ? `<span class="mapped-info">${row.ticker}</span>` : '';
@@ -1661,52 +1778,79 @@
                 <td>${name}${ticker}</td>
                 <td>${formatPct(row.sector_return)}</td>
                 <td>${formatPct(row.rs)}</td>
+                <td>${formatPct(row.volume_change)}</td>
+                <td>${formatScore(row)}</td>
                 <td>${mappedStr}</td>
             </tr>`;
         }
-        tbody.innerHTML = html;
-        tbody.querySelectorAll('tr').forEach(tr => {
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        container.querySelectorAll('th.sortable').forEach(th => {
+            th.addEventListener('click', () => handleSort(th.dataset.sort));
+        });
+        container.querySelectorAll('tbody tr').forEach(tr => {
             tr.addEventListener('click', function() {
                 toggleSectorChart(this.dataset.region, this.dataset.key, this.dataset.mapped, this);
             });
         });
     }
 
+    function mappedTheadHtml() {
+        function th(label, key, cls) {
+            const sc = 'sortable' + (sortColumn === key ? ' sort-active' : '');
+            return `<th class="${cls ? cls + ' ' : ''}${sc}" data-sort="${key}">${label}${sortArrow(key)}</th>`;
+        }
+        let h = '<thead><tr>';
+        h += '<th>KRX</th>';
+        h += th('수익률', 'sector_return', 'col-return');
+        h += th('상대강도', 'rs', 'col-rs');
+        h += th('거래대금', 'volume_change', 'col-volume');
+        h += '<th class="arrow-col"></th>';
+        h += '<th>US ETF</th><th class="col-return">수익률</th><th class="col-rs">상대강도</th><th class="col-volume">거래대금</th>';
+        h += '<th class="col-sync">동조</th>';
+        h += th('점수', 'score', 'col-rs');
+        h += '</tr></thead>';
+        return h;
+    }
+
     function renderMappedTable(containerId, krItems, usItems, usNames, groupKey) {
         closeSectorChart();
         const container = document.getElementById(containerId);
         if (!krItems || !usItems) { container.innerHTML = ''; return; }
+        const sorted = sortItems(krItems);
         let html = '<table class="sector-table"><colgroup>';
-        html += '<col style="width:20%"><col class="col-return" style="width:10%"><col style="width:10%">';
-        html += '<col class="arrow-col" style="width:4%">';
-        html += '<col style="width:22%"><col class="col-return" style="width:10%"><col style="width:10%">';
-        html += '<col style="width:8%">';
-        html += '</colgroup><thead><tr>';
-        html += '<th>KRX</th><th class="col-return">수익률</th><th class="col-rs">상대강도</th>';
-        html += '<th class="arrow-col"></th>';
-        html += '<th>US ETF</th><th class="col-return">수익률</th><th class="col-rs">상대강도</th>';
-        html += '<th class="col-sync">동조</th>';
-        html += '</tr></thead><tbody>';
-        for (const kr of krItems) {
+        html += '<col style="width:16%"><col class="col-return" style="width:8%"><col style="width:8%"><col class="col-volume" style="width:8%">';
+        html += '<col class="arrow-col" style="width:3%">';
+        html += '<col style="width:18%"><col class="col-return" style="width:8%"><col style="width:8%"><col class="col-volume" style="width:8%">';
+        html += '<col style="width:5%"><col style="width:6%">';
+        html += '</colgroup>' + mappedTheadHtml() + '<tbody>';
+        for (const kr of sorted) {
             const usTicker = kr.mapped_us;
             const us = usTicker ? usItems.find(r => r.ticker === usTicker) : null;
             const usLabel = us ? `${us.name} <span class="mapped-info">${us.ticker}</span>` : '<span class="sync-none">—</span>';
             const usReturn = us ? formatPct(us.sector_return) : '<span class="sync-none">—</span>';
             const usRs = us ? formatPct(us.rs) : '<span class="sync-none">—</span>';
+            const usVc = us ? formatPct(us.volume_change) : '<span class="sync-none">—</span>';
             const sync = us ? syncMarker(kr.rs, us.rs) : '<span class="sync-none">—</span>';
             html += `<tr data-group="${groupKey}" data-kr="${kr.sector}" data-us="${usTicker || ''}">
                 <td>${kr.sector}</td>
                 <td class="col-return">${formatPct(kr.sector_return)}</td>
                 <td class="col-rs">${formatPct(kr.rs)}</td>
+                <td class="col-volume">${formatPct(kr.volume_change)}</td>
                 <td class="arrow-col">→</td>
                 <td>${usLabel}</td>
                 <td class="col-return">${usReturn}</td>
                 <td class="col-rs">${usRs}</td>
+                <td class="col-volume">${usVc}</td>
                 <td class="col-sync">${sync}</td>
+                <td class="col-rs">${formatScore(kr)}</td>
             </tr>`;
         }
         html += '</tbody></table>';
         container.innerHTML = html;
+        container.querySelectorAll('th.sortable').forEach(th => {
+            th.addEventListener('click', () => handleSort(th.dataset.sort));
+        });
         container.querySelectorAll('tbody tr').forEach(tr => {
             tr.addEventListener('click', function() {
                 toggleMappedChart(this.dataset.group, this.dataset.kr, this.dataset.us, this);
@@ -1719,16 +1863,7 @@
         document.querySelectorAll('.period-selector .period-btn').forEach(btn => {
             btn.classList.toggle('active', btn.textContent.trim() === period.toUpperCase());
         });
-        renderSectorTable('kr');
-        renderSectorTable('us');
-        renderMappedTable('theme-table',
-            (leadersData.kr.themes || {})[currentPeriod],
-            (leadersData.us.themes || {})[currentPeriod],
-            leadersData.us.themes, 'themes');
-        renderMappedTable('size-table',
-            (leadersData.kr.sizes || {})[currentPeriod],
-            (leadersData.us.sizes || {})[currentPeriod],
-            leadersData.us.sizes, 'sizes');
+        reRenderAllTables();
     }
 
     // 그룹 관리 (서버 저장)

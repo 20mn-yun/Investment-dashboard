@@ -371,6 +371,210 @@ def _fetch_us_etfs(ticker_dict, label):
     return result
 
 
+def _fetch_kr_index_volume_long(sector_code, total_trading_days=504):
+    token = get_access_token()
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "FHKUP03500100",
+    }
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(total_trading_days * 1.6))
+    all_dates = []
+    all_volumes = []
+    cur_end = end_date
+    for _ in range(14):
+        if cur_end < start_date:
+            break
+        params = {
+            "FID_COND_MRKT_DIV_CODE": "U",
+            "FID_INPUT_ISCD": sector_code,
+            "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+            "FID_INPUT_DATE_2": cur_end.strftime("%Y%m%d"),
+            "FID_PERIOD_DIV_CODE": "D",
+        }
+        resp = requests.get(
+            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice",
+            headers=headers,
+            params=params,
+        )
+        body = resp.json()
+        if body.get("rt_cd") != "0":
+            break
+        records = body.get("output2") or []
+        if not records:
+            break
+        for rec in records:
+            dt_str = rec.get("stck_bsop_date", "")
+            vol_str = rec.get("acml_tr_pbmn", "")
+            if dt_str and vol_str:
+                all_dates.append(pd.Timestamp(dt_str))
+                all_volumes.append(float(vol_str))
+        if len(records) < 50:
+            break
+        earliest = min(pd.Timestamp(r["stck_bsop_date"]) for r in records)
+        cur_end = earliest - timedelta(days=1)
+        time.sleep(0.05)
+    if not all_dates:
+        return pd.Series(dtype=float, name=sector_code)
+    series = pd.Series(all_volumes, index=pd.DatetimeIndex(all_dates), name=sector_code)
+    return series[~series.index.duplicated(keep="first")].sort_index()
+
+
+def _fetch_kr_etf_volume_long(stock_code, total_trading_days=504):
+    token = get_access_token()
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "FHKST03010100",
+    }
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(total_trading_days * 1.6))
+    all_dates = []
+    all_volumes = []
+    cur_end = end_date
+    for _ in range(14):
+        if cur_end < start_date:
+            break
+        params = {
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": stock_code,
+            "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+            "FID_INPUT_DATE_2": cur_end.strftime("%Y%m%d"),
+            "FID_PERIOD_DIV_CODE": "D",
+            "FID_ORG_ADJ_PRC": "0",
+        }
+        resp = requests.get(
+            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+            headers=headers,
+            params=params,
+        )
+        body = resp.json()
+        if body.get("rt_cd") != "0":
+            break
+        records = body.get("output2") or []
+        if not records:
+            break
+        for rec in records:
+            dt_str = rec.get("stck_bsop_date", "")
+            vol_str = rec.get("acml_tr_pbmn", "")
+            if dt_str and vol_str:
+                all_dates.append(pd.Timestamp(dt_str))
+                all_volumes.append(float(vol_str))
+        if len(records) < 50:
+            break
+        earliest = min(pd.Timestamp(r["stck_bsop_date"]) for r in records)
+        cur_end = earliest - timedelta(days=1)
+        time.sleep(0.05)
+    if not all_dates:
+        return pd.Series(dtype=float, name=stock_code)
+    series = pd.Series(all_volumes, index=pd.DatetimeIndex(all_dates), name=stock_code)
+    return series[~series.index.duplicated(keep="first")].sort_index()
+
+
+def _fetch_kr_sector_volume():
+    codes = get_sector_codes()
+    result = {}
+    for i, c in enumerate(codes):
+        try:
+            s = _fetch_kr_index_volume_long(c["code"])
+            if len(s) > 0:
+                result[c["name"]] = s
+                print(f"  KR vol [{i+1}/{len(codes)}] {c['name']}: {len(s)} days")
+            else:
+                print(f"  KR vol [{i+1}/{len(codes)}] {c['name']}: empty")
+        except Exception as e:
+            print(f"  KR vol [{i+1}/{len(codes)}] {c['name']}: ERROR {e}")
+        time.sleep(0.05)
+    return result
+
+
+def _fetch_kr_group_volume(code_dict, label):
+    result = {}
+    items = list(code_dict.items())
+    for i, (code, entry) in enumerate(items):
+        if isinstance(entry, dict):
+            name = entry["name"]
+            source = entry.get("source", "index")
+        else:
+            name = entry
+            source = "index"
+        try:
+            if source == "etf":
+                s = _fetch_kr_etf_volume_long(code)
+            else:
+                s = _fetch_kr_index_volume_long(code)
+            if len(s) > 0:
+                result[name] = s
+                print(f"  {label} [{i+1}/{len(items)}] {name}: {len(s)} days")
+            else:
+                print(f"  {label} [{i+1}/{len(items)}] {name}: empty")
+        except Exception as e:
+            print(f"  {label} [{i+1}/{len(items)}] {name}: ERROR {e}")
+        time.sleep(0.05)
+    return result
+
+
+def winsorized_zscores(values, clip_pct=0.1):
+    valid = [(i, v) for i, v in enumerate(values) if v is not None]
+    result = [None] * len(values)
+    if len(valid) < 2:
+        return result
+    sorted_vals = sorted(v for _, v in valid)
+    n = len(sorted_vals)
+    lo_idx = clip_pct * (n - 1)
+    hi_idx = (1 - clip_pct) * (n - 1)
+    lo_bound = sorted_vals[int(lo_idx)] + (lo_idx % 1) * (sorted_vals[min(int(lo_idx) + 1, n - 1)] - sorted_vals[int(lo_idx)])
+    hi_bound = sorted_vals[int(hi_idx)] + (hi_idx % 1) * (sorted_vals[min(int(hi_idx) + 1, n - 1)] - sorted_vals[int(hi_idx)])
+    clipped = {i: max(lo_bound, min(hi_bound, v)) for i, v in valid}
+    mean = sum(clipped.values()) / len(clipped)
+    std = (sum((c - mean) ** 2 for c in clipped.values()) / len(clipped)) ** 0.5
+    for i, v in valid:
+        result[i] = 0.0 if std == 0 else round((v - mean) / std, 4)
+    return result
+
+
+def _add_zscores(rows):
+    rs_vals = [r.get("rs") for r in rows]
+    vc_vals = [r.get("volume_change") for r in rows]
+    rs_zs = winsorized_zscores(rs_vals)
+    vc_zs = winsorized_zscores(vc_vals)
+    for i, r in enumerate(rows):
+        r["rs_z"] = rs_zs[i]
+        r["vc_z"] = vc_zs[i]
+
+
+def _fetch_us_dollar_volume(ticker_dict, label):
+    tickers = list(ticker_dict.keys())
+    print(f"  {label} volume: downloading {len(tickers)} ETFs (3y)...")
+    try:
+        df = yf.download(tickers, period="3y", progress=False, auto_adjust=True)
+    except Exception as e:
+        print(f"  {label} volume download failed: {e}")
+        return {}
+    result = {}
+    for ticker in tickers:
+        try:
+            if isinstance(df.columns, pd.MultiIndex):
+                c = df["Close"][ticker].dropna()
+                v = df["Volume"][ticker].dropna()
+            else:
+                c = df["Close"].dropna()
+                v = df["Volume"].dropna()
+            common = c.index.intersection(v.index)
+            dollar_vol = (c[common] * v[common]).dropna()
+            if len(dollar_vol) > 0:
+                result[ticker] = dollar_vol
+                print(f"    {ticker}: {len(dollar_vol)} vol days")
+        except Exception as e:
+            print(f"    {ticker} volume: ERROR {e}")
+    return result
+
+
 def compute_rs(series, benchmark, period_days):
     min_required = max(period_days - 5, int(period_days * 0.95))
     if len(series) < min_required or len(benchmark) < min_required:
@@ -385,6 +589,17 @@ def compute_rs(series, benchmark, period_days):
     rs = sector_ret - bench_ret
 
     return round(rs, 2), round(sector_ret, 2), round(bench_ret, 2)
+
+
+def compute_volume_change(volume_series, period_days):
+    if len(volume_series) < 2 * period_days:
+        return None
+    recent = volume_series.iloc[-period_days:]
+    previous = volume_series.iloc[-2 * period_days:-period_days]
+    prev_avg = previous.mean()
+    if prev_avg == 0:
+        return None
+    return round((recent.mean() / prev_avg - 1) * 100, 2)
 
 
 def _reverse_mapping():
@@ -420,26 +635,33 @@ def _build_series(sectors, benchmark):
     return out
 
 
-def _compute_kr_group(series_dict, benchmark, mapping):
+def _compute_kr_group(series_dict, benchmark, mapping, volume_dict=None):
+    vol = volume_dict or {}
     result = {}
     for period_name, period_days in PERIODS.items():
         rows = []
         for name, s in series_dict.items():
             rs, s_ret, b_ret = compute_rs(s, benchmark, period_days)
+            vc = None
+            if name in vol:
+                vc = compute_volume_change(vol[name], period_days)
             rows.append({
                 "sector": name,
                 "rs": rs,
                 "sector_return": s_ret,
                 "benchmark_return": b_ret,
                 "mapped_us": mapping.get(name),
+                "volume_change": vc,
             })
+        _add_zscores(rows)
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result[period_name] = rows
     result["series"] = _build_series(series_dict, benchmark)
     return result
 
 
-def _compute_us_group(series_dict, benchmark, names, kr_to_us_mapping):
+def _compute_us_group(series_dict, benchmark, names, kr_to_us_mapping, volume_dict=None):
+    vol = volume_dict or {}
     rev = {}
     for kr_name, us_ticker in kr_to_us_mapping.items():
         rev.setdefault(us_ticker, []).append(kr_name)
@@ -448,6 +670,9 @@ def _compute_us_group(series_dict, benchmark, names, kr_to_us_mapping):
         rows = []
         for ticker, s in series_dict.items():
             rs, s_ret, b_ret = compute_rs(s, benchmark, period_days)
+            vc = None
+            if ticker in vol:
+                vc = compute_volume_change(vol[ticker], period_days)
             rows.append({
                 "ticker": ticker,
                 "name": names.get(ticker, ""),
@@ -455,7 +680,9 @@ def _compute_us_group(series_dict, benchmark, names, kr_to_us_mapping):
                 "sector_return": s_ret,
                 "benchmark_return": b_ret,
                 "mapped_kr": rev.get(ticker, []),
+                "volume_change": vc,
             })
+        _add_zscores(rows)
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result[period_name] = rows
     result["series"] = _build_series(series_dict, benchmark)
@@ -463,21 +690,31 @@ def _compute_us_group(series_dict, benchmark, names, kr_to_us_mapping):
 
 
 def compute_all_scores():
-    print("[1/6] Fetching KR sector data...")
+    print("[1/8] Fetching KR sector data...")
     kr_sectors = fetch_kr_sector_series()
     kr_bench = fetch_kr_benchmark_series()
 
-    print("[2/6] Fetching KR themes + sizes...")
+    print("[2/8] Fetching KR themes + sizes...")
     kr_themes = _fetch_kr_group_series(KR_THEMES, "KR theme")
     kr_sizes = _fetch_kr_group_series(KR_SIZES, "KR size")
 
-    print("[3/6] Fetching US sector data...")
+    print("[3/8] Fetching KR volume data (2y)...")
+    kr_sector_vol = _fetch_kr_sector_volume()
+    kr_theme_vol = _fetch_kr_group_volume(KR_THEMES, "KR theme vol")
+    kr_size_vol = _fetch_kr_group_volume(KR_SIZES, "KR size vol")
+
+    print("[4/8] Fetching US sector data...")
     us_sectors = fetch_us_sector_series()
     us_bench = fetch_us_benchmark_series()
 
-    print("[4/6] Fetching US themes + sizes...")
+    print("[5/8] Fetching US themes + sizes...")
     us_themes = _fetch_us_etfs(US_THEMES, "US themes")
     us_sizes = _fetch_us_etfs(US_SIZES, "US sizes")
+
+    print("[6/8] Fetching US volume data (3y)...")
+    us_sector_vol = _fetch_us_dollar_volume(US_SECTORS, "US sectors")
+    us_theme_vol = _fetch_us_dollar_volume(US_THEMES, "US themes")
+    us_size_vol = _fetch_us_dollar_volume(US_SIZES, "US sizes")
 
     rev_map = _reverse_mapping()
 
@@ -487,26 +724,34 @@ def compute_all_scores():
         "us": {},
     }
 
-    print("[5/6] Computing KR RS scores...")
+    print("[7/8] Computing KR RS scores...")
     for period_name, period_days in PERIODS.items():
         rows = []
         for sector_name, series in kr_sectors.items():
             rs, s_ret, b_ret = compute_rs(series, kr_bench, period_days)
+            vc = compute_volume_change(
+                kr_sector_vol.get(sector_name, pd.Series(dtype=float)), period_days
+            )
             rows.append({
                 "sector": sector_name,
                 "rs": rs,
                 "sector_return": s_ret,
                 "benchmark_return": b_ret,
                 "mapped_us": SECTOR_MAPPING.get(sector_name),
+                "volume_change": vc,
             })
+        _add_zscores(rows)
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result["kr"][period_name] = rows
 
-    print("[6/6] Computing US RS scores...")
+    print("[8/8] Computing US RS scores...")
     for period_name, period_days in PERIODS.items():
         rows = []
         for ticker, series in us_sectors.items():
             rs, s_ret, b_ret = compute_rs(series, us_bench, period_days)
+            vc = compute_volume_change(
+                us_sector_vol.get(ticker, pd.Series(dtype=float)), period_days
+            )
             rows.append({
                 "ticker": ticker,
                 "name": US_SECTORS.get(ticker, ""),
@@ -514,16 +759,18 @@ def compute_all_scores():
                 "sector_return": s_ret,
                 "benchmark_return": b_ret,
                 "mapped_kr": rev_map.get(ticker, []),
+                "volume_change": vc,
             })
+        _add_zscores(rows)
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result["us"][period_name] = rows
 
     result["kr"]["series"] = _build_series(kr_sectors, kr_bench)
     result["us"]["series"] = _build_series(us_sectors, us_bench)
-    result["kr"]["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING)
-    result["kr"]["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING)
-    result["us"]["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING)
-    result["us"]["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING)
+    result["kr"]["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING, kr_theme_vol)
+    result["kr"]["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING, kr_size_vol)
+    result["us"]["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING, us_theme_vol)
+    result["us"]["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING, us_size_vol)
 
     return result
 
@@ -555,23 +802,32 @@ def main(argv):
         print("[KR only] Fetching KR themes + sizes...")
         kr_themes = _fetch_kr_group_series(KR_THEMES, "KR theme")
         kr_sizes = _fetch_kr_group_series(KR_SIZES, "KR size")
+        print("[KR only] Fetching KR volume data (2y)...")
+        kr_sector_vol = _fetch_kr_sector_volume()
+        kr_theme_vol = _fetch_kr_group_volume(KR_THEMES, "KR theme vol")
+        kr_size_vol = _fetch_kr_group_volume(KR_SIZES, "KR size vol")
         kr_result = {}
         for period_name, period_days in PERIODS.items():
             rows = []
             for sector_name, series in kr_sectors.items():
                 rs, s_ret, b_ret = compute_rs(series, kr_bench, period_days)
+                vc = compute_volume_change(
+                    kr_sector_vol.get(sector_name, pd.Series(dtype=float)), period_days
+                )
                 rows.append({
                     "sector": sector_name,
                     "rs": rs,
                     "sector_return": s_ret,
                     "benchmark_return": b_ret,
                     "mapped_us": SECTOR_MAPPING.get(sector_name),
+                    "volume_change": vc,
                 })
+            _add_zscores(rows)
             rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
             kr_result[period_name] = rows
         kr_result["series"] = _build_series(kr_sectors, kr_bench)
-        kr_result["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING)
-        kr_result["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING)
+        kr_result["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING, kr_theme_vol)
+        kr_result["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING, kr_size_vol)
         data = {
             "last_updated": datetime.now().isoformat(timespec="seconds"),
             "kr": kr_result,
@@ -584,12 +840,19 @@ def main(argv):
         print("[US only] Fetching US themes + sizes...")
         us_themes = _fetch_us_etfs(US_THEMES, "US themes")
         us_sizes = _fetch_us_etfs(US_SIZES, "US sizes")
+        print("[US only] Fetching US volume data (3y)...")
+        us_sector_vol = _fetch_us_dollar_volume(US_SECTORS, "US sectors")
+        us_theme_vol = _fetch_us_dollar_volume(US_THEMES, "US themes")
+        us_size_vol = _fetch_us_dollar_volume(US_SIZES, "US sizes")
         rev_map = _reverse_mapping()
         us_result = {}
         for period_name, period_days in PERIODS.items():
             rows = []
             for ticker, series in us_sectors.items():
                 rs, s_ret, b_ret = compute_rs(series, us_bench, period_days)
+                vc = compute_volume_change(
+                    us_sector_vol.get(ticker, pd.Series(dtype=float)), period_days
+                )
                 rows.append({
                     "ticker": ticker,
                     "name": US_SECTORS.get(ticker, ""),
@@ -597,12 +860,14 @@ def main(argv):
                     "sector_return": s_ret,
                     "benchmark_return": b_ret,
                     "mapped_kr": rev_map.get(ticker, []),
+                    "volume_change": vc,
                 })
+            _add_zscores(rows)
             rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
             us_result[period_name] = rows
         us_result["series"] = _build_series(us_sectors, us_bench)
-        us_result["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING)
-        us_result["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING)
+        us_result["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING, us_theme_vol)
+        us_result["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING, us_size_vol)
         data = {
             "last_updated": datetime.now().isoformat(timespec="seconds"),
             "kr": existing.get("kr", {}),
