@@ -368,6 +368,9 @@
             transition: background-color 0.15s;
         }
         .sector-table tr:hover { background-color: rgba(88, 166, 255, 0.06); }
+        .sector-table tr.chart-active { background-color: rgba(88, 166, 255, 0.10); }
+        .chart-row td { padding: 0 !important; border-bottom: 1px solid #21262d; }
+        .chart-container { position: relative; height: 260px; padding: 8px 12px 4px; }
         .rs-positive { color: #f85149; }
         .rs-negative { color: #58a6ff; }
         .sync-ok { color: #3fb950; font-size: 12px; }
@@ -1424,6 +1427,45 @@
     // 주도섹터
     let leadersData = null;
     let currentPeriod = '3m';
+    let activeChartRow = null;
+    let activeChartInstance = null;
+    const PERIOD_DAYS = {'1w':5, '1m':21, '3m':63, '6m':126, '1y':252};
+
+    function normalizeBase100(values) {
+        const first = values.find(v => v !== null && v !== undefined && !isNaN(v));
+        if (!first) return values;
+        return values.map(v => (v === null || v === undefined || isNaN(v)) ? null : (v / first) * 100);
+    }
+
+    function renderSeriesChart(canvas, krLabel, krVals, usLabel, usVals, dates) {
+        if (activeChartInstance) { activeChartInstance.destroy(); activeChartInstance = null; }
+        const n = Math.min(krVals.length, usVals.length, dates.length);
+        const periodN = Math.min(PERIOD_DAYS[currentPeriod] || 63, n);
+        const krSlice = normalizeBase100(krVals.slice(-periodN));
+        const usSlice = normalizeBase100(usVals.slice(-periodN));
+        const dateSlice = dates.slice(-periodN);
+        activeChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: dateSlice,
+                datasets: [
+                    { label: krLabel, data: krSlice, borderColor: '#f85149', borderWidth: 2, tension: 0.1, pointRadius: 0 },
+                    { label: usLabel, data: usSlice, borderColor: '#8b949e', borderWidth: 2, tension: 0.1, pointRadius: 0, borderDash: [5, 3] }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#c9d1d9', font: { size: 11 } } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { ticks: { color: '#484f58', maxTicksLimit: 6, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                    y: { ticks: { color: '#484f58', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } }
+                }
+            }
+        });
+    }
 
     async function loadLeadersData() {
         try {
@@ -1451,11 +1493,11 @@
         renderMappedTable('theme-table',
             (leadersData.kr.themes || {})[currentPeriod],
             (leadersData.us.themes || {})[currentPeriod],
-            leadersData.us.themes);
+            leadersData.us.themes, 'themes');
         renderMappedTable('size-table',
             (leadersData.kr.sizes || {})[currentPeriod],
             (leadersData.us.sizes || {})[currentPeriod],
-            leadersData.us.sizes);
+            leadersData.us.sizes, 'sizes');
     }
 
     function findMappedRs(region, row) {
@@ -1486,13 +1528,124 @@
         return `<span class="${cls}">${sign}${v.toFixed(1)}%</span>`;
     }
 
+    function closeSectorChart() {
+        if (activeChartInstance) { activeChartInstance.destroy(); activeChartInstance = null; }
+        if (activeChartRow) { activeChartRow.remove(); activeChartRow = null; }
+        document.querySelectorAll('.sector-table tr.chart-active').forEach(el => el.classList.remove('chart-active'));
+    }
+
+    function toggleSectorChart(region, sectorKey, mappedKey, trElement) {
+        const wasKey = activeChartRow ? activeChartRow.dataset.chartKey : null;
+        closeSectorChart();
+        if (wasKey === region + ':' + sectorKey) return;
+
+        const series = (leadersData[region] || {}).series || {};
+        const myData = series[sectorKey];
+        if (!myData || !myData.values) return;
+
+        const otherRegion = region === 'kr' ? 'us' : 'kr';
+        const otherSeries = (leadersData[otherRegion] || {}).series || {};
+        const otherData = mappedKey ? otherSeries[mappedKey] : null;
+
+        const myDates = (myData.dates && myData.dates.length > 0)
+            ? myData.dates
+            : ((series._benchmark || {}).dates || []);
+
+        const chartTr = document.createElement('tr');
+        chartTr.className = 'chart-row';
+        chartTr.dataset.chartKey = region + ':' + sectorKey;
+        const chartTd = document.createElement('td');
+        chartTd.colSpan = 4;
+        const container = document.createElement('div');
+        container.className = 'chart-container';
+        const canvas = document.createElement('canvas');
+        container.appendChild(canvas);
+        chartTd.appendChild(container);
+        chartTr.appendChild(chartTd);
+        trElement.after(chartTr);
+        trElement.classList.add('chart-active');
+        activeChartRow = chartTr;
+
+        const myLabel = region === 'kr' ? sectorKey : (US_SECTORS_KR[sectorKey] || sectorKey);
+        const otherLabel = otherData
+            ? (region === 'kr' ? (US_SECTORS_KR[mappedKey] || mappedKey) : mappedKey)
+            : null;
+
+        const myVals = myData.values;
+
+        const otherDates = otherData
+            ? ((otherData.dates && otherData.dates.length > 0)
+                ? otherData.dates
+                : ((otherSeries._benchmark || {}).dates || []))
+            : [];
+        const otherVals = otherData ? otherData.values : [];
+
+        if (otherData && otherVals.length > 0) {
+            renderSeriesChart(canvas,
+                region === 'kr' ? myLabel : otherLabel,
+                region === 'kr' ? myVals : otherVals,
+                region === 'us' ? myLabel : otherLabel,
+                region === 'us' ? myVals : otherVals,
+                myDates);
+        } else {
+            renderSeriesChart(canvas, myLabel, myVals, '', myVals, myDates);
+        }
+    }
+
+    function toggleMappedChart(groupKey, krName, usTicker, trElement) {
+        const chartKey = groupKey + ':' + krName;
+        const wasKey = activeChartRow ? activeChartRow.dataset.chartKey : null;
+        closeSectorChart();
+        if (wasKey === chartKey) return;
+
+        const krGroup = (leadersData.kr[groupKey] || {}).series || {};
+        const usGroup = (leadersData.us[groupKey] || {}).series || {};
+        const krData = krGroup[krName];
+        if (!krData || !krData.values) return;
+
+        const usData = usTicker ? usGroup[usTicker] : null;
+        const dates = (krGroup._benchmark || {}).dates || [];
+
+        const chartTr = document.createElement('tr');
+        chartTr.className = 'chart-row';
+        chartTr.dataset.chartKey = chartKey;
+        const chartTd = document.createElement('td');
+        chartTd.colSpan = 8;
+        const container = document.createElement('div');
+        container.className = 'chart-container';
+        const canvas = document.createElement('canvas');
+        container.appendChild(canvas);
+        chartTd.appendChild(container);
+        chartTr.appendChild(chartTd);
+        trElement.after(chartTr);
+        trElement.classList.add('chart-active');
+        activeChartRow = chartTr;
+
+        const krVals = krData.values;
+        const usVals = usData ? usData.values : [];
+
+        if (usData && usVals.length > 0) {
+            renderSeriesChart(canvas, krName, krVals, usTicker, usVals, dates);
+        } else {
+            renderSeriesChart(canvas, krName, krVals, '', krVals, dates);
+        }
+    }
+
+    const US_SECTORS_KR = {
+        XLK:'기술', XLF:'금융', XLV:'헬스케어', XLE:'에너지', XLY:'임의소비재',
+        XLP:'필수소비재', XLI:'산업재', XLB:'소재', XLU:'유틸리티', XLRE:'부동산', XLC:'통신서비스'
+    };
+
     function renderSectorTable(region) {
+        closeSectorChart();
         const rows = (leadersData[region] || {})[currentPeriod] || [];
         const tbody = document.getElementById('sector-tbody-' + region);
         let html = '';
         for (const row of rows) {
             const name = region === 'kr' ? row.sector : `${row.name}`;
             const ticker = region === 'us' ? `<span class="mapped-info">${row.ticker}</span>` : '';
+            const sectorKey = region === 'kr' ? row.sector : row.ticker;
+            const mappedKey = region === 'kr' ? (row.mapped_us || '') : ((row.mapped_kr || [])[0] || '');
 
             const mapped = findMappedRs(region, row);
             let mappedStr = '';
@@ -1504,7 +1657,7 @@
                 mappedStr = '<span class="sync-none">—</span>';
             }
 
-            html += `<tr onclick="console.log('sector click', '${region}', '${name}')">
+            html += `<tr data-region="${region}" data-key="${sectorKey}" data-mapped="${mappedKey}">
                 <td>${name}${ticker}</td>
                 <td>${formatPct(row.sector_return)}</td>
                 <td>${formatPct(row.rs)}</td>
@@ -1512,12 +1665,18 @@
             </tr>`;
         }
         tbody.innerHTML = html;
+        tbody.querySelectorAll('tr').forEach(tr => {
+            tr.addEventListener('click', function() {
+                toggleSectorChart(this.dataset.region, this.dataset.key, this.dataset.mapped, this);
+            });
+        });
     }
 
-    function renderMappedTable(containerId, krItems, usItems, usNames) {
+    function renderMappedTable(containerId, krItems, usItems, usNames, groupKey) {
+        closeSectorChart();
         const container = document.getElementById(containerId);
         if (!krItems || !usItems) { container.innerHTML = ''; return; }
-        let html = '<table><colgroup>';
+        let html = '<table class="sector-table"><colgroup>';
         html += '<col style="width:20%"><col class="col-return" style="width:10%"><col style="width:10%">';
         html += '<col class="arrow-col" style="width:4%">';
         html += '<col style="width:22%"><col class="col-return" style="width:10%"><col style="width:10%">';
@@ -1535,7 +1694,7 @@
             const usReturn = us ? formatPct(us.sector_return) : '<span class="sync-none">—</span>';
             const usRs = us ? formatPct(us.rs) : '<span class="sync-none">—</span>';
             const sync = us ? syncMarker(kr.rs, us.rs) : '<span class="sync-none">—</span>';
-            html += `<tr>
+            html += `<tr data-group="${groupKey}" data-kr="${kr.sector}" data-us="${usTicker || ''}">
                 <td>${kr.sector}</td>
                 <td class="col-return">${formatPct(kr.sector_return)}</td>
                 <td class="col-rs">${formatPct(kr.rs)}</td>
@@ -1548,6 +1707,11 @@
         }
         html += '</tbody></table>';
         container.innerHTML = html;
+        container.querySelectorAll('tbody tr').forEach(tr => {
+            tr.addEventListener('click', function() {
+                toggleMappedChart(this.dataset.group, this.dataset.kr, this.dataset.us, this);
+            });
+        });
     }
 
     function changePeriod(period) {
@@ -1560,11 +1724,11 @@
         renderMappedTable('theme-table',
             (leadersData.kr.themes || {})[currentPeriod],
             (leadersData.us.themes || {})[currentPeriod],
-            leadersData.us.themes);
+            leadersData.us.themes, 'themes');
         renderMappedTable('size-table',
             (leadersData.kr.sizes || {})[currentPeriod],
             (leadersData.us.sizes || {})[currentPeriod],
-            leadersData.us.sizes);
+            leadersData.us.sizes, 'sizes');
     }
 
     // 그룹 관리 (서버 저장)
