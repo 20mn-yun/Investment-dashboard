@@ -925,9 +925,50 @@ def compute_stock_leaders():
     return result
 
 
+CONSENSUS_DIR = Path("cache/consensus_snapshots")
+
+
+def snapshot_consensus_today():
+    from datetime import datetime
+
+    CONSENSUS_DIR.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().strftime("%Y-%m-%d")
+    out_path = CONSENSUS_DIR / f"{today}.json"
+
+    print(f"[consensus] Snapshotting {today}...")
+    mapping = load_stock_sector_mapping()
+    codes = list(mapping.keys())
+    print(f"  {len(codes)} stocks")
+
+    t0 = time.time()
+    raw = _fetch_all_estimates(codes)
+    print(f"  {len(raw)} estimates in {time.time()-t0:.1f}s")
+
+    consensus = {}
+    for code, est in raw.items():
+        consensus[code] = {
+            "periods": est.get("periods", []),
+            "eps": est.get("eps", []),
+            "eps_growth": est.get("eps_growth", []),
+        }
+
+    result = {
+        "snapshot_date": today,
+        "snapshot_time": datetime.now().isoformat(timespec="seconds"),
+        "consensus": consensus,
+    }
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"  Saved to {out_path} ({len(consensus)} stocks)")
+    return result
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "stocks":
         compute_stock_leaders()
+    elif len(sys.argv) > 1 and sys.argv[1] == "snapshot-consensus":
+        snapshot_consensus_today()
     else:
         mapping = load_stock_sector_mapping()
         total = len(mapping)
