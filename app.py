@@ -667,6 +667,17 @@ def get_sector_leaders():
     return jsonify(cached)
 
 
+@app.route("/api/stock-leaders", methods=["GET"])
+def get_stock_leaders():
+    cache_path = os.path.join(_CACHE_DIR, "stock_leaders.json")
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"error": "아직 배치가 실행되지 않았습니다"}), 503
+    return jsonify(cached)
+
+
 @app.route("/api/sector-leaders/<region>", methods=["GET"])
 def get_sector_leaders_by_region(region):
     if region not in ("kr", "us"):

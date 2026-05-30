@@ -343,7 +343,10 @@ def _load_kospi_benchmark():
         return [], []
     with open(sl_path, "r", encoding="utf-8") as f:
         sl = json.load(f)
-    bench = sl.get("kr", {}).get("series", {}).get("_benchmark", {})
+    kr = sl.get("kr", {})
+    bench = kr.get("series", {}).get("_benchmark", {})
+    if not bench.get("values"):
+        bench = kr.get("themes", {}).get("series", {}).get("_benchmark", {})
     return bench.get("dates", []), bench.get("values", [])
 
 
@@ -421,6 +424,20 @@ def compute_wics_rs():
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         _apply_wics_zscores(rows)
         result["kr_wics"][period_name] = rows
+
+    wics_series = {"_benchmark": {"dates": kospi_dates, "values": kospi_vals}}
+    for mid_cd in WICS_MID_NAMES:
+        sec = series.get(mid_cd, {})
+        sec_dates = sec.get("dates", [])
+        sec_vals = sec.get("values", [])
+        common, aligned_sec, aligned_kospi = _align_to_kospi(
+            sec_dates, sec_vals, kospi_dates, kospi_vals
+        )
+        wics_series[mid_cd] = {"values": aligned_sec}
+    wics_series["_benchmark"]["dates"] = (
+        wics_series["_benchmark"]["dates"]
+    )
+    result["series"] = wics_series
 
     WICS_CACHE_SERIES_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(WICS_CACHE_SERIES_PATH, "w", encoding="utf-8") as f:
@@ -598,12 +615,324 @@ def load_stock_sector_mapping():
     return result
 
 
-if __name__ == "__main__":
-    mapping = load_stock_sector_mapping()
-    total = len(mapping)
-    mapped = sum(1 for v in mapping.values() if v["sector_name"] != "미분류")
-    print(f"Total: {total}, Mapped: {mapped} ({mapped / total * 100:.1f}%)")
+STOCK_LEADERS_PATH = Path("cache/stock_leaders.json")
+STOCK_PERIODS = {"1w": 5, "1m": 21, "3m": 63, "6m": 126, "1y": 252}
 
-    sectors = Counter(v["sector_name"] for v in mapping.values())
-    for s, c in sectors.most_common():
-        print(f"  {s}: {c}")
+
+def _fetch_stock_kis(stock_code, total_trading_days=504):
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    token = get_access_token()
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": "FHKST03010100",
+    }
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(total_trading_days * 1.6))
+
+    all_dates, all_closes, all_dvols = [], [], []
+    cur_end = end_date
+
+    for _ in range(14):
+        if cur_end < start_date:
+            break
+        params = {
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": stock_code,
+            "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+            "FID_INPUT_DATE_2": cur_end.strftime("%Y%m%d"),
+            "FID_PERIOD_DIV_CODE": "D",
+            "FID_ORG_ADJ_PRC": "0",
+        }
+        resp = requests.get(
+            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+            headers=headers, params=params,
+        )
+        body = resp.json()
+        if body.get("rt_cd") != "0":
+            break
+        records = body.get("output2") or []
+        if not records:
+            break
+        for rec in records:
+            dt_str = rec.get("stck_bsop_date", "")
+            close_str = rec.get("stck_clpr", "")
+            dvol_str = rec.get("acml_tr_pbmn", "")
+            if dt_str and close_str:
+                all_dates.append(pd.Timestamp(dt_str))
+                all_closes.append(float(close_str))
+                all_dvols.append(float(dvol_str) if dvol_str else 0.0)
+        if len(records) < 50:
+            break
+        earliest = min(pd.Timestamp(r["stck_bsop_date"]) for r in records)
+        cur_end = earliest - timedelta(days=1)
+        time.sleep(0.05)
+
+    if not all_dates:
+        return pd.Series(dtype=float), pd.Series(dtype=float)
+
+    idx = pd.DatetimeIndex(all_dates)
+    close_s = pd.Series(all_closes, index=idx)
+    close_s = close_s[~close_s.index.duplicated(keep="first")].sort_index()
+    dvol_s = pd.Series(all_dvols, index=idx)
+    dvol_s = dvol_s[~dvol_s.index.duplicated(keep="first")].sort_index()
+    return close_s, dvol_s
+
+
+def _fetch_all_stock_prices(codes):
+    import pandas as pd
+    closes = {}
+    dvols = {}
+    total = len(codes)
+    for i, code in enumerate(codes):
+        try:
+            c, d = _fetch_stock_kis(code, total_trading_days=504)
+            if len(c) > 20:
+                closes[code] = c
+            if len(d) > 20:
+                dvols[code] = d
+        except Exception:
+            pass
+        if (i + 1) % 100 == 0:
+            print(f"    [{i+1}/{total}] fetched...")
+        time.sleep(0.05)
+    return closes, dvols
+
+
+def _stock_period_return(prices, period_days):
+    if len(prices) < period_days + 1:
+        return None
+    end_p = float(prices.iloc[-1])
+    start_p = float(prices.iloc[-(period_days + 1)])
+    if abs(start_p) < 1e-9:
+        return None
+    return round((end_p / start_p - 1) * 100, 2)
+
+
+def _stock_volume_change(dvol, period_days):
+    if len(dvol) < 2 * period_days:
+        return None
+    recent = dvol.iloc[-period_days:]
+    previous = dvol.iloc[-2 * period_days:-period_days]
+    prev_avg = previous.mean()
+    if prev_avg == 0:
+        return None
+    return round((recent.mean() / prev_avg - 1) * 100, 2)
+
+
+def _load_wics_sector_returns():
+    if not WICS_CACHE_SERIES_PATH.exists():
+        return {}
+    with open(WICS_CACHE_SERIES_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    result = {}
+    for period_name in STOCK_PERIODS:
+        period_rows = data.get("kr_wics", {}).get(period_name, [])
+        for row in period_rows:
+            result[(period_name, row["code"])] = row.get("sector_return")
+    return result
+
+
+def _load_kospi_returns():
+    dates, values = _load_kospi_benchmark()
+    if not values:
+        return {}
+    import pandas as pd
+    bench = pd.Series(values, index=pd.DatetimeIndex(dates)).sort_index()
+    result = {}
+    for period_name, period_days in STOCK_PERIODS.items():
+        ret = _stock_period_return(bench, period_days)
+        result[period_name] = ret
+    return result
+
+
+def _fetch_all_estimates(codes):
+    from kis_api import get_estimate_perform
+    results = {}
+    for i, code in enumerate(codes):
+        try:
+            data = get_estimate_perform(code)
+            if data.get("periods"):
+                results[code] = data
+        except Exception:
+            pass
+        if (i + 1) % 100 == 0:
+            print(f"    [{i+1}/{len(codes)}] estimates fetched...")
+        time.sleep(0.05)
+    return results
+
+
+def _parse_earnings(est):
+    if not est:
+        return None, None
+    periods = est.get("periods", [])
+    eps = est.get("eps", [])
+    if not periods or not eps or len(periods) != len(eps):
+        return None, None
+
+    actual_idx = [i for i, p in enumerate(periods) if not p.endswith("E")]
+    est_idx = [i for i, p in enumerate(periods) if p.endswith("E")]
+
+    yoy = None
+    if len(actual_idx) >= 2:
+        prev_eps = eps[actual_idx[-2]]
+        curr_eps = eps[actual_idx[-1]]
+        if prev_eps is not None and prev_eps > 0:
+            yoy = round((curr_eps / prev_eps - 1) * 100, 2)
+
+    fwd = None
+    if actual_idx and est_idx:
+        base_eps = eps[actual_idx[-1]]
+        fwd_eps = eps[est_idx[0]]
+        if base_eps is not None and base_eps > 0:
+            fwd = round((fwd_eps / base_eps - 1) * 100, 2)
+
+    return yoy, fwd
+
+
+def compute_stock_leaders():
+    import pandas as pd
+
+    print("[1/5] Loading stock-sector mapping...")
+    mapping = load_stock_sector_mapping()
+    print(f"  {len(mapping)} stocks mapped")
+
+    print("[2/5] Fetching stock prices + volumes (KIS API 2y)...")
+    t0 = time.time()
+    all_codes = list(mapping.keys())
+    closes, dvols = _fetch_all_stock_prices(all_codes)
+    print(f"  {len(closes)} closes, {len(dvols)} dvols in {time.time()-t0:.1f}s")
+
+    print("[3/5] Fetching earnings estimates (KIS API)...")
+    t1 = time.time()
+    estimates = _fetch_all_estimates(all_codes)
+    print(f"  {len(estimates)} estimates in {time.time()-t1:.1f}s")
+
+    earnings = {}
+    for code in all_codes:
+        yoy, fwd = _parse_earnings(estimates.get(code))
+        earnings[code] = {"yoy": yoy, "fwd": fwd}
+
+    print("[4/5] Loading benchmarks...")
+    kospi_returns = _load_kospi_returns()
+    sector_returns = _load_wics_sector_returns()
+    print(f"  KOSPI returns: {len(kospi_returns)}, WICS sector-period returns: {len(sector_returns)}")
+
+    yoy_vals = [earnings.get(c, {}).get("yoy") for c in all_codes]
+    fwd_vals = [earnings.get(c, {}).get("fwd") for c in all_codes]
+    yoy_zs = winsorized_zscores(yoy_vals)
+    fwd_zs = winsorized_zscores(fwd_vals)
+    Z_CAP = 5.0
+    for i, code in enumerate(all_codes):
+        y_z = max(-Z_CAP, min(Z_CAP, yoy_zs[i])) if yoy_zs[i] is not None else None
+        f_z = max(-Z_CAP, min(Z_CAP, fwd_zs[i])) if fwd_zs[i] is not None else None
+        if y_z is not None and f_z is not None:
+            e_z = round((y_z + f_z) / 2, 4)
+        elif y_z is not None:
+            e_z = y_z
+        elif f_z is not None:
+            e_z = f_z
+        else:
+            e_z = None
+        earnings[code]["yoy_z"] = y_z
+        earnings[code]["fwd_z"] = f_z
+        earnings[code]["earnings_z"] = e_z
+
+    print("[5/5] Computing 5-period RS + volume change...")
+    result = {"last_updated": time.strftime("%Y-%m-%dT%H:%M:%S"), "kr_stocks": {}}
+
+    with open(TOP600_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    tickers_info = data.get("tickers", []) if isinstance(data, dict) else data
+    ticker_meta = {}
+    for t in tickers_info:
+        ticker_meta[t["code"]] = {"name": t["name"], "market": t.get("market_sub", "")}
+
+    for period_name, period_days in STOCK_PERIODS.items():
+        rows = []
+        kospi_ret = kospi_returns.get(period_name)
+
+        for code, meta in ticker_meta.items():
+            m = mapping.get(code, {})
+            wics_cd = m.get("wics_mcls_cd")
+            wics_nm = m.get("wics_mcls_nm")
+            lcls_nm = m.get("wics_lcls_nm")
+            themes = m.get("themes", [])
+
+            stock_ret = None
+            rs_market = None
+            rs_sector = None
+            vc = None
+
+            if code in closes:
+                stock_ret = _stock_period_return(closes[code], period_days)
+
+            if stock_ret is not None and kospi_ret is not None:
+                rs_market = round(stock_ret - kospi_ret, 2)
+
+            if stock_ret is not None and wics_cd:
+                sec_ret = sector_returns.get((period_name, wics_cd))
+                if sec_ret is not None:
+                    rs_sector = round(stock_ret - sec_ret, 2)
+
+            if code in dvols:
+                vc = _stock_volume_change(dvols[code], period_days)
+
+            e = earnings.get(code, {})
+            rows.append({
+                "ticker": code,
+                "name": meta["name"],
+                "market": meta["market"],
+                "wics_mcls_cd": wics_cd,
+                "wics_mcls_nm": wics_nm,
+                "wics_lcls_nm": lcls_nm,
+                "themes": themes,
+                "stock_return": stock_ret,
+                "rs_market": rs_market,
+                "rs_sector": rs_sector,
+                "volume_change": vc,
+                "yoy_eps_growth": e.get("yoy"),
+                "fwd_eps_growth": e.get("fwd"),
+                "yoy_eps_z": e.get("yoy_z"),
+                "fwd_eps_z": e.get("fwd_z"),
+                "earnings_z": e.get("earnings_z"),
+            })
+
+        rs_m_vals = [r["rs_market"] for r in rows]
+        rs_s_vals = [r["rs_sector"] for r in rows]
+        vc_vals = [r["volume_change"] for r in rows]
+        rs_m_zs = winsorized_zscores(rs_m_vals)
+        rs_s_zs = winsorized_zscores(rs_s_vals)
+        vc_zs = winsorized_zscores(vc_vals)
+        Z_CAP = 5.0
+        for i, r in enumerate(rows):
+            r["rs_market_z"] = max(-Z_CAP, min(Z_CAP, rs_m_zs[i])) if rs_m_zs[i] is not None else None
+            r["rs_sector_z"] = max(-Z_CAP, min(Z_CAP, rs_s_zs[i])) if rs_s_zs[i] is not None else None
+            r["vc_z"] = max(-Z_CAP, min(Z_CAP, vc_zs[i])) if vc_zs[i] is not None else None
+
+        rows.sort(key=lambda x: (x["rs_market"] is None, -(x["rs_market"] or 0)))
+        result["kr_stocks"][period_name] = rows
+
+    STOCK_LEADERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(STOCK_LEADERS_PATH, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"  Saved to {STOCK_LEADERS_PATH}")
+    return result
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "stocks":
+        compute_stock_leaders()
+    else:
+        mapping = load_stock_sector_mapping()
+        total = len(mapping)
+        mapped = sum(1 for v in mapping.values() if v["sector_name"] != "미분류")
+        print(f"Total: {total}, Mapped: {mapped} ({mapped / total * 100:.1f}%)")
+        sectors = Counter(v["sector_name"] for v in mapping.values())
+        for s, c in sectors.most_common():
+            print(f"  {s}: {c}")

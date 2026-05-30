@@ -519,6 +519,37 @@
         th.sortable { cursor: pointer; user-select: none; }
         th.sortable:hover { color: #e6edf3; }
         th.sort-active { color: #58a6ff; }
+        .stk-slider-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+            max-width: 600px; margin: 0 auto 12px;
+        }
+        .stk-slider-col { text-align: center; }
+        .stk-slider-col label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 2px; }
+        .stk-slider-col input[type=range] {
+            width: 100%; height: 4px; -webkit-appearance: none; background: #30363d;
+            border-radius: 2px; outline: none;
+        }
+        .stk-slider-col input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+            background: #58a6ff; cursor: pointer;
+        }
+        .stk-slider-col .stk-val { font-size: 12px; color: #e6edf3; margin-top: 2px; }
+        .stk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .stk-table th { padding: 6px 8px; border-bottom: 1px solid #30363d; color: #8b949e; text-align: right; font-weight: 500; font-size: 11px; }
+        .stk-table th:first-child, .stk-table th:nth-child(2) { text-align: left; }
+        .stk-table td { padding: 5px 8px; border-bottom: 1px solid #21262d; text-align: right; white-space: nowrap; }
+        .stk-table td:first-child { text-align: left; font-weight: 500; color: #e6edf3; }
+        .stk-table td:nth-child(2) { text-align: left; color: #8b949e; font-size: 11px; }
+        .stk-table tbody tr:hover { background-color: rgba(88,166,255,0.06); }
+        .stk-market { font-size: 10px; color: #484f58; margin-left: 4px; }
+        .stk-earnings { font-size: 10px; color: #8b949e; }
+        .stk-score { font-weight: 600; }
+        .stk-filters { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .stk-filters select { background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 4px 8px; font-size: 12px; }
+        .stk-filter-count { font-size: 11px; color: #8b949e; margin-left: auto; }
+        .stk-table tbody tr { cursor: pointer; }
+        .drill-btn { background: none; border: 1px solid #30363d; color: #58a6ff; border-radius: 3px; padding: 1px 6px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+        .drill-btn:hover { background: #21262d; border-color: #58a6ff; }
 
         /* 그룹 카드 */
         .group-card {
@@ -1018,6 +1049,7 @@
 <div class="tabs">
     <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
     <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
+    <div class="tab" onclick="switchTab('stocks')">🔍 주도주</div>
     <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
     <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
     <div class="tab" onclick="switchTab('report')">📄 증권사 Report</div>
@@ -1245,6 +1277,48 @@
     </div>
 </div>
 
+<!-- 주도주 탭 -->
+<div class="tab-content" id="tab-stocks">
+    <div class="leaders-loading" id="stocks-loading">데이터를 불러오는 중...</div>
+    <div id="stocks-content" style="display:none;">
+        <div class="period-selector">
+            <span class="period-btn" onclick="changeStkPeriod('1w')">1W</span>
+            <span class="period-btn" onclick="changeStkPeriod('1m')">1M</span>
+            <span class="period-btn active" onclick="changeStkPeriod('3m')">3M</span>
+            <span class="period-btn" onclick="changeStkPeriod('6m')">6M</span>
+            <span class="period-btn" onclick="changeStkPeriod('1y')">1Y</span>
+            <span class="leaders-updated" id="stocks-updated"></span>
+        </div>
+        <div class="stk-slider-grid">
+            <div class="stk-slider-col">
+                <label>RS (상대강도)</label>
+                <input type="range" min="0" max="100" value="33" id="stk-w-rs">
+                <div class="stk-val" id="stk-w-rs-val">33%</div>
+            </div>
+            <div class="stk-slider-col">
+                <label>거래대금</label>
+                <input type="range" min="0" max="100" value="33" id="stk-w-vol">
+                <div class="stk-val" id="stk-w-vol-val">33%</div>
+            </div>
+            <div class="stk-slider-col">
+                <label>실적</label>
+                <input type="range" min="0" max="100" value="34" id="stk-w-earn">
+                <div class="stk-val" id="stk-w-earn-val">34%</div>
+            </div>
+        </div>
+        <div class="stk-filters">
+            <select id="stk-sector-filter" onchange="renderStockTable()">
+                <option value="">섹터: 전체</option>
+            </select>
+            <select id="stk-theme-filter" onchange="renderStockTable()">
+                <option value="">테마: 전체</option>
+            </select>
+            <span class="stk-filter-count" id="stk-filter-count"></span>
+        </div>
+        <div class="data-table" id="stock-table-container"></div>
+    </div>
+</div>
+
 <!-- 캘린더 탭 -->
 <div class="tab-content" id="tab-calendar">
     <div class="cal-nav">
@@ -1448,10 +1522,17 @@
     let dartLoaded = false;
     let reportLoaded = false;
     let leadersLoaded = false;
-    function switchTab(tabName) {
+    let stocksLoaded = false;
+    function switchTab(tabName, programmatic) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        event.target.classList.add('active');
+        if (!programmatic && typeof event !== 'undefined' && event && event.target) {
+            event.target.classList.add('active');
+        } else {
+            document.querySelectorAll('.tab').forEach(t => {
+                if (t.getAttribute('onclick') && t.getAttribute('onclick').includes("'" + tabName + "'")) t.classList.add('active');
+            });
+        }
         document.getElementById('tab-' + tabName).classList.add('active');
         if (tabName === 'calendar' && !calLoaded) {
             calLoaded = true;
@@ -1468,6 +1549,10 @@
         if (tabName === 'leaders' && !leadersLoaded) {
             leadersLoaded = true;
             loadLeadersData();
+        }
+        if (tabName === 'stocks' && !stocksLoaded) {
+            stocksLoaded = true;
+            loadStockLeaders();
         }
     }
 
@@ -1659,7 +1744,7 @@
         chartTr.className = 'chart-row';
         chartTr.dataset.chartKey = region + ':' + sectorKey;
         const chartTd = document.createElement('td');
-        chartTd.colSpan = 6;
+        chartTd.colSpan = region === 'kr' ? 7 : 6;
         const container = document.createElement('div');
         container.className = 'chart-container';
         const canvas = document.createElement('canvas');
@@ -1744,7 +1829,7 @@
         XLP:'필수소비재', XLI:'산업재', XLB:'소재', XLU:'유틸리티', XLRE:'부동산', XLC:'통신서비스'
     };
 
-    function sectorTheadHtml() {
+    function sectorTheadHtml(region) {
         const cols = [
             ['섹터', ''],
             ['수익률', 'sector_return'],
@@ -1753,11 +1838,13 @@
             ['점수', 'score'],
             ['매핑', ''],
         ];
-        return '<thead><tr>' + cols.map(([label, key]) => {
+        let h = '<thead><tr>' + cols.map(([label, key]) => {
             if (!key) return `<th>${label}</th>`;
             const cls = 'sortable' + (sortColumn === key ? ' sort-active' : '');
             return `<th class="${cls}" data-sort="${key}">${label}${sortArrow(key)}</th>`;
-        }).join('') + '</tr></thead>';
+        }).join('');
+        if (region === 'kr') h += '<th></th>';
+        return h + '</tr></thead>';
     }
 
     function renderSectorTable(region) {
@@ -1765,7 +1852,7 @@
         const source = region === 'kr' ? ((leadersData.kr || {}).wics_sectors || {}) : (leadersData[region] || {});
         const rows = sortItems(source[currentPeriod] || []);
         const container = document.getElementById('sector-container-' + region);
-        let html = '<table class="sector-table">' + sectorTheadHtml() + '<tbody>';
+        let html = '<table class="sector-table">' + sectorTheadHtml(region) + '<tbody>';
         for (const row of rows) {
             const name = row.name || row.sector || '';
             const ticker = region === 'us' ? `<span class="mapped-info">${row.ticker}</span>` : '';
@@ -1782,6 +1869,7 @@
                 mappedStr = '<span class="sync-none">—</span>';
             }
 
+            const drillTd = region === 'kr' ? `<td><button class="drill-btn" onclick="event.stopPropagation();drillToStocks('${name}')">종목▸</button></td>` : '';
             html += `<tr data-region="${region}" data-key="${sectorKey}" data-mapped="${mappedKey}" data-name="${name}">
                 <td>${name}${ticker}</td>
                 <td>${formatPct(row.sector_return)}</td>
@@ -1789,6 +1877,7 @@
                 <td>${formatPct(row.volume_change)}</td>
                 <td>${formatScore(row)}</td>
                 <td>${mappedStr}</td>
+                ${drillTd}
             </tr>`;
         }
         html += '</tbody></table>';
@@ -2377,6 +2466,192 @@
 
     // 30초마다 자동 새로고침
     setInterval(fetchAllData, 30000);
+
+    // ===== 주도주 =====
+    let stockData = null;
+    let stkPeriod = '3m';
+    let stkWRs = 33, stkWVol = 33, stkWEarn = 34;
+    let stkSortCol = 'score', stkSortDir = 'desc';
+
+    async function loadStockLeaders() {
+        try {
+            const res = await fetch(API_BASE + '/api/stock-leaders');
+            stockData = await res.json();
+            document.getElementById('stocks-loading').style.display = 'none';
+            document.getElementById('stocks-content').style.display = 'block';
+            const upd = stockData.last_updated || '';
+            if (upd) {
+                const d = new Date(upd);
+                const kst = new Date(d.getTime() + 9*60*60*1000);
+                document.getElementById('stocks-updated').textContent = kst.toISOString().slice(0,16).replace('T',' ') + ' KST';
+            }
+            ['stk-w-rs','stk-w-vol','stk-w-earn'].forEach(id => {
+                document.getElementById(id).addEventListener('input', function() {
+                    stkWRs = +document.getElementById('stk-w-rs').value;
+                    stkWVol = +document.getElementById('stk-w-vol').value;
+                    stkWEarn = +document.getElementById('stk-w-earn').value;
+                    document.getElementById('stk-w-rs-val').textContent = stkWRs + '%';
+                    document.getElementById('stk-w-vol-val').textContent = stkWVol + '%';
+                    document.getElementById('stk-w-earn-val').textContent = stkWEarn + '%';
+                    renderStockTable();
+                });
+            });
+            const allItems = Object.values(stockData.kr_stocks || {}).flat();
+            const sectors = [...new Set(allItems.map(it => it.wics_mcls_nm).filter(Boolean))].sort();
+            const themes = [...new Set(allItems.flatMap(it => it.themes || []))].sort();
+            const secSel = document.getElementById('stk-sector-filter');
+            sectors.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; secSel.appendChild(o); });
+            const themeSel = document.getElementById('stk-theme-filter');
+            themes.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; themeSel.appendChild(o); });
+            if (pendingDrillSector) {
+                secSel.value = pendingDrillSector;
+                pendingDrillSector = null;
+            }
+            renderStockTable();
+        } catch (e) {
+            console.error('Stock leaders fetch failed:', e);
+            document.getElementById('stocks-loading').textContent = '데이터 로드 실패';
+        }
+    }
+
+    function changeStkPeriod(p) {
+        stkPeriod = p;
+        document.querySelectorAll('#tab-stocks .period-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        renderStockTable();
+    }
+
+    let pendingDrillSector = null;
+
+    function drillToStocks(wicsName) {
+        if (stocksLoaded && stockData) {
+            document.getElementById('stk-sector-filter').value = wicsName;
+            document.getElementById('stk-theme-filter').value = '';
+            switchTab('stocks', true);
+            renderStockTable();
+        } else {
+            pendingDrillSector = wicsName;
+            switchTab('stocks', true);
+            if (!stocksLoaded) {
+                stocksLoaded = true;
+                loadStockLeaders();
+            }
+        }
+    }
+
+    function stkScore(it) {
+        const rm = it.rs_market_z, vc = it.vc_z, ez = it.earnings_z;
+        if (rm == null && vc == null) return null;
+        const wTotal = stkWRs + stkWVol + stkWEarn;
+        if (wTotal === 0) return 5;
+        let raw;
+        if (ez != null) {
+            raw = ((rm || 0) * stkWRs + (vc || 0) * stkWVol + ez * stkWEarn) / wTotal;
+        } else {
+            const w2 = stkWRs + stkWVol;
+            raw = w2 === 0 ? 0 : ((rm || 0) * stkWRs + (vc || 0) * stkWVol) / w2;
+        }
+        return Math.max(0, Math.min(10, raw + 5));
+    }
+
+    function stkFmtPct(v) {
+        if (v == null || isNaN(v)) return '<span class="sync-none">—</span>';
+        const cls = v >= 0 ? 'rs-positive' : 'rs-negative';
+        const sign = v >= 0 ? '+' : '';
+        return `<span class="${cls}">${sign}${v.toFixed(1)}%</span>`;
+    }
+
+    function renderStockTable() {
+        if (!stockData) return;
+        const allItems = (stockData.kr_stocks || {})[stkPeriod] || [];
+        const secFilter = document.getElementById('stk-sector-filter').value;
+        const themeFilter = document.getElementById('stk-theme-filter').value;
+        const filtered = allItems.filter(it => {
+            if (secFilter && it.wics_mcls_nm !== secFilter) return false;
+            if (themeFilter && !(it.themes || []).includes(themeFilter)) return false;
+            return true;
+        });
+        document.getElementById('stk-filter-count').textContent =
+            (secFilter || themeFilter) ? `${filtered.length} / ${allItems.length} 종목` : `${allItems.length} 종목`;
+
+        const scored = filtered.map(it => ({ ...it, _score: stkScore(it) }));
+
+        const stkSortFn = (a, b) => {
+            const va = stkSortCol === 'score' ? a._score : a[stkSortCol];
+            const vb = stkSortCol === 'score' ? b._score : b[stkSortCol];
+            if (va == null && vb == null) return 0;
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            return stkSortDir === 'desc' ? vb - va : va - vb;
+        };
+        scored.sort(stkSortFn);
+
+        const cols = [
+            ['종목', '', ''],
+            ['섹터', '', ''],
+            ['수익률', 'stock_return', '선택 기간 동안의 절대 수익률'],
+            ['초과수익(시장)', 'rs_market', '= 종목 수익률 − KOSPI 종합지수 수익률. 양수면 시장보다 강함'],
+            ['초과수익(섹터)', 'rs_sector', '= 종목 수익률 − 소속 WICS 중분류 지수 수익률. 양수면 섹터 내 더 강함'],
+            ['거래대금 증가율', 'volume_change', '= 최근 N일 평균 거래대금 / 직전 N일 평균 − 1. N: 1W=5, 1M=21, 3M=63, 6M=126, 1Y=252'],
+            ['EPS 증가(YoY/Fwd)', '', 'YoY = 최신연도/전년 EPS − 1. Fwd = 다음연도 추정/최신연도 EPS − 1. KIS 컨센서스 기준. —는 미커버 또는 적자'],
+            ['평가점수', 'score', '초과수익·거래대금·EPS의 z-score 가중평균. 10점 만점 (5=평균, 10=최고, 0=최악). 실적 미커버 종목은 초과수익+거래대금으로 재분배'],
+        ];
+
+        let html = '<table class="stk-table"><thead><tr>';
+        for (const [label, key, tip] of cols) {
+            const tipAttr = tip ? ` title="${tip}"` : '';
+            const tipIcon = tip ? ' <span style="opacity:0.4;font-size:10px">ⓘ</span>' : '';
+            if (!key) { html += `<th${tipAttr}>${label}${tipIcon}</th>`; continue; }
+            const active = stkSortCol === key ? ' sort-active' : '';
+            const arrow = stkSortCol === key ? (stkSortDir === 'desc' ? ' ▼' : ' ▲') : '';
+            html += `<th class="sortable${active}" data-stk-sort="${key}"${tipAttr}>${label}${tipIcon}${arrow}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+
+        for (const it of scored) {
+            const yoy = it.yoy_eps_growth, fwd = it.fwd_eps_growth;
+            let earnStr;
+            if (yoy != null || fwd != null) {
+                const yStr = yoy != null ? (yoy >= 0 ? '+' : '') + yoy.toFixed(0) : '—';
+                const fStr = fwd != null ? (fwd >= 0 ? '+' : '') + fwd.toFixed(0) : '—';
+                earnStr = `<span class="stk-earnings">${yStr} / ${fStr}</span>`;
+            } else {
+                earnStr = '<span class="sync-none">—</span>';
+            }
+
+            const sc = it._score;
+            const scCls = sc != null ? (sc >= 7 ? 'rs-positive' : sc <= 3 ? 'rs-negative' : '') : '';
+            const scStr = sc != null
+                ? `<span class="stk-score ${scCls}">${sc.toFixed(1)}</span>`
+                : '<span class="sync-none">—</span>';
+
+            const suffix = it.market === 'KOSDAQ' ? '.KQ' : '.KS';
+            const sym = it.ticker + suffix;
+            const retPct = it.stock_return != null ? it.stock_return : 0;
+            html += `<tr onclick="openChart('${sym}','${it.name}',${retPct})">
+                <td>${it.name}<span class="stk-market">${it.market === 'KOSDAQ' ? 'Q' : ''}</span></td>
+                <td>${it.wics_mcls_nm || '—'}</td>
+                <td>${stkFmtPct(it.stock_return)}</td>
+                <td>${stkFmtPct(it.rs_market)}</td>
+                <td>${stkFmtPct(it.rs_sector)}</td>
+                <td>${stkFmtPct(it.volume_change)}</td>
+                <td>${earnStr}</td>
+                <td>${scStr}</td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+
+        const container = document.getElementById('stock-table-container');
+        container.innerHTML = html;
+        container.querySelectorAll('th.sortable').forEach(th => {
+            th.addEventListener('click', function() {
+                const col = this.dataset.stkSort;
+                if (stkSortCol === col) { stkSortDir = stkSortDir === 'desc' ? 'asc' : 'desc'; }
+                else { stkSortCol = col; stkSortDir = 'desc'; }
+                renderStockTable();
+            });
+        });
+    }
 
     // ===== 캘린더 =====
     let calYear, calMonth, calEvents = {}, calSelectedDate = null;
