@@ -11,7 +11,6 @@ import yfinance as yf
 
 from kis_api import (
     get_access_token,
-    get_sector_codes,
     APP_KEY,
     APP_SECRET,
     BASE_URL,
@@ -128,6 +127,41 @@ SIZE_MAPPING = {
     "소형 TMI": "IWM",
     "초소형 TMI": "IWC",
 }
+
+WICS_TO_US_ETF = {
+    "G1010": {"name": "에너지", "us_etf": "XLE"},
+    "G1510": {"name": "소재", "us_etf": "XLB"},
+    "G2010": {"name": "자본재", "us_etf": "XLI"},
+    "G2020": {"name": "상업서비스와공급품", "us_etf": "XLI"},
+    "G2030": {"name": "운송", "us_etf": "IYT"},
+    "G2510": {"name": "자동차와부품", "us_etf": "CARZ"},
+    "G2520": {"name": "내구소비재와의류", "us_etf": "XLY"},
+    "G2530": {"name": "호텔,레스토랑,레저등", "us_etf": "PEJ"},
+    "G2550": {"name": "소매(유통)", "us_etf": "XRT"},
+    "G2560": {"name": "교육서비스", "us_etf": None},
+    "G3010": {"name": "식품과기본식료품소매", "us_etf": "XLP"},
+    "G3020": {"name": "식품,음료,담배", "us_etf": "PBJ"},
+    "G3030": {"name": "가정용품과개인용품", "us_etf": "XLP"},
+    "G3510": {"name": "건강관리장비와서비스", "us_etf": "IHI"},
+    "G3520": {"name": "제약과생물공학", "us_etf": "IHE"},
+    "G4010": {"name": "은행", "us_etf": "KBE"},
+    "G4020": {"name": "증권", "us_etf": "IAI"},
+    "G4030": {"name": "다각화된금융", "us_etf": "XLF"},
+    "G4040": {"name": "보험", "us_etf": "KIE"},
+    "G4050": {"name": "부동산", "us_etf": "XLRE"},
+    "G4510": {"name": "소프트웨어와서비스", "us_etf": "IGV"},
+    "G4520": {"name": "기술하드웨어와장비", "us_etf": "XLK"},
+    "G4530": {"name": "반도체와반도체장비", "us_etf": "SOXX"},
+    "G4535": {"name": "전자와전기제품", "us_etf": "LIT"},
+    "G4540": {"name": "디스플레이", "us_etf": None},
+    "G5010": {"name": "전기통신서비스", "us_etf": "IYZ"},
+    "G5020": {"name": "미디어와엔터테인먼트", "us_etf": "XLC"},
+    "G5510": {"name": "유틸리티", "us_etf": "XLU"},
+}
+
+WICS_US_ETFS = sorted({
+    v["us_etf"] for v in WICS_TO_US_ETF.values() if v["us_etf"]
+})
 
 
 def _fetch_kr_index_long(sector_code, total_trading_days=260):
@@ -257,23 +291,6 @@ def _fetch_kr_etf_long(stock_code, total_trading_days=260):
 
     series = pd.Series(all_closes, index=pd.DatetimeIndex(all_dates), name=stock_code)
     return series[~series.index.duplicated(keep="first")].sort_index()
-
-
-def fetch_kr_sector_series():
-    codes = get_sector_codes()
-    result = {}
-    for i, c in enumerate(codes):
-        try:
-            s = _fetch_kr_index_long(c["code"])
-            if len(s) > 0:
-                result[c["name"]] = s
-                print(f"  KR [{i+1}/{len(codes)}] {c['name']}: {len(s)} days")
-            else:
-                print(f"  KR [{i+1}/{len(codes)}] {c['name']}: empty")
-        except Exception as e:
-            print(f"  KR [{i+1}/{len(codes)}] {c['name']}: ERROR {e}")
-        time.sleep(0.05)
-    return result
 
 
 def fetch_kr_benchmark_series():
@@ -476,23 +493,6 @@ def _fetch_kr_etf_volume_long(stock_code, total_trading_days=504):
     return series[~series.index.duplicated(keep="first")].sort_index()
 
 
-def _fetch_kr_sector_volume():
-    codes = get_sector_codes()
-    result = {}
-    for i, c in enumerate(codes):
-        try:
-            s = _fetch_kr_index_volume_long(c["code"])
-            if len(s) > 0:
-                result[c["name"]] = s
-                print(f"  KR vol [{i+1}/{len(codes)}] {c['name']}: {len(s)} days")
-            else:
-                print(f"  KR vol [{i+1}/{len(codes)}] {c['name']}: empty")
-        except Exception as e:
-            print(f"  KR vol [{i+1}/{len(codes)}] {c['name']}: ERROR {e}")
-        time.sleep(0.05)
-    return result
-
-
 def _fetch_kr_group_volume(code_dict, label):
     result = {}
     items = list(code_dict.items())
@@ -546,6 +546,92 @@ def _add_zscores(rows):
     for i, r in enumerate(rows):
         r["rs_z"] = rs_zs[i]
         r["vc_z"] = vc_zs[i]
+
+
+WICS_US_CACHE_PATH = Path("cache/wics_us_etfs.json")
+
+
+def compute_wics_us_etfs():
+    tickers = WICS_US_ETFS
+    print(f"[WICS-US] Downloading {len(tickers)} ETFs (2y close)...")
+    try:
+        df_close = yf.download(tickers, period="2y", progress=False, auto_adjust=True)
+    except Exception as e:
+        print(f"  Download failed: {e}")
+        return {}
+
+    print(f"[WICS-US] Downloading {len(tickers)} ETFs (3y volume)...")
+    try:
+        df_vol = yf.download(tickers, period="3y", progress=False, auto_adjust=True)
+    except Exception as e:
+        print(f"  Volume download failed: {e}")
+        df_vol = None
+
+    print("[WICS-US] Fetching US benchmark (^GSPC)...")
+    try:
+        bench_df = yf.download("^GSPC", period="2y", progress=False, auto_adjust=True)
+        if isinstance(bench_df.columns, pd.MultiIndex):
+            bench_series = bench_df["Close"]["^GSPC"].dropna()
+        else:
+            bench_series = bench_df["Close"].dropna()
+    except Exception as e:
+        print(f"  Benchmark failed: {e}")
+        bench_series = pd.Series(dtype=float)
+
+    result = {"last_updated": datetime.now().isoformat(timespec="seconds"), "etfs": {}}
+
+    for ticker in tickers:
+        try:
+            if isinstance(df_close.columns, pd.MultiIndex):
+                close_s = df_close["Close"][ticker].dropna()
+            else:
+                close_s = df_close["Close"].dropna()
+        except Exception:
+            continue
+
+        vol_s = pd.Series(dtype=float)
+        if df_vol is not None:
+            try:
+                if isinstance(df_vol.columns, pd.MultiIndex):
+                    c = df_vol["Close"][ticker].dropna()
+                    v = df_vol["Volume"][ticker].dropna()
+                else:
+                    c = df_vol["Close"].dropna()
+                    v = df_vol["Volume"].dropna()
+                common = c.index.intersection(v.index)
+                vol_s = (c[common] * v[common]).dropna()
+            except Exception:
+                pass
+
+        etf_data = {"ticker": ticker}
+        for period_name, period_days in PERIODS.items():
+            s_ret = None
+            b_ret = None
+            rs = None
+            if len(close_s) >= period_days + 1:
+                s_ret = round((close_s.iloc[-1] / close_s.iloc[-(period_days + 1)] - 1) * 100, 2)
+            if len(bench_series) >= period_days + 1:
+                b_ret = round((bench_series.iloc[-1] / bench_series.iloc[-(period_days + 1)] - 1) * 100, 2)
+            if s_ret is not None and b_ret is not None:
+                rs = round(s_ret - b_ret, 2)
+
+            vc = compute_volume_change(vol_s, period_days) if len(vol_s) >= 2 * period_days else None
+
+            etf_data[period_name] = {
+                "sector_return": s_ret,
+                "benchmark_return": b_ret,
+                "rs": rs,
+                "volume_change": vc,
+            }
+
+        result["etfs"][ticker] = etf_data
+        print(f"  {ticker}: {len(close_s)} close days, {len(vol_s)} vol days")
+
+    WICS_US_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(WICS_US_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"  Saved to {WICS_US_CACHE_PATH}")
+    return result
 
 
 def _fetch_us_dollar_volume(ticker_dict, label):
@@ -689,29 +775,78 @@ def _compute_us_group(series_dict, benchmark, names, kr_to_us_mapping, volume_di
     return result
 
 
-def compute_all_scores():
-    print("[1/8] Fetching KR sector data...")
-    kr_sectors = fetch_kr_sector_series()
-    kr_bench = fetch_kr_benchmark_series()
+def _load_wics_kr_cache():
+    path = Path("cache/wics_sectors.json")
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-    print("[2/8] Fetching KR themes + sizes...")
+
+def _build_wics_kr_result(wics_data):
+    kr_wics = wics_data.get("kr_wics", {})
+    for period_name in PERIODS:
+        rows = kr_wics.get(period_name, [])
+        for row in rows:
+            code = row.get("code", "")
+            mapping = WICS_TO_US_ETF.get(code, {})
+            row["mapped_us"] = mapping.get("us_etf")
+    return kr_wics
+
+
+def _build_wics_us_result():
+    if not WICS_US_CACHE_PATH.exists():
+        return {}
+    with open(WICS_US_CACHE_PATH, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    etfs = raw.get("etfs", {})
+
+    us_to_wics = {}
+    for code, mapping in WICS_TO_US_ETF.items():
+        etf = mapping.get("us_etf")
+        if etf:
+            us_to_wics.setdefault(etf, []).append((code, mapping["name"]))
+
+    result = {}
+    for period_name in PERIODS:
+        rows = []
+        for ticker, etf_data in etfs.items():
+            pd_data = etf_data.get(period_name, {})
+            mapped = us_to_wics.get(ticker, [])
+            rows.append({
+                "etf": ticker,
+                "mapped_kr_wics": [c for c, _ in mapped],
+                "mapped_kr_names": [n for _, n in mapped],
+                "sector_return": pd_data.get("sector_return"),
+                "benchmark_return": pd_data.get("benchmark_return"),
+                "rs": pd_data.get("rs"),
+                "volume_change": pd_data.get("volume_change"),
+            })
+        _add_zscores(rows)
+        rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
+        result[period_name] = rows
+    return result
+
+
+def compute_all_scores():
+    print("[1/7] Fetching KR benchmark + themes + sizes...")
+    kr_bench = fetch_kr_benchmark_series()
     kr_themes = _fetch_kr_group_series(KR_THEMES, "KR theme")
     kr_sizes = _fetch_kr_group_series(KR_SIZES, "KR size")
 
-    print("[3/8] Fetching KR volume data (2y)...")
-    kr_sector_vol = _fetch_kr_sector_volume()
+    print("[2/7] Fetching KR volume data (2y)...")
     kr_theme_vol = _fetch_kr_group_volume(KR_THEMES, "KR theme vol")
     kr_size_vol = _fetch_kr_group_volume(KR_SIZES, "KR size vol")
 
-    print("[4/8] Fetching US sector data...")
+    print("[3/7] Fetching US sector data...")
     us_sectors = fetch_us_sector_series()
     us_bench = fetch_us_benchmark_series()
 
-    print("[5/8] Fetching US themes + sizes...")
+    print("[4/7] Fetching US themes + sizes...")
     us_themes = _fetch_us_etfs(US_THEMES, "US themes")
     us_sizes = _fetch_us_etfs(US_SIZES, "US sizes")
 
-    print("[6/8] Fetching US volume data (3y)...")
+    print("[5/7] Fetching US volume data (3y)...")
     us_sector_vol = _fetch_us_dollar_volume(US_SECTORS, "US sectors")
     us_theme_vol = _fetch_us_dollar_volume(US_THEMES, "US themes")
     us_size_vol = _fetch_us_dollar_volume(US_SIZES, "US sizes")
@@ -724,27 +859,7 @@ def compute_all_scores():
         "us": {},
     }
 
-    print("[7/8] Computing KR RS scores...")
-    for period_name, period_days in PERIODS.items():
-        rows = []
-        for sector_name, series in kr_sectors.items():
-            rs, s_ret, b_ret = compute_rs(series, kr_bench, period_days)
-            vc = compute_volume_change(
-                kr_sector_vol.get(sector_name, pd.Series(dtype=float)), period_days
-            )
-            rows.append({
-                "sector": sector_name,
-                "rs": rs,
-                "sector_return": s_ret,
-                "benchmark_return": b_ret,
-                "mapped_us": SECTOR_MAPPING.get(sector_name),
-                "volume_change": vc,
-            })
-        _add_zscores(rows)
-        rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
-        result["kr"][period_name] = rows
-
-    print("[8/8] Computing US RS scores...")
+    print("[6/7] Computing US RS scores...")
     for period_name, period_days in PERIODS.items():
         rows = []
         for ticker, series in us_sectors.items():
@@ -765,12 +880,20 @@ def compute_all_scores():
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result["us"][period_name] = rows
 
-    result["kr"]["series"] = _build_series(kr_sectors, kr_bench)
     result["us"]["series"] = _build_series(us_sectors, us_bench)
     result["kr"]["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING, kr_theme_vol)
     result["kr"]["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING, kr_size_vol)
     result["us"]["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING, us_theme_vol)
     result["us"]["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING, us_size_vol)
+
+    print("[7/7] Loading WICS KR sector data...")
+    wics_kr = _load_wics_kr_cache()
+    if wics_kr:
+        result["kr"]["wics_sectors"] = _build_wics_kr_result(wics_kr)
+
+    print("  Computing WICS US ETF data...")
+    compute_wics_us_etfs()
+    result["us"]["wics_sectors"] = _build_wics_us_result()
 
     return result
 
@@ -796,38 +919,19 @@ def main(argv):
     if mode == "all":
         data = compute_all_scores()
     elif mode == "kr":
-        print("[KR only] Fetching KR sector data...")
-        kr_sectors = fetch_kr_sector_series()
+        print("[KR only] Fetching KR benchmark + themes + sizes...")
         kr_bench = fetch_kr_benchmark_series()
-        print("[KR only] Fetching KR themes + sizes...")
         kr_themes = _fetch_kr_group_series(KR_THEMES, "KR theme")
         kr_sizes = _fetch_kr_group_series(KR_SIZES, "KR size")
         print("[KR only] Fetching KR volume data (2y)...")
-        kr_sector_vol = _fetch_kr_sector_volume()
         kr_theme_vol = _fetch_kr_group_volume(KR_THEMES, "KR theme vol")
         kr_size_vol = _fetch_kr_group_volume(KR_SIZES, "KR size vol")
         kr_result = {}
-        for period_name, period_days in PERIODS.items():
-            rows = []
-            for sector_name, series in kr_sectors.items():
-                rs, s_ret, b_ret = compute_rs(series, kr_bench, period_days)
-                vc = compute_volume_change(
-                    kr_sector_vol.get(sector_name, pd.Series(dtype=float)), period_days
-                )
-                rows.append({
-                    "sector": sector_name,
-                    "rs": rs,
-                    "sector_return": s_ret,
-                    "benchmark_return": b_ret,
-                    "mapped_us": SECTOR_MAPPING.get(sector_name),
-                    "volume_change": vc,
-                })
-            _add_zscores(rows)
-            rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
-            kr_result[period_name] = rows
-        kr_result["series"] = _build_series(kr_sectors, kr_bench)
         kr_result["themes"] = _compute_kr_group(kr_themes, kr_bench, THEME_MAPPING, kr_theme_vol)
         kr_result["sizes"] = _compute_kr_group(kr_sizes, kr_bench, SIZE_MAPPING, kr_size_vol)
+        wics_kr = _load_wics_kr_cache()
+        if wics_kr:
+            kr_result["wics_sectors"] = _build_wics_kr_result(wics_kr)
         data = {
             "last_updated": datetime.now().isoformat(timespec="seconds"),
             "kr": kr_result,
@@ -868,6 +972,8 @@ def main(argv):
         us_result["series"] = _build_series(us_sectors, us_bench)
         us_result["themes"] = _compute_us_group(us_themes, us_bench, US_THEMES, THEME_MAPPING, us_theme_vol)
         us_result["sizes"] = _compute_us_group(us_sizes, us_bench, US_SIZES, SIZE_MAPPING, us_size_vol)
+        compute_wics_us_etfs()
+        us_result["wics_sectors"] = _build_wics_us_result()
         data = {
             "last_updated": datetime.now().isoformat(timespec="seconds"),
             "kr": existing.get("kr", {}),
@@ -883,9 +989,10 @@ def main(argv):
 
     for period_name in PERIODS:
         print(f"\n=== {period_name} ===")
-        if data.get("kr", {}).get(period_name):
-            top3 = [s for s in data["kr"][period_name] if s["rs"] is not None][:3]
-            labels = [f"{s['sector']}({s['rs']:+.1f}%)" for s in top3]
+        kr_wics = (data.get("kr", {}).get("wics_sectors") or {}).get(period_name, [])
+        if kr_wics:
+            top3 = [s for s in kr_wics if s["rs"] is not None][:3]
+            labels = [f"{s['name']}({s['rs']:+.1f}%)" for s in top3]
             print(f"  KR top 3: {', '.join(labels)}")
         if data.get("us", {}).get(period_name):
             top3 = [s for s in data["us"][period_name] if s["rs"] is not None][:3]

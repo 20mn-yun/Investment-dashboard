@@ -1609,6 +1609,9 @@
             const usRows = leadersData.us[currentPeriod] || [];
             return usRows.find(r => r.ticker === usTicker) || null;
         }
+        const wicsRows = ((leadersData.kr || {}).wics_sectors || {})[currentPeriod] || [];
+        const wicsMatch = wicsRows.find(r => r.mapped_us === row.ticker);
+        if (wicsMatch) return wicsMatch;
         const krNames = row.mapped_kr || [];
         if (krNames.length === 0) return null;
         const krRows = leadersData.kr[currentPeriod] || [];
@@ -1640,17 +1643,17 @@
         closeSectorChart();
         if (wasKey === region + ':' + sectorKey) return;
 
-        const series = (leadersData[region] || {}).series || {};
-        const myData = series[sectorKey];
-        if (!myData || !myData.values) return;
-
-        const otherRegion = region === 'kr' ? 'us' : 'kr';
-        const otherSeries = (leadersData[otherRegion] || {}).series || {};
+        const krSeries = ((leadersData.kr || {}).wics_sectors || {}).series || (leadersData.kr || {}).series || {};
+        const usSeries = (leadersData.us || {}).series || {};
+        const mySeries = region === 'kr' ? krSeries : usSeries;
+        const otherSeries = region === 'kr' ? usSeries : krSeries;
+        const myData = mySeries[sectorKey];
         const otherData = mappedKey ? otherSeries[mappedKey] : null;
+        if ((!myData || !myData.values) && (!otherData || !otherData.values)) return;
 
-        const myDates = (myData.dates && myData.dates.length > 0)
-            ? myData.dates
-            : ((series._benchmark || {}).dates || []);
+        const myDates = myData
+            ? ((myData.dates && myData.dates.length > 0) ? myData.dates : ((mySeries._benchmark || {}).dates || []))
+            : [];
 
         const chartTr = document.createElement('tr');
         chartTr.className = 'chart-row';
@@ -1667,12 +1670,12 @@
         trElement.classList.add('chart-active');
         activeChartRow = chartTr;
 
-        const myLabel = region === 'kr' ? sectorKey : (US_SECTORS_KR[sectorKey] || sectorKey);
+        const myLabel = region === 'kr' ? (trElement.dataset.name || sectorKey) : (US_SECTORS_KR[sectorKey] || sectorKey);
         const otherLabel = otherData
             ? (region === 'kr' ? (US_SECTORS_KR[mappedKey] || mappedKey) : mappedKey)
             : null;
 
-        const myVals = myData.values;
+        const myVals = myData ? myData.values : [];
 
         const otherDates = otherData
             ? ((otherData.dates && otherData.dates.length > 0)
@@ -1681,15 +1684,19 @@
             : [];
         const otherVals = otherData ? otherData.values : [];
 
-        if (otherData && otherVals.length > 0) {
+        const chartDates = myDates.length > 0 ? myDates : otherDates;
+        if (myVals.length > 0 && otherVals.length > 0) {
             renderSeriesChart(canvas,
                 region === 'kr' ? myLabel : otherLabel,
                 region === 'kr' ? myVals : otherVals,
                 region === 'us' ? myLabel : otherLabel,
                 region === 'us' ? myVals : otherVals,
-                myDates);
-        } else {
+                chartDates);
+        } else if (myVals.length > 0) {
             renderSeriesChart(canvas, myLabel, myVals, '', myVals, myDates);
+        } else if (otherVals.length > 0) {
+            const label = region === 'kr' ? (US_SECTORS_KR[mappedKey] || mappedKey) : (trElement.dataset.name || mappedKey);
+            renderSeriesChart(canvas, label, otherVals, '', otherVals, otherDates);
         }
     }
 
@@ -1755,26 +1762,27 @@
 
     function renderSectorTable(region) {
         closeSectorChart();
-        const rows = sortItems((leadersData[region] || {})[currentPeriod] || []);
+        const source = region === 'kr' ? ((leadersData.kr || {}).wics_sectors || {}) : (leadersData[region] || {});
+        const rows = sortItems(source[currentPeriod] || []);
         const container = document.getElementById('sector-container-' + region);
         let html = '<table class="sector-table">' + sectorTheadHtml() + '<tbody>';
         for (const row of rows) {
-            const name = region === 'kr' ? row.sector : `${row.name}`;
+            const name = row.name || row.sector || '';
             const ticker = region === 'us' ? `<span class="mapped-info">${row.ticker}</span>` : '';
-            const sectorKey = region === 'kr' ? row.sector : row.ticker;
+            const sectorKey = region === 'kr' ? row.code : row.ticker;
             const mappedKey = region === 'kr' ? (row.mapped_us || '') : ((row.mapped_kr || [])[0] || '');
 
             const mapped = findMappedRs(region, row);
             let mappedStr = '';
             if (mapped) {
-                const mName = region === 'kr' ? mapped.ticker : mapped.sector;
+                const mName = region === 'kr' ? mapped.ticker : (mapped.name || mapped.sector);
                 const sync = syncMarker(row.rs, mapped.rs);
                 mappedStr = `${formatPct(mapped.rs)}<span class="mapped-info">${mName}</span> ${sync}`;
             } else {
                 mappedStr = '<span class="sync-none">—</span>';
             }
 
-            html += `<tr data-region="${region}" data-key="${sectorKey}" data-mapped="${mappedKey}">
+            html += `<tr data-region="${region}" data-key="${sectorKey}" data-mapped="${mappedKey}" data-name="${name}">
                 <td>${name}${ticker}</td>
                 <td>${formatPct(row.sector_return)}</td>
                 <td>${formatPct(row.rs)}</td>
