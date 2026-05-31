@@ -322,6 +322,102 @@ def get_stock_detail(ticker):
     return jsonify(result)
 
 
+@app.route("/api/stock-opinion/<ticker>", methods=["GET"])
+def get_stock_opinion(ticker):
+    is_korean = ticker.endswith(".KS") or ticker.endswith(".KQ")
+    if not is_korean:
+        return jsonify({"available": False})
+
+    try:
+        from kis_api import get_invest_opinion
+        df = get_invest_opinion(ticker, months=6)
+    except Exception:
+        return jsonify({"available": False})
+
+    if df is None or (hasattr(df, 'empty') and df.empty):
+        return jsonify({"available": False})
+
+    df_sorted = df.reset_index().sort_values('date', ascending=False)
+    current_price = int(df_sorted.iloc[0]['close_price']) if len(df_sorted) > 0 else 0
+    latest = df_sorted.groupby('broker').first()
+
+    _OPINION_MAP = {
+        'buy': 'buy', '매수': 'buy', 'strong buy': 'buy',
+        'hold': 'hold', '중립': 'hold', '보유': 'hold', 'neutral': 'hold',
+        'marketperform': 'hold', 'market perform': 'hold',
+        'sell': 'sell', '매도': 'sell', 'underperform': 'sell',
+        'strong sell': 'sell', 'reduce': 'sell',
+    }
+
+    buy_count = 0
+    hold_count = 0
+    sell_count = 0
+    for op in latest['opinion']:
+        mapped = _OPINION_MAP.get(str(op).strip().lower(), 'buy')
+        if mapped == 'buy':
+            buy_count += 1
+        elif mapped == 'hold':
+            hold_count += 1
+        else:
+            sell_count += 1
+
+    targets = latest['target_price']
+    targets = targets[targets > 0]
+
+    broker_opinions = []
+    for broker_name, row in latest.iterrows():
+        broker_opinions.append({
+            "broker": broker_name,
+            "opinion": row["opinion"],
+            "target_price": int(row["target_price"]),
+            "date": row["date"].strftime("%Y-%m-%d") if hasattr(row["date"], "strftime") else str(row["date"])[:10],
+        })
+    broker_opinions.sort(key=lambda x: x["date"], reverse=True)
+
+    result = {
+        "available": True,
+        "ticker": ticker,
+        "target_price_avg": int(targets.mean()) if len(targets) > 0 else 0,
+        "target_price_high": int(targets.max()) if len(targets) > 0 else 0,
+        "target_price_low": int(targets.min()) if len(targets) > 0 else 0,
+        "current_price": current_price,
+        "consensus": {"buy": buy_count, "hold": hold_count, "sell": sell_count},
+        "coverage_count": len(latest),
+        "broker_opinions": broker_opinions,
+    }
+    return jsonify(result)
+
+
+@app.route("/api/stock-moat/<ticker>", methods=["GET"])
+def get_stock_moat(ticker):
+    is_korean = ticker.endswith(".KS") or ticker.endswith(".KQ")
+    if not is_korean:
+        return jsonify({"has_data": False})
+    ms_name, _, _ = _find_in_market_stocks(ticker)
+    if not ms_name:
+        try:
+            info = yf.Ticker(ticker).info
+            ms_name = info.get("longName") or info.get("shortName") or ticker
+        except Exception:
+            ms_name = ticker
+    try:
+        from moat_analyzer import get_or_analyze_moat
+        result = get_or_analyze_moat(ticker, ms_name)
+    except Exception:
+        return jsonify({"has_data": False})
+    if not result:
+        return jsonify({"has_data": False})
+    return jsonify({
+        "has_data": True,
+        "ticker": ticker,
+        "name": result.get("name", ms_name),
+        "moat": result.get("moat", ""),
+        "bottleneck": result.get("bottleneck", ""),
+        "news_count": result.get("news_count", 0),
+        "last_updated": result.get("last_updated", ""),
+    })
+
+
 @app.route("/api/chart", methods=["GET"])
 def get_chart():
     """차트용 히스토리컬 데이터"""

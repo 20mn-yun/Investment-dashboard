@@ -638,6 +638,7 @@
             padding:24px; width:90%; max-width:800px;
             max-height:90vh; overflow-y:auto;
         }
+        #brokerOpinionBody tr:hover { background:#1c2333; }
         .chart-header {
             display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;
             position:sticky; top:-24px; background:#161b22; z-index:10;
@@ -1233,6 +1234,62 @@
                 <h3 style="font-size:16px; margin:0 0 8px 0; color:#f0f6fc;">📰 오늘의 움직임</h3>
                 <div id="newsReasonText" style="color:#c9d1d9; line-height:1.6;">로딩 중...</div>
                 <div id="newsSourcesList" style="margin-top:10px; font-size:13px;"></div>
+            </div>
+            <div id="investOpinionSection" style="display:none; margin-top:16px;">
+                <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">🎯 투자의견</h3>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:140px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px; text-align:center;">
+                        <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">평균 목표가</div>
+                        <div id="opinionTargetAvg" style="font-size:22px; font-weight:700; color:#f0f6fc;">—</div>
+                        <div id="opinionUpside" style="font-size:13px; margin-top:4px;">—</div>
+                    </div>
+                    <div style="flex:1; min-width:140px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px; text-align:center;">
+                        <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">목표가 범위</div>
+                        <div id="opinionTargetRange" style="font-size:16px; font-weight:600; color:#c9d1d9;">—</div>
+                    </div>
+                    <div style="flex:1; min-width:140px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px; text-align:center;">
+                        <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">증권사 커버리지</div>
+                        <div id="opinionCoverage" style="font-size:22px; font-weight:700; color:#f0f6fc;">—</div>
+                    </div>
+                </div>
+                <div style="margin-top:12px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px;">
+                    <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">컨센서스</div>
+                    <div id="opinionConsensusBar" style="display:flex; height:20px; border-radius:4px; overflow:hidden; margin-bottom:6px;"></div>
+                    <div id="opinionConsensusText" style="font-size:13px; color:#c9d1d9; text-align:center;">—</div>
+                </div>
+                <div id="brokerOpinionTable" style="display:none; margin-top:12px; background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden;">
+                    <div style="max-height:300px; overflow-y:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                            <thead>
+                                <tr style="position:sticky; top:0; background:#161b22; z-index:1;">
+                                    <th style="text-align:left; padding:10px 12px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">증권사</th>
+                                    <th style="text-align:center; padding:10px 8px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">의견</th>
+                                    <th style="text-align:right; padding:10px 12px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">목표가</th>
+                                    <th style="text-align:right; padding:10px 12px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">일자</th>
+                                </tr>
+                            </thead>
+                            <tbody id="brokerOpinionBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="opinionResearchLink" style="display:none; text-align:right; margin-top:8px;">
+                    <a id="opinionResearchAnchor" href="" target="_blank" rel="noopener" style="font-size:13px; color:#58a6ff; text-decoration:none;">📄 이 종목 전체 리서치 보기 →</a>
+                </div>
+            </div>
+            <div id="moatSection" style="display:none; margin-top:16px;">
+                <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">🛡️ 병목 & 해자 <span style="font-size:11px; color:#8b949e; font-weight:400;">(AI 분석)</span></h3>
+                <div id="moatLoading" style="display:none; text-align:center; padding:16px; color:#8b949e; font-size:13px;">AI 분석 중... (5~10초 소요)</div>
+                <div id="moatContent" style="display:none;">
+                    <div style="border-left:3px solid #3fb950; background:rgba(63,185,80,0.06); border-radius:0 6px 6px 0; padding:10px 14px; margin-bottom:8px;">
+                        <div style="font-size:11px; color:#3fb950; font-weight:600; margin-bottom:4px;">해자 (경쟁우위)</div>
+                        <div id="moatText" style="font-size:13px; color:#c9d1d9; line-height:1.5;"></div>
+                    </div>
+                    <div style="border-left:3px solid #f85149; background:rgba(248,81,73,0.06); border-radius:0 6px 6px 0; padding:10px 14px;">
+                        <div style="font-size:11px; color:#f85149; font-weight:600; margin-bottom:4px;">병목 (리스크)</div>
+                        <div id="bottleneckText" style="font-size:13px; color:#c9d1d9; line-height:1.5;"></div>
+                    </div>
+                    <div id="moatMeta" style="text-align:right; margin-top:6px; font-size:11px; color:#484f58;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -2140,6 +2197,7 @@
             document.getElementById('companySectorIndustry').textContent = '';
             document.getElementById('newsReasonText').textContent = '로딩 중...';
             document.getElementById('newsSourcesList').innerHTML = '';
+            document.getElementById('investOpinionSection').style.display = 'none';
             fetch(API_BASE + '/api/stock-detail/' + encodeURIComponent(symbol) + '?change_pct=' + encodeURIComponent(changePct))
                 .then(r => r.json())
                 .then(data => {
@@ -2157,8 +2215,12 @@
                     document.getElementById('companyOverviewText').textContent = '정보를 불러오지 못했습니다.';
                     document.getElementById('newsReasonText').textContent = '';
                 });
+            loadInvestOpinion(symbol);
+            loadMoat(symbol);
         } else {
             detailSection.style.display = 'none';
+            document.getElementById('investOpinionSection').style.display = 'none';
+            document.getElementById('moatSection').style.display = 'none';
         }
     }
 
@@ -2173,6 +2235,119 @@
         document.getElementById('companySectorIndustry').textContent = '';
         document.getElementById('newsReasonText').textContent = '로딩 중...';
         document.getElementById('newsSourcesList').innerHTML = '';
+        document.getElementById('investOpinionSection').style.display = 'none';
+        document.getElementById('brokerOpinionTable').style.display = 'none';
+        document.getElementById('brokerOpinionBody').innerHTML = '';
+        document.getElementById('opinionResearchLink').style.display = 'none';
+        document.getElementById('moatSection').style.display = 'none';
+        document.getElementById('moatLoading').style.display = 'none';
+        document.getElementById('moatContent').style.display = 'none';
+    }
+
+    function formatKrw(val) {
+        if (val >= 1000000) return (val / 10000).toLocaleString() + '만';
+        return val.toLocaleString();
+    }
+
+    function loadInvestOpinion(symbol) {
+        fetch(API_BASE + '/api/stock-opinion/' + encodeURIComponent(symbol))
+            .then(r => r.json())
+            .then(data => {
+                const section = document.getElementById('investOpinionSection');
+                if (!data.available) {
+                    section.style.display = 'none';
+                    return;
+                }
+                section.style.display = 'block';
+
+                document.getElementById('opinionTargetAvg').textContent = formatKrw(data.target_price_avg) + '원';
+                document.getElementById('opinionTargetRange').textContent =
+                    formatKrw(data.target_price_low) + ' ~ ' + formatKrw(data.target_price_high) + '원';
+                document.getElementById('opinionCoverage').textContent = data.coverage_count + '개사';
+
+                var upside = 0;
+                if (data.current_price > 0) {
+                    upside = ((data.target_price_avg - data.current_price) / data.current_price * 100);
+                }
+                var upsideEl = document.getElementById('opinionUpside');
+                var sign = upside >= 0 ? '+' : '';
+                upsideEl.textContent = '상승여력 ' + sign + upside.toFixed(1) + '%';
+                upsideEl.style.color = upside >= 0 ? '#f85149' : '#58a6ff';
+
+                var con = data.consensus;
+                var total = con.buy + con.hold + con.sell;
+                var bar = document.getElementById('opinionConsensusBar');
+                bar.innerHTML = '';
+                if (total > 0) {
+                    if (con.buy > 0) bar.innerHTML += '<div style="width:' + (con.buy/total*100) + '%; background:#f85149;"></div>';
+                    if (con.hold > 0) bar.innerHTML += '<div style="width:' + (con.hold/total*100) + '%; background:#d29922;"></div>';
+                    if (con.sell > 0) bar.innerHTML += '<div style="width:' + (con.sell/total*100) + '%; background:#58a6ff;"></div>';
+                }
+                document.getElementById('opinionConsensusText').textContent =
+                    '매수 ' + con.buy + ' · 중립 ' + con.hold + ' · 매도 ' + con.sell;
+
+                var tableWrap = document.getElementById('brokerOpinionTable');
+                var tbody = document.getElementById('brokerOpinionBody');
+                var opinions = data.broker_opinions || [];
+                if (opinions.length === 0) {
+                    tableWrap.style.display = 'none';
+                } else {
+                    tableWrap.style.display = 'block';
+                    var opMap = {
+                        'buy': '매수', '매수': '매수', 'strong buy': '매수',
+                        'hold': '중립', '중립': '중립', '보유': '중립', 'neutral': '중립',
+                        'marketperform': '중립', 'market perform': '중립',
+                        'sell': '매도', '매도': '매도', 'underperform': '매도',
+                        'strong sell': '매도', 'reduce': '매도'
+                    };
+                    var opColor = {'매수': '#f85149', '중립': '#d29922', '매도': '#58a6ff'};
+                    tbody.innerHTML = opinions.map(function(o) {
+                        var label = opMap[o.opinion.toLowerCase()] || o.opinion;
+                        var color = opColor[label] || '#c9d1d9';
+                        return '<tr style="border-bottom:1px solid #21262d;">'
+                            + '<td style="padding:8px 12px; color:#c9d1d9;">' + o.broker + '</td>'
+                            + '<td style="padding:8px; text-align:center; color:' + color + '; font-weight:600;">' + label + '</td>'
+                            + '<td style="padding:8px 12px; text-align:right; color:#c9d1d9;">' + formatKrw(o.target_price) + '원</td>'
+                            + '<td style="padding:8px 12px; text-align:right; color:#8b949e;">' + o.date + '</td>'
+                            + '</tr>';
+                    }).join('');
+                }
+
+                var stockCode = symbol.replace(/\.(KS|KQ)$/i, '');
+                var linkWrap = document.getElementById('opinionResearchLink');
+                var anchor = document.getElementById('opinionResearchAnchor');
+                anchor.href = 'https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemCode=' + stockCode;
+                linkWrap.style.display = 'block';
+            })
+            .catch(() => {
+                document.getElementById('investOpinionSection').style.display = 'none';
+            });
+    }
+
+    function loadMoat(symbol) {
+        var section = document.getElementById('moatSection');
+        var loading = document.getElementById('moatLoading');
+        var content = document.getElementById('moatContent');
+        section.style.display = 'block';
+        loading.style.display = 'block';
+        content.style.display = 'none';
+        fetch(API_BASE + '/api/stock-moat/' + encodeURIComponent(symbol))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                loading.style.display = 'none';
+                if (!data.has_data) {
+                    section.style.display = 'none';
+                    return;
+                }
+                content.style.display = 'block';
+                document.getElementById('moatText').textContent = data.moat || '정보 없음';
+                document.getElementById('bottleneckText').textContent = data.bottleneck || '정보 없음';
+                document.getElementById('moatMeta').textContent = data.last_updated + ' 분석 · 뉴스 ' + data.news_count + '건 참고';
+            })
+            .catch(function() {
+                loading.style.display = 'none';
+                section.style.display = 'none';
+            });
     }
 
     async function loadChart(period) {
