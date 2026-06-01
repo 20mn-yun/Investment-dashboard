@@ -124,11 +124,6 @@ async def update_index(channel_username, api_id, api_hash, session_path):
     row = c.fetchone()
     last_id = row[0] if row else 0
 
-    cfg = get_config()
-    watchlist = cfg.get("watchlist", [])
-    personal_channel = cfg.get("personal_channel", "")
-    forward_enabled = cfg.get("forward_enabled", True)
-
     channel = await client.get_entity(channel_username)
     new_count = 0
     max_id = last_id
@@ -154,16 +149,6 @@ async def update_index(channel_username, api_id, api_hash, session_path):
         new_count += 1
         if message.id > max_id:
             max_id = message.id
-
-        if forward_enabled and personal_channel and watchlist:
-            combined = (filename + " " + text_preview).lower()
-            for stock in watchlist:
-                if stock.lower() in combined:
-                    try:
-                        await client.forward_messages(personal_channel, [message.id], channel)
-                    except Exception:
-                        pass
-                    break
 
     conn.commit()
     c.execute("SELECT COUNT(*) FROM messages WHERE channel=?", (channel_username,))
