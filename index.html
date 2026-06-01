@@ -1035,6 +1035,39 @@
             .mapped-table .col-return { display: none; }
             .mapped-table .col-volume { display: none; }
             .period-selector .period-btn { padding: 4px 10px; font-size: 12px; }
+
+            #stock-table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .stk-table { min-width: 1000px; font-size: 13px; }
+            .stk-table th { font-size: 12px; padding: 5px 6px; }
+            .stk-table td { padding: 4px 6px; }
+            .stk-table th:first-child,
+            .stk-table td:first-child {
+                position: sticky; left: 0; z-index: 2;
+                background: #0d1117; box-shadow: 2px 0 4px rgba(0,0,0,0.4);
+            }
+            .stk-table thead th:first-child { z-index: 3; background: #0d1117; }
+            .stk-table tbody tr:hover td:first-child { background: rgba(88,166,255,0.06); }
+
+            .stk-slider-grid { grid-template-columns: 1fr; max-width: 100%; gap: 8px; }
+            .stk-slider-col input[type=range] { height: 8px; }
+            .stk-slider-col input[type=range]::-webkit-slider-thumb { width: 22px; height: 22px; }
+            .stk-slider-col label { font-size: 12px; }
+            .stk-slider-col .stk-val { font-size: 13px; }
+
+            .stk-filters { gap: 6px; }
+            .stk-filters select { padding: 6px 10px; font-size: 13px; }
+            .stk-filter-count { font-size: 12px; width: 100%; text-align: right; }
+
+            .chart-modal {
+                width: 100vw !important; max-width: 100% !important;
+                height: 100vh; max-height: 100vh;
+                border-radius: 0; margin: 0;
+                padding: 12px;
+            }
+            .chart-header { top: -12px; padding: 12px 0 6px 0; margin-top: -12px; }
+            .chart-title { font-size: 15px; }
+            .chart-close { width: 44px; height: 44px; font-size: 28px; }
+            .chart-periods { flex-wrap: wrap; gap: 6px; }
         }
 
         @media (max-width: 480px) {
@@ -1042,6 +1075,9 @@
             .metric-card .value { font-size: 16px; }
             .metric-card .change { font-size: 10px; }
             .header h1 { font-size: 14px; }
+
+            .stk-table { min-width: 900px; font-size: 12px; }
+            .stk-table th { font-size: 11px; }
         }
     </style>
 </head>
