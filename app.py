@@ -418,6 +418,30 @@ def get_stock_moat(ticker):
     })
 
 
+@app.route("/api/stock-quarterly-eps/<ticker>", methods=["GET"])
+def get_stock_quarterly_eps(ticker):
+    is_korean = ticker.endswith(".KS") or ticker.endswith(".KQ")
+    if not is_korean:
+        return jsonify({"has_data": False})
+    stock_code = ticker.replace(".KS", "").replace(".KQ", "")
+    cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "stock_quarterly_eps.json")
+    if not os.path.exists(cache_path):
+        return jsonify({"has_data": False})
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cache = json.load(f)
+    except Exception:
+        return jsonify({"has_data": False})
+    entry = cache.get(stock_code)
+    if not entry or not entry.get("eps_series"):
+        return jsonify({"has_data": False})
+    return jsonify({
+        "has_data": True,
+        "ticker": ticker,
+        "series": entry["eps_series"],
+    })
+
+
 @app.route("/api/chart", methods=["GET"])
 def get_chart():
     """차트용 히스토리컬 데이터"""

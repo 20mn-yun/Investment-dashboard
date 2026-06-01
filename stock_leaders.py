@@ -843,6 +843,18 @@ def compute_stock_leaders():
         earnings[code]["fwd_z"] = f_z
         earnings[code]["earnings_z"] = e_z
 
+    q_eps_cache = {}
+    try:
+        from quarterly_eps_tracker import _load_cache as _load_qeps_cache
+        raw_qeps = _load_qeps_cache()
+        for code, entry in raw_qeps.items():
+            t = entry.get("trend")
+            if t:
+                q_eps_cache[code] = t
+    except Exception:
+        pass
+    print(f"  Quarterly EPS cache: {len(q_eps_cache)} stocks")
+
     print("[5/5] Computing 5-period RS + volume change...")
     result = {"last_updated": time.strftime("%Y-%m-%dT%H:%M:%S"), "kr_stocks": {}}
 
@@ -884,6 +896,7 @@ def compute_stock_leaders():
                 vc = _stock_volume_change(dvols[code], period_days)
 
             e = earnings.get(code, {})
+            qe = q_eps_cache.get(code, {})
             rows.append({
                 "ticker": code,
                 "name": meta["name"],
@@ -901,6 +914,9 @@ def compute_stock_leaders():
                 "yoy_eps_z": e.get("yoy_z"),
                 "fwd_eps_z": e.get("fwd_z"),
                 "earnings_z": e.get("earnings_z"),
+                "q_eps_qoq": qe.get("qoq"),
+                "q_eps_yoy": qe.get("yoy"),
+                "q_eps_period": qe.get("latest_period"),
             })
 
         rs_m_vals = [r["rs_market"] for r in rows]

@@ -534,15 +534,15 @@
             background: #58a6ff; cursor: pointer;
         }
         .stk-slider-col .stk-val { font-size: 12px; color: #e6edf3; margin-top: 2px; }
-        .stk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .stk-table th { padding: 6px 8px; border-bottom: 1px solid #30363d; color: #8b949e; text-align: right; font-weight: 500; font-size: 11px; }
+        .stk-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+        .stk-table th { padding: 6px 8px; border-bottom: 1px solid #30363d; color: #8b949e; text-align: right; font-weight: 500; font-size: 14px; white-space: pre-line; line-height: 1.3; vertical-align: bottom; }
         .stk-table th:first-child, .stk-table th:nth-child(2) { text-align: left; }
         .stk-table td { padding: 5px 8px; border-bottom: 1px solid #21262d; text-align: right; white-space: nowrap; }
         .stk-table td:first-child { text-align: left; font-weight: 500; color: #e6edf3; }
-        .stk-table td:nth-child(2) { text-align: left; color: #8b949e; font-size: 11px; }
+        .stk-table td:nth-child(2) { text-align: left; color: #8b949e; font-size: 14px; }
         .stk-table tbody tr:hover { background-color: rgba(88,166,255,0.06); }
         .stk-market { font-size: 10px; color: #484f58; margin-left: 4px; }
-        .stk-earnings { font-size: 10px; color: #8b949e; }
+        .stk-earnings { font-size: 15px; color: #8b949e; }
         .stk-score { font-weight: 600; }
         .stk-filters { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
         .stk-filters select { background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 4px 8px; font-size: 12px; }
@@ -662,6 +662,13 @@
         }
         .period-btn.active { background:#1f3a5f; color:#58a6ff; border-color:#58a6ff; }
         .period-btn:hover { color:#e6edf3; }
+
+        .eps-period-btn {
+            background:transparent; border:1px solid #30363d; border-radius:4px;
+            padding:3px 10px; color:#8b949e; cursor:pointer; font-size:12px;
+        }
+        .eps-period-btn.active { background:#1f3a5f; color:#58a6ff; border-color:#58a6ff; }
+        .eps-period-btn:hover { color:#e6edf3; }
 
         /* 클릭 가능 표시 */
         .clickable { cursor:pointer; transition:border-color 0.2s; }
@@ -1223,6 +1230,20 @@
         </div>
         <div style="height:400px;">
             <canvas id="price-chart"></canvas>
+        </div>
+        <div id="epsChartSection" style="display:none; margin-top:16px; border-top:1px solid #30363d; padding-top:16px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <h3 style="font-size:16px; margin:0; color:#f0f6fc;">📊 분기 EPS 추이</h3>
+                <div id="epsPeriodButtons" style="display:flex; gap:4px;">
+                    <button class="eps-period-btn" data-eq="4">4분기</button>
+                    <button class="eps-period-btn active" data-eq="8">8분기</button>
+                    <button class="eps-period-btn" data-eq="12">12분기</button>
+                </div>
+            </div>
+            <div style="position:relative; height:250px;">
+                <canvas id="epsChart"></canvas>
+            </div>
+            <div id="epsChartUnit" style="text-align:right; font-size:11px; color:#484f58; margin-top:4px;"></div>
         </div>
         <div id="stockDetailSection" style="display:none; margin-top:20px; border-top:1px solid #30363d; padding-top:16px;">
             <div id="companyOverview">
@@ -2217,10 +2238,12 @@
                 });
             loadInvestOpinion(symbol);
             loadMoat(symbol);
+            loadQuarterlyEps(symbol);
         } else {
             detailSection.style.display = 'none';
             document.getElementById('investOpinionSection').style.display = 'none';
             document.getElementById('moatSection').style.display = 'none';
+            document.getElementById('epsChartSection').style.display = 'none';
         }
     }
 
@@ -2242,6 +2265,9 @@
         document.getElementById('moatSection').style.display = 'none';
         document.getElementById('moatLoading').style.display = 'none';
         document.getElementById('moatContent').style.display = 'none';
+        if (epsChartInstance) { epsChartInstance.destroy(); epsChartInstance = null; }
+        epsFullSeries = [];
+        document.getElementById('epsChartSection').style.display = 'none';
     }
 
     function formatKrw(val) {
@@ -2350,6 +2376,134 @@
             });
     }
 
+    let epsChartInstance = null;
+    let epsFullSeries = [];
+
+    function epsUnit(maxAbs) {
+        if (maxAbs >= 1e8) return {div: 1e8, label: '억원'};
+        if (maxAbs >= 1e4) return {div: 1e4, label: '만원'};
+        if (maxAbs >= 1e3) return {div: 1e3, label: '천원'};
+        return {div: 1, label: '원'};
+    }
+
+    const epsBarLabelPlugin = {
+        id: 'epsBarLabels',
+        afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || meta.hidden) return;
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'center';
+            meta.data.forEach(function(bar, i) {
+                const val = chart.data.datasets[0].data[i];
+                if (val == null) return;
+                var label = val.toLocaleString('ko-KR', { maximumFractionDigits: 1 });
+                var y = val >= 0 ? bar.y - 6 : bar.y + 14;
+                ctx.fillStyle = '#c9d1d9';
+                ctx.fillText(label, bar.x, y);
+            });
+            ctx.restore();
+        }
+    };
+
+    function drawEpsChart(series, quarters) {
+        const sliced = series.slice(-(quarters || 8));
+        if (!sliced.length) return;
+        const labels = sliced.map(d => d.period.replace(/^20/, ''));
+        const values = sliced.map(d => d.eps);
+        const maxAbs = Math.max(...values.map(v => Math.abs(v || 0)), 1);
+        const unit = epsUnit(maxAbs);
+        const scaled = values.map(v => v != null ? v / unit.div : null);
+        const colors = values.map(v => v >= 0 ? '#f85149' : '#58a6ff');
+
+        document.getElementById('epsChartUnit').textContent = '단위: ' + unit.label;
+
+        if (epsChartInstance) { epsChartInstance.destroy(); epsChartInstance = null; }
+        const ctx = document.getElementById('epsChart').getContext('2d');
+        epsChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'EPS',
+                        data: scaled,
+                        backgroundColor: colors,
+                        borderRadius: 3,
+                        order: 2,
+                    },
+                    {
+                        label: '연결선',
+                        data: scaled,
+                        type: 'line',
+                        borderColor: '#6e7681',
+                        borderWidth: 1.5,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#8b949e',
+                        fill: false,
+                        tension: 0,
+                        order: 1,
+                    }
+                ]
+            },
+            plugins: [epsBarLabelPlugin],
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: { padding: { top: 20 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c) {
+                                if (c.datasetIndex === 1) return '';
+                                const raw = sliced[c.dataIndex];
+                                return raw ? raw.period + ': ' + (raw.eps != null ? raw.eps.toLocaleString('ko-KR') + '원' : '—') : '';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: '#8b949e', font: { size: 12 } }, grid: { display: false } },
+                    y: {
+                        ticks: { color: '#8b949e', font: { size: 11 } },
+                        grid: { color: '#21262d' },
+                        title: { display: true, text: unit.label, color: '#8b949e', font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    function loadQuarterlyEps(symbol) {
+        var section = document.getElementById('epsChartSection');
+        section.style.display = 'none';
+        epsFullSeries = [];
+        fetch(API_BASE + '/api/stock-quarterly-eps/' + encodeURIComponent(symbol))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.has_data || !data.series || !data.series.length) return;
+                epsFullSeries = data.series;
+                section.style.display = 'block';
+                document.querySelectorAll('.eps-period-btn').forEach(function(b) {
+                    b.classList.toggle('active', b.dataset.eq === '8');
+                });
+                drawEpsChart(epsFullSeries, 8);
+            })
+            .catch(function() {});
+    }
+
+    document.getElementById('epsPeriodButtons').addEventListener('click', function(e) {
+        var btn = e.target.closest('.eps-period-btn');
+        if (!btn || !epsFullSeries.length) return;
+        var q = parseInt(btn.dataset.eq);
+        document.querySelectorAll('.eps-period-btn').forEach(function(b) {
+            b.classList.toggle('active', b === btn);
+        });
+        drawEpsChart(epsFullSeries, q);
+    });
+
     async function loadChart(period) {
         document.querySelectorAll('[data-cperiod]').forEach(b =>
             b.classList.toggle('active', b.dataset.cperiod === period));
@@ -2395,8 +2549,7 @@
         const start = prices[0];
         const end = prices[prices.length - 1];
         const returnPct = ((end - start) / start) * 100;
-        const sign = returnPct >= 0 ? '+' : '';
-        valueEl.textContent = sign + returnPct.toFixed(2) + '%';
+        valueEl.textContent = fmtPct(returnPct, 2);
         if (returnPct > 0) valueEl.style.color = '#f85149';
         else if (returnPct < 0) valueEl.style.color = '#58a6ff';
         else valueEl.style.color = '#c9d1d9';
@@ -2729,11 +2882,23 @@
         return Math.max(0, Math.min(10, raw + 5));
     }
 
+    function fmtPct(val, digits) {
+        if (val === null || val === undefined || isNaN(val)) return '—';
+        const sign = val >= 0 ? '+' : '';
+        return sign + val.toLocaleString('ko-KR', {
+            minimumFractionDigits: digits ?? 1,
+            maximumFractionDigits: digits ?? 1
+        }) + '%';
+    }
+
+    function fmtPctPair(a, b) {
+        return fmtPct(a, 0) + ' / ' + fmtPct(b, 0);
+    }
+
     function stkFmtPct(v) {
         if (v == null || isNaN(v)) return '<span class="sync-none">—</span>';
         const cls = v >= 0 ? 'rs-positive' : 'rs-negative';
-        const sign = v >= 0 ? '+' : '';
-        return `<span class="${cls}">${sign}${v.toFixed(1)}%</span>`;
+        return `<span class="${cls}">${fmtPct(v, 1)}</span>`;
     }
 
     function renderStockTable() {
@@ -2768,7 +2933,8 @@
             ['초과수익(시장)', 'rs_market', '= 종목 수익률 − KOSPI 종합지수 수익률. 양수면 시장보다 강함'],
             ['초과수익(섹터)', 'rs_sector', '= 종목 수익률 − 소속 WICS 중분류 지수 수익률. 양수면 섹터 내 더 강함'],
             ['거래대금 증가율', 'volume_change', '= 최근 N일 평균 거래대금 / 직전 N일 평균 − 1. N: 1W=5, 1M=21, 3M=63, 6M=126, 1Y=252'],
-            ['EPS 증가(YoY/Fwd)', '', 'YoY = 최신연도/전년 EPS − 1. Fwd = 다음연도 추정/최신연도 EPS − 1. KIS 컨센서스 기준. —는 미커버 또는 적자'],
+            ['추정EPS\n(YoY/Fwd)', '', 'YoY = 최신연도/전년 EPS − 1. Fwd = 다음연도 추정/최신연도 EPS − 1. KIS 컨센서스 기준. —는 미커버 또는 적자'],
+            ['분기EPS\n(QoQ/YoY)', '', 'DART 분기보고서 기본주당이익 기준. QoQ = 직전 분기 대비, YoY = 전년 동기 대비. —는 보고서 미제출 또는 적자 전환'],
             ['평가점수', 'score', '초과수익·거래대금·EPS의 z-score 가중평균. 10점 만점 (5=평균, 10=최고, 0=최악). 실적 미커버 종목은 초과수익+거래대금으로 재분배'],
         ];
 
@@ -2785,14 +2951,14 @@
 
         for (const it of scored) {
             const yoy = it.yoy_eps_growth, fwd = it.fwd_eps_growth;
-            let earnStr;
-            if (yoy != null || fwd != null) {
-                const yStr = yoy != null ? (yoy >= 0 ? '+' : '') + yoy.toFixed(0) : '—';
-                const fStr = fwd != null ? (fwd >= 0 ? '+' : '') + fwd.toFixed(0) : '—';
-                earnStr = `<span class="stk-earnings">${yStr} / ${fStr}</span>`;
-            } else {
-                earnStr = '<span class="sync-none">—</span>';
-            }
+            const earnStr = (yoy != null || fwd != null)
+                ? `<span class="stk-earnings">${fmtPctPair(yoy, fwd)}</span>`
+                : '<span class="sync-none">—</span>';
+
+            const qQoq = it.q_eps_qoq, qYoy = it.q_eps_yoy;
+            const qEpsStr = (qQoq != null || qYoy != null)
+                ? `<span class="stk-earnings">${fmtPctPair(qQoq, qYoy)}</span>`
+                : '<span class="sync-none">—</span>';
 
             const sc = it._score;
             const scCls = sc != null ? (sc >= 7 ? 'rs-positive' : sc <= 3 ? 'rs-negative' : '') : '';
@@ -2811,6 +2977,7 @@
                 <td>${stkFmtPct(it.rs_sector)}</td>
                 <td>${stkFmtPct(it.volume_change)}</td>
                 <td>${earnStr}</td>
+                <td>${qEpsStr}</td>
                 <td>${scStr}</td>
             </tr>`;
         }
