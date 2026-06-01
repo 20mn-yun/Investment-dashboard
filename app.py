@@ -1547,6 +1547,7 @@ _BD = os.path.dirname(os.path.abspath(__file__))
 DART_MON_CFG_FILE = os.path.join(_BD, "dart_monitor_config.json")
 DART_SEEN_FILE = os.path.join(_BD, "dart_seen.json")
 DART_DAILY_FILE = os.path.join(_BD, "dart_daily.json")
+DART_HISTORY_FILE = os.path.join(_BD, "dart_daily_history.json")
 DART_SENT_FILE = os.path.join(_BD, "dart_sent.json")
 EXCEL_PATH = os.path.expanduser(
     "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/내 드라이브/공시정리/DART_공시_누적.xlsx"
@@ -1560,6 +1561,7 @@ DEFAULT_DART_MON_CFG = {
     },
     "telegram_chat_ids": {"general": None, "earnings": None},
     "monitor_enabled": True,
+    "digest_telegram_enabled": False,
 }
 
 _dart_alert_log = []
@@ -1604,12 +1606,29 @@ def _save_seen(seen):
     _sj(DART_SEEN_FILE, ordered[-3000:])
 
 
+def _load_daily_history():
+    return _lj(DART_HISTORY_FILE, {"days": {}})
+
+
+def _save_daily_history(h):
+    _sj(DART_HISTORY_FILE, h)
+
+
 def _load_daily():
-    return _lj(DART_DAILY_FILE, {"date": "", "items": []})
+    h = _load_daily_history()
+    today = date.today().isoformat()
+    items = h.get("days", {}).get(today, [])
+    return {"date": today, "items": items}
 
 
 def _save_daily(d):
-    _sj(DART_DAILY_FILE, d)
+    h = _load_daily_history()
+    days = h.get("days", {})
+    days[d["date"]] = d["items"]
+    cutoff = (date.today() - timedelta(days=14)).isoformat()
+    days = {k: v for k, v in days.items() if k >= cutoff}
+    h["days"] = days
+    _save_daily_history(h)
 
 
 def _load_sent():
@@ -1705,7 +1724,7 @@ def _tg_detect(token):
 def _gemini(prompt):
     try:
         res = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
             f"?key={GEMINI_API_KEY}",
             json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=30,
@@ -1809,6 +1828,173 @@ def _ck_watchlist():
             continue
     if chg:
         _save_seen(seen)
+
+
+def _fmt_amt(v):
+    if v is None:
+        return "-"
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    if abs(n) >= 10000:
+        return f"{n/10000:.1f}조"
+    return f"{n:,.0f}억"
+
+
+def _pct_change(cur, prev):
+    try:
+        c, p = float(cur), float(prev)
+        if p == 0:
+            return ""
+        pct = (c - p) / abs(p) * 100
+        return f"{pct:+.0f}%"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _majorstock_summary(corp_code, rno):
+    try:
+        res = requests.get(
+            "https://opendart.fss.or.kr/api/majorstock.json",
+            params={"crtfc_key": DART_API_KEY, "corp_code": corp_code},
+            timeout=15,
+        )
+        data = res.json()
+        if data.get("status") != "000":
+            return ""
+        hit = next((x for x in data.get("list", []) if x.get("rcept_no") == rno), None)
+        if not hit:
+            return ""
+        repror = hit.get("repror", "")
+        report_tp = hit.get("report_tp", "")
+        try:
+            curr = float(hit.get("stkrt", "0"))
+            irds = float(hit.get("stkrt_irds", "0"))
+            prev = round(curr - irds, 2)
+        except (TypeError, ValueError):
+            return ""
+        reason = (hit.get("report_resn") or "").lstrip("- ").strip()
+        if len(reason) > 50:
+            reason = reason[:50]
+        parts = []
+        if repror:
+            parts.append(f"보고자: {repror}")
+        parts.append(f"보유비율: {prev}%→{curr}%")
+        if reason:
+            parts.append(f"사유: {reason}")
+        if report_tp:
+            parts.append(f"({report_tp})")
+        return " · ".join(parts)
+    except Exception:
+        return ""
+
+
+def _dart_summary(title, rno, corp_code=""):
+    try:
+        doc = _dart_doc(rno)
+    except Exception:
+        doc = ""
+
+    if not doc and "대량보유" in title and corp_code:
+        return _majorstock_summary(corp_code, rno)
+
+    if not doc:
+        return ""
+
+    if "공급계약" in title:
+        raw = _gemini(
+            "다음 DART 공급계약 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+            '{"counterparty":"계약상대방","amount":계약금액(억원),'
+            '"recent_revenue":최근매출액(억원),"pct":매출대비퍼센트숫자,'
+            '"period":"계약기간 문자열"}\n'
+            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}"
+        )
+        try:
+            m = re.search(r"\{[\s\S]*\}", raw)
+            if m:
+                d = json.loads(m.group())
+                parts = []
+                if d.get("counterparty"):
+                    parts.append(f"계약상대: {d['counterparty']}")
+                if d.get("amount") is not None:
+                    parts.append(f"금액: {_fmt_amt(d['amount'])}")
+                if d.get("recent_revenue") is not None:
+                    parts.append(f"최근매출: {_fmt_amt(d['recent_revenue'])}")
+                if d.get("pct") is not None:
+                    parts.append(f"매출대비: {d['pct']}%")
+                if d.get("period"):
+                    parts.append(f"기간: {d['period']}")
+                if parts:
+                    return " · ".join(parts)
+        except Exception:
+            pass
+        return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+
+    if "대량보유" in title:
+        raw = _gemini(
+            "다음 DART 대량보유 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+            '{"reporter":"보고자","prev_ratio":직전보유비율숫자,'
+            '"curr_ratio":이번보유비율숫자,"reason":"보고사유",'
+            '"purpose":"보유목적"}\n'
+            f"숫자는 퍼센트, 없으면 null.\n\n{doc[:4000]}"
+        )
+        try:
+            m = re.search(r"\{[\s\S]*\}", raw)
+            if m:
+                d = json.loads(m.group())
+                parts = []
+                if d.get("reporter"):
+                    parts.append(f"보고자: {d['reporter']}")
+                pr = d.get("prev_ratio")
+                cr = d.get("curr_ratio")
+                if pr is not None and cr is not None:
+                    parts.append(f"보유비율: {pr}%→{cr}%")
+                elif cr is not None:
+                    parts.append(f"보유비율: {cr}%")
+                if d.get("reason"):
+                    parts.append(f"사유: {d['reason']}")
+                if d.get("purpose"):
+                    parts.append(f"목적: {d['purpose']}")
+                if parts:
+                    return " · ".join(parts)
+        except Exception:
+            pass
+        return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+
+    if "잠정실적" in title or "영업(잠정)" in title:
+        raw = _gemini(
+            "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+            '{"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
+            '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)}}\n'
+            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}"
+        )
+        try:
+            m = re.search(r"\{[\s\S]*\}", raw)
+            if m:
+                d = json.loads(m.group())
+                rv = d.get("revenue", {})
+                op = d.get("op_profit", {})
+                parts = []
+                rc, rp = rv.get("current"), rv.get("prev")
+                oc, op_ = op.get("current"), op.get("prev")
+                if rc is not None:
+                    s = f"매출: {_fmt_amt(rc)}"
+                    if rp is not None:
+                        s += f"(전기 {_fmt_amt(rp)}, {_pct_change(rc, rp)})"
+                    parts.append(s)
+                if oc is not None:
+                    s = f"영업익: {_fmt_amt(oc)}"
+                    if op_ is not None:
+                        s += f"(전기 {_fmt_amt(op_)}, {_pct_change(oc, op_)})"
+                    parts.append(s)
+                if parts:
+                    return " · ".join(parts)
+        except Exception:
+            pass
+        return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+
+    return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
 
 
 # --- Feature 2: 잠정실적 ---
@@ -1915,8 +2101,8 @@ def _ck_earnings():
 
 
 # --- Feature 3: 주요 공시 ---
-_MAJOR_KW = ["대량보유", "기업설명회", "실적", "매출액", "공급계약"]
-_MAJOR_EXCLUDE = ["증권발행실적보고서"]
+_MAJOR_KW = ["대량보유", "실적", "매출액", "공급계약"]
+_MAJOR_EXCLUDE = ["증권발행실적보고서", "주식등의대량보유상황보고서(일반)"]
 
 
 def _ck_major():
@@ -1957,12 +2143,21 @@ def _ck_major():
                 chg = True
                 corp_name = it.get("corp_name", "")
                 stock_code = it.get("stock_code", "")
+                it_corp_code = it.get("corp_code", "")
+                if not it_corp_code and stock_code:
+                    cmap = load_dart_corp_map()
+                    entry = cmap.get(stock_code, {})
+                    it_corp_code = entry.get("corp_code", "") if isinstance(entry, dict) else str(entry)
+                summary = _dart_summary(title, rno, corp_code=it_corp_code)
                 daily["items"].append({
                     "corp_name": corp_name,
                     "stock_code": stock_code,
+                    "corp_code": it_corp_code,
                     "title": title, "rcept_no": rno,
                     "rcept_dt": it.get("rcept_dt", ""),
                     "detected_at": datetime.now().strftime("%H:%M"),
+                    "summary": summary,
+                    "summary_tries": 1 if not summary else 0,
                 })
                 _alog("주요", f"{corp_name} - {title}")
             total_page = int(data.get("total_page", 1))
@@ -1972,6 +2167,36 @@ def _ck_major():
             time.sleep(0.2)
     except Exception:
         pass
+
+    retried = 0
+    for item in daily.get("items", []):
+        if retried >= 12:
+            break
+        if item.get("summary"):
+            continue
+        tries = item.get("summary_tries", 0)
+        if tries >= 5:
+            continue
+        cc = item.get("corp_code", "")
+        if not cc and item.get("stock_code"):
+            cmap = load_dart_corp_map()
+            entry = cmap.get(item["stock_code"], {})
+            cc = entry.get("corp_code", "") if isinstance(entry, dict) else str(entry)
+            item["corp_code"] = cc
+        try:
+            s = _dart_summary(item.get("title", ""), item.get("rcept_no", ""), corp_code=cc)
+            item["summary_tries"] = tries + 1
+            if s:
+                item["summary"] = s
+                chg = True
+        except Exception:
+            item["summary_tries"] = tries + 1
+        retried += 1
+        time.sleep(0.5)
+
+    if retried:
+        chg = True
+
     if chg:
         _save_seen(seen)
         _save_daily(daily)
@@ -2101,9 +2326,12 @@ def _dart_loop():
                 sent_state = _load_sent()
                 if sent_state.get("date") != today_iso:
                     sent_state = {"date": today_iso, "sent": []}
+                cfg = load_dm_cfg()
+                tg_on = cfg.get("digest_telegram_enabled", False)
                 for slot in _DAILY_SLOTS:
                     if now.hour == slot["hour"] and slot["key"] not in sent_state["sent"]:
-                        _send_daily_slot(slot)
+                        if tg_on:
+                            _send_daily_slot(slot)
                         sent_state["sent"].append(slot["key"])
                         _save_sent(sent_state)
                         if slot["key"] == "22":
@@ -2181,6 +2409,39 @@ def trigger_earnings_tracker():
     force = request.args.get("force", "false").lower() == "true"
     result = earnings_tracker.run_daily(force=force)
     return jsonify(result)
+
+
+# --- DART Daily API ---
+@app.route("/api/dart/daily", methods=["GET"])
+def get_dart_daily():
+    days_param = request.args.get("days")
+    if days_param:
+        try:
+            n = int(days_param)
+        except ValueError:
+            n = 1
+        h = _load_daily_history()
+        all_days = h.get("days", {})
+        cutoff = (date.today() - timedelta(days=n - 1)).isoformat()
+        items = []
+        for d, d_items in all_days.items():
+            if d >= cutoff:
+                for it in d_items:
+                    it_copy = dict(it)
+                    it_copy["date"] = d
+                    items.append(it_copy)
+        return jsonify({"days": n, "items": items})
+    dt = request.args.get("date", date.today().isoformat())
+    h = _load_daily_history()
+    items = h.get("days", {}).get(dt, [])
+    return jsonify({"date": dt, "items": items})
+
+
+@app.route("/api/dart/dates", methods=["GET"])
+def get_dart_dates():
+    h = _load_daily_history()
+    dates = sorted(h.get("days", {}).keys(), reverse=True)
+    return jsonify({"dates": dates})
 
 
 # --- DART Monitor API ---

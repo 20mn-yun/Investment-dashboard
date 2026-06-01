@@ -878,6 +878,32 @@
             padding: 5px 12px; color: #e6edf3; cursor: pointer; font-size: 12px;
         }
         .dart-tg-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+        .dart-digest-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .dart-digest-toolbar .period-btn { font-size: 12px; padding: 4px 10px; }
+        .dart-digest-row {
+            display: grid; grid-template-columns: 100px 1fr 2fr; gap: 8px;
+            padding: 7px 0; border-bottom: 1px solid #21262d; font-size: 13px; align-items: baseline;
+        }
+        .dart-digest-row:last-child { border-bottom: none; }
+        .dart-digest-date { font-size: 11px; color: #484f58; white-space: nowrap; }
+        .dart-digest-corp { color: #e6edf3; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dart-digest-corp .sc { font-size: 10px; color: #484f58; margin-left: 3px; }
+        .dart-digest-link a { color: #58a6ff; text-decoration: none; }
+        .dart-digest-link a:hover { text-decoration: underline; }
+        .dart-digest-summary { font-size: 12px; color: #e6edf3; margin-top: 2px; grid-column: 1 / -1; padding-left: 108px; }
+        .dart-digest-empty { font-size: 13px; color: #484f58; text-align: center; padding: 20px 0; }
+        .dart-digest-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; font-size: 12px; color: #8b949e; }
+        .dart-digest-pager button {
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 4px 12px; color: #8b949e; cursor: pointer; font-size: 12px;
+        }
+        .dart-digest-pager button:hover { color: #e6edf3; border-color: #58a6ff; }
+        .dart-digest-pager button:disabled { opacity: 0.4; cursor: default; }
+        .dart-tg-toggle-row {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 12px; font-size: 13px; color: #e6edf3;
+        }
+        .dart-tg-toggle-row input[type="checkbox"] { accent-color: #58a6ff; }
         .dart-log-section {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px;
         }
@@ -1535,6 +1561,28 @@
                 <p style="margin-top:8px;">오후 6시에 일일 요약 + 엑셀 저장</p>
             </div>
         </div>
+    </div>
+
+    <div class="dart-section" style="margin-top:16px;">
+      <div class="dart-section-title">📋 공시 요약</div>
+      <div class="dart-digest-toolbar">
+        <span class="period-btn active" onclick="loadDigestRange(1, this)">오늘</span>
+        <span class="period-btn" onclick="loadDigestRange(3, this)">3일</span>
+        <span class="period-btn" onclick="loadDigestRange(5, this)">5일</span>
+        <span class="period-btn" onclick="loadDigestRange(14, this)">2주</span>
+        <label class="dart-tg-toggle-row" style="margin:0 0 0 auto;">
+          <input type="checkbox" id="dart-digest-tg-toggle" onchange="toggleDigestTelegram(this.checked)">
+          텔레그램 슬롯 전송
+        </label>
+      </div>
+      <div id="dart-digest-list">
+        <div class="dart-digest-empty">로딩 중...</div>
+      </div>
+      <div class="dart-digest-pager" id="dart-digest-pager" style="display:none;">
+        <button onclick="digestPage(-1)" id="dart-digest-prev">← 이전</button>
+        <span id="dart-digest-page-info"></span>
+        <button onclick="digestPage(1)" id="dart-digest-next">다음 →</button>
+      </div>
     </div>
 
     <div class="dart-section" style="margin-top:16px;">
@@ -3496,11 +3544,103 @@
         container.style.display = 'block';
     }
 
+    let _digestAllItems = [];
+    let _digestPage = 1;
+    const _digestPerPage = 20;
+
+    async function loadDigestRange(days, btnEl) {
+        if (btnEl) {
+            document.querySelectorAll('.dart-digest-toolbar .period-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
+        _digestPage = 1;
+        try {
+            const res = await fetch(API_BASE + '/api/dart/daily?days=' + days);
+            const data = await res.json();
+            _digestAllItems = (data.items || []).slice().sort((a, b) => {
+                const dc = (b.date || '').localeCompare(a.date || '');
+                if (dc !== 0) return dc;
+                return (b.detected_at || '').localeCompare(a.detected_at || '');
+            });
+            renderDigestPage();
+        } catch(e) {
+            document.getElementById('dart-digest-list').innerHTML = '<div class="dart-digest-empty">로드 실패</div>';
+            document.getElementById('dart-digest-pager').style.display = 'none';
+        }
+    }
+
+    function digestPage(delta) {
+        const total = Math.ceil(_digestAllItems.length / _digestPerPage) || 1;
+        _digestPage = Math.max(1, Math.min(total, _digestPage + delta));
+        renderDigestPage();
+    }
+
+    function renderDigestPage() {
+        const container = document.getElementById('dart-digest-list');
+        const pager = document.getElementById('dart-digest-pager');
+        if (!_digestAllItems.length) {
+            container.innerHTML = '<div class="dart-digest-empty">탐지된 공시가 없습니다</div>';
+            pager.style.display = 'none';
+            return;
+        }
+        const total = Math.ceil(_digestAllItems.length / _digestPerPage);
+        const start = (_digestPage - 1) * _digestPerPage;
+        const slice = _digestAllItems.slice(start, start + _digestPerPage);
+
+        let lastDate = '';
+        let html = '';
+        for (const it of slice) {
+            const d = it.date || it.rcept_dt || '';
+            if (d !== lastDate) {
+                html += `<div style="font-size:11px;color:#484f58;padding:6px 0 2px;margin-top:4px;border-top:1px solid #21262d;">${d}</div>`;
+                lastDate = d;
+            }
+            const link = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${it.rcept_no}`;
+            const summary = it.summary ? `<div class="dart-digest-summary">${it.summary}</div>` : '';
+            html += `<div class="dart-digest-row">
+                <div class="dart-digest-corp">${it.corp_name || ''}<span class="sc">${it.stock_code || ''}</span></div>
+                <div class="dart-digest-link"><a href="${link}" target="_blank">${it.title || ''}</a></div>
+                <div style="font-size:12px;color:#e6edf3;">${it.summary || ''}</div>
+            </div>`;
+        }
+        container.innerHTML = html;
+
+        if (total > 1) {
+            pager.style.display = 'flex';
+            document.getElementById('dart-digest-page-info').textContent = `${_digestPage} / ${total}`;
+            document.getElementById('dart-digest-prev').disabled = _digestPage <= 1;
+            document.getElementById('dart-digest-next').disabled = _digestPage >= total;
+        } else {
+            pager.style.display = 'none';
+        }
+    }
+
+    async function loadDigestTelegramToggle() {
+        try {
+            const res = await fetch(API_BASE + '/api/dart/monitor/config');
+            const cfg = await res.json();
+            document.getElementById('dart-digest-tg-toggle').checked = !!cfg.digest_telegram_enabled;
+        } catch(e) {}
+    }
+
+    async function toggleDigestTelegram(val) {
+        try {
+            const res = await fetch(API_BASE + '/api/dart/monitor/config');
+            const cfg = await res.json();
+            cfg.digest_telegram_enabled = val;
+            await fetch(API_BASE + '/api/dart/monitor/config', {
+                method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(cfg)
+            });
+        } catch(e) {}
+    }
+
     async function initDart() {
         await loadDartConfig();
         loadDartStatus();
         loadDartLog();
         initDartReportDownload();
+        loadDigestRange(1);
+        loadDigestTelegramToggle();
     }
 
     async function loadDartConfig() {
