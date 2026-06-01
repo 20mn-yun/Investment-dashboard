@@ -17,6 +17,8 @@ import xml.etree.ElementTree as ET
 from datetime import date, timedelta, datetime
 import pandas as pd
 import telegram_report
+import dart_report
+import earnings_tracker
 
 app = Flask(__name__)
 
@@ -2294,6 +2296,43 @@ def get_report_status(job_id):
 @app.route("/api/report/stop/<job_id>", methods=["POST"])
 def stop_report_search(job_id):
     job = telegram_report.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    job["stop_requested"] = True
+    return jsonify({"ok": True})
+
+
+@app.route("/api/dart-report/download", methods=["POST"])
+def start_dart_download():
+    body = request.json or {}
+    code = body.get("code", "")
+    name = body.get("name", "")
+    date_from = body.get("date_from", "")
+    date_to = body.get("date_to", "")
+    want_xml = body.get("want_xml", True)
+    want_pdf = body.get("want_pdf", True)
+    corp_code = earnings_tracker.get_corp_code(code)
+    if not corp_code:
+        return jsonify({"error": "corp_code를 찾을 수 없습니다"}), 400
+    cfg = telegram_report.get_config()
+    download_base = cfg.get("download_base", telegram_report.DEFAULT_CONFIG["download_base"])
+    job_id = dart_report.start_download_job(
+        corp_code, name, date_from, date_to, download_base, want_xml, want_pdf,
+    )
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/api/dart-report/status/<job_id>", methods=["GET"])
+def get_dart_report_status(job_id):
+    job = dart_report.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+
+@app.route("/api/dart-report/stop/<job_id>", methods=["POST"])
+def stop_dart_download(job_id):
+    job = dart_report.get_job(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
     job["stop_requested"] = True

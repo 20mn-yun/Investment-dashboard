@@ -934,6 +934,12 @@
             padding: 8px 12px; color: #e6edf3; font-size: 13px; outline: none;
         }
         .rpt-field input:focus, .rpt-field select:focus { border-color: #58a6ff; }
+        #dart-rpt-search {
+            width: 100%; box-sizing: border-box;
+            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+            padding: 8px 12px; color: #e6edf3; font-size: 13px; outline: none;
+        }
+        #dart-rpt-search:focus { border-color: #58a6ff; }
         .rpt-progress {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 16px; margin-bottom: 16px;
@@ -1529,6 +1535,35 @@
                 <p style="margin-top:8px;">오후 6시에 일일 요약 + 엑셀 저장</p>
             </div>
         </div>
+    </div>
+
+    <div class="dart-section" style="margin-top:16px;">
+      <div class="dart-section-title">📥 정기보고서 다운로드</div>
+      <div style="position:relative;margin-bottom:8px;">
+        <input type="text" id="dart-rpt-search" data-cal-search="dart_report_download" placeholder="회사명 또는 종목코드 검색" autocomplete="off">
+      </div>
+      <div id="dart-rpt-selected" style="font-size:13px;color:#8b949e;margin-bottom:8px;">선택된 회사 없음</div>
+      <div class="rpt-search-grid">
+        <div class="rpt-field"><label>시작일</label><input type="date" id="dart-rpt-from"></div>
+        <div class="rpt-field"><label>종료일</label><input type="date" id="dart-rpt-to"></div>
+      </div>
+      <div style="margin:8px 0;font-size:13px;">
+        <label><input type="checkbox" id="dart-rpt-xml" checked> 원본(XML)</label>
+        <label style="margin-left:14px;"><input type="checkbox" id="dart-rpt-pdf" checked> PDF</label>
+      </div>
+      <button class="btn" onclick="startDartReportDownload()">다운로드</button>
+      <div id="dart-rpt-progress" class="rpt-progress" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div class="rpt-progress-text" id="dart-rpt-progress-text"></div>
+            <div class="rpt-progress-path" id="dart-rpt-progress-path"></div>
+          </div>
+          <button class="btn" id="dart-rpt-stop" onclick="stopDartReportDownload()" style="background:#da3633;display:none;white-space:nowrap;">⏹ 중단</button>
+        </div>
+      </div>
+      <div id="dart-rpt-result" class="data-table" style="display:none;margin-top:8px;">
+        <table class="rpt-result-table"><thead><tr><th>파일명</th><th>구분</th><th>날짜</th></tr></thead><tbody id="dart-rpt-result-body"></tbody></table>
+      </div>
     </div>
 
     <!-- 알림 로그 -->
@@ -3330,11 +3365,19 @@
         const r = calSearchResults[idx];
         if (!r) return;
 
-        // DART 감시목록 처리
         if (calSearchKey === 'dart_watchlist') {
             const code = r.code.replace('.KS','').replace('.KQ','');
             await addDartWl(code, r.name);
             document.getElementById('dart-wl-input').value = '';
+            document.querySelectorAll('.cal-dropdown').forEach(d => d.style.display = 'none');
+            return;
+        }
+
+        if (calSearchKey === 'dart_report_download') {
+            const code = r.code.replace('.KS','').replace('.KQ','');
+            _dartRptSelected = {code: code, name: r.name};
+            document.getElementById('dart-rpt-selected').textContent = '선택: ' + r.name + ' (' + code + ')';
+            document.getElementById('dart-rpt-search').value = '';
             document.querySelectorAll('.cal-dropdown').forEach(d => d.style.display = 'none');
             return;
         }
@@ -3363,10 +3406,101 @@
     let dartConfig = null;
     let dartNameCache = {};
 
+    let _dartRptSelected = null;
+    let _dartRptJobId = null;
+    let _dartRptTimer = null;
+
+    function initDartReportDownload() {
+        const today = new Date();
+        const past = new Date(today);
+        past.setFullYear(today.getFullYear() - 3);
+        document.getElementById('dart-rpt-from').value = past.toISOString().slice(0,10);
+        document.getElementById('dart-rpt-to').value = today.toISOString().slice(0,10);
+    }
+
+    async function startDartReportDownload() {
+        if (!_dartRptSelected) { alert('회사를 먼저 선택하세요'); return; }
+        const wantXml = document.getElementById('dart-rpt-xml').checked;
+        const wantPdf = document.getElementById('dart-rpt-pdf').checked;
+        if (!wantXml && !wantPdf) { alert('원본 또는 PDF 중 하나는 선택하세요'); return; }
+        const body = {
+            code: _dartRptSelected.code,
+            name: _dartRptSelected.name,
+            date_from: document.getElementById('dart-rpt-from').value,
+            date_to: document.getElementById('dart-rpt-to').value,
+            want_xml: wantXml,
+            want_pdf: wantPdf
+        };
+        document.getElementById('dart-rpt-progress').style.display = 'block';
+        document.getElementById('dart-rpt-result').style.display = 'none';
+        document.getElementById('dart-rpt-progress-text').textContent = '검색 준비 중...';
+        document.getElementById('dart-rpt-progress-path').textContent = '';
+        const stopBtn = document.getElementById('dart-rpt-stop');
+        stopBtn.style.display = 'inline-block';
+        try {
+            const res = await fetch(API_BASE + '/api/dart-report/download', {
+                method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.error) { document.getElementById('dart-rpt-progress-text').textContent = '오류: ' + data.error; stopBtn.style.display='none'; return; }
+            _dartRptJobId = data.job_id;
+            pollDartReportStatus();
+        } catch(e) {
+            document.getElementById('dart-rpt-progress-text').textContent = '시작 실패: ' + e.message;
+            stopBtn.style.display = 'none';
+        }
+    }
+
+    async function stopDartReportDownload() {
+        if (!_dartRptJobId) return;
+        document.getElementById('dart-rpt-stop').disabled = true;
+        try { await fetch(API_BASE + '/api/dart-report/stop/' + _dartRptJobId, {method:'POST'}); } catch(e) {}
+    }
+
+    function pollDartReportStatus() {
+        if (_dartRptTimer) clearInterval(_dartRptTimer);
+        _dartRptTimer = setInterval(async () => {
+            try {
+                const res = await fetch(API_BASE + '/api/dart-report/status/' + _dartRptJobId);
+                const job = await res.json();
+                const txt = document.getElementById('dart-rpt-progress-text');
+                const pathEl = document.getElementById('dart-rpt-progress-path');
+                const stopBtn = document.getElementById('dart-rpt-stop');
+                if (job.status === 'done') {
+                    clearInterval(_dartRptTimer);
+                    txt.textContent = `완료! 발견 ${job.found} / 다운로드 ${job.done}` + (job.skipped ? ` / 스킵 ${job.skipped}` : '');
+                    if (job.download_path) pathEl.textContent = '저장 경로: ' + job.download_path;
+                    stopBtn.style.display = 'none';
+                    showDartReportResult(job.files);
+                } else if (job.status === 'error') {
+                    clearInterval(_dartRptTimer);
+                    txt.textContent = '오류: ' + (job.error || '알 수 없는 오류');
+                    stopBtn.style.display = 'none';
+                } else if (job.status === 'stopping') {
+                    txt.textContent = `중단 중... (${job.done}/${job.found})`;
+                } else {
+                    txt.textContent = `진행 중... 발견 ${job.found} / 완료 ${job.done}` + (job.skipped ? ` / 스킵 ${job.skipped}` : '');
+                }
+            } catch(e) {
+                clearInterval(_dartRptTimer);
+                document.getElementById('dart-rpt-progress-text').textContent = '상태 조회 실패';
+            }
+        }, 2000);
+    }
+
+    function showDartReportResult(files) {
+        const container = document.getElementById('dart-rpt-result');
+        const tbody = document.getElementById('dart-rpt-result-body');
+        if (!files || !files.length) { container.style.display = 'none'; return; }
+        tbody.innerHTML = files.map(f => `<tr><td>${f.filename}</td><td>${f.kind||''}</td><td>${f.rcept_dt||''}</td></tr>`).join('');
+        container.style.display = 'block';
+    }
+
     async function initDart() {
         await loadDartConfig();
         loadDartStatus();
         loadDartLog();
+        initDartReportDownload();
     }
 
     async function loadDartConfig() {
