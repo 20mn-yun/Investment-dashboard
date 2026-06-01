@@ -21,6 +21,26 @@ DEFAULT_CONFIG = {
     "forward_enabled": True,
 }
 
+BROKERAGES = [
+    "현대차증권", "미래에셋증권", "한국투자증권", "삼성증권", "NH투자증권",
+    "KB증권", "신한투자증권", "키움증권", "하나증권", "메리츠증권",
+    "대신증권", "유안타증권", "한화투자증권", "교보증권", "하이투자증권",
+    "DB금융투자", "신영증권", "IBK투자증권", "SK증권", "유진투자증권",
+    "다올투자증권", "LS증권", "이베스트투자증권", "부국증권", "BNK투자증권",
+    "상상인증권", "흥국증권", "케이프투자증권",
+]
+
+
+def _mask_brokerages(text, watchlist):
+    wl_lower = [w.lower() for w in watchlist]
+    for b in BROKERAGES:
+        bl = b.lower()
+        if bl in wl_lower:
+            continue
+        text = text.replace(bl, " ")
+    return text
+
+
 _jobs = {}
 _shared_client = None
 _shared_loop = None
@@ -239,8 +259,11 @@ def start_realtime_watcher(api_id, api_hash, session_path):
                     filename = attr.file_name
                     break
             text = message.message or ""
+            cleaned_filename = _mask_brokerages(filename.lower(), watchlist)
+            cleaned_text = _mask_brokerages(text.lower(), watchlist)
             for stock in watchlist:
-                if stock.lower() in filename.lower() or stock.lower() in text.lower():
+                kw = stock.lower()
+                if kw in cleaned_filename or kw in cleaned_text:
                     for ch in personal_channels:
                         await _shared_client.forward_messages(ch, [message.id], event.chat_id)
                     break
