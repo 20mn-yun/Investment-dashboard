@@ -550,6 +550,8 @@
         .stk-table tbody tr { cursor: pointer; }
         .drill-btn { background: none; border: 1px solid #30363d; color: #58a6ff; border-radius: 3px; padding: 1px 6px; font-size: 11px; cursor: pointer; white-space: nowrap; }
         .drill-btn:hover { background: #21262d; border-color: #58a6ff; }
+        #tab-valuation .val-table td, #tab-valuation .val-table th { font-size: 12px; font-weight: normal; }
+        #tab-valuation .val-table th { white-space: nowrap; vertical-align: middle; }
 
         /* 그룹 카드 */
         .group-card {
@@ -1126,6 +1128,7 @@
     <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
     <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
     <div class="tab" onclick="switchTab('stocks')">🔍 주도주</div>
+    <div class="tab" onclick="switchTab('valuation')">💰 PER/PBR</div>
     <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
     <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
     <div class="tab" onclick="switchTab('report')">📄 증권사 Report</div>
@@ -1299,6 +1302,14 @@
         <div style="height:400px;">
             <canvas id="price-chart"></canvas>
         </div>
+        <div id="perBandSection" style="display:none; margin-top:16px; border-top:1px solid #30363d; padding-top:16px;">
+            <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">📈 PER 밴드 (5년)</h3>
+            <div style="position:relative; height:260px;"><canvas id="perBandChart"></canvas></div>
+        </div>
+        <div id="pbrBandSection" style="display:none; margin-top:16px; border-top:1px solid #30363d; padding-top:16px;">
+            <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">📉 PBR 밴드 (5년)</h3>
+            <div style="position:relative; height:260px;"><canvas id="pbrBandChart"></canvas></div>
+        </div>
         <div id="epsChartSection" style="display:none; margin-top:16px; border-top:1px solid #30363d; padding-top:16px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
                 <h3 style="font-size:16px; margin:0; color:#f0f6fc;">📊 분기 EPS 추이</h3>
@@ -1462,6 +1473,28 @@
             <span class="stk-filter-count" id="stk-filter-count"></span>
         </div>
         <div class="data-table" id="stock-table-container"></div>
+    </div>
+</div>
+
+<!-- PER/PBR 탭 -->
+<div class="tab-content" id="tab-valuation">
+    <div class="leaders-loading" id="val-loading">데이터를 불러오는 중...</div>
+    <div id="val-content" style="display:none;">
+        <div class="stk-filters">
+            <div id="val-sector-dd" style="position:relative; display:inline-block;">
+                <button type="button" id="val-sector-btn" onclick="toggleValSectorMenu(event)" style="background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:13px;">섹터: 전체 ▾</button>
+                <div id="val-sector-menu" style="display:none; position:absolute; z-index:50; top:100%; left:0; margin-top:4px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:8px; min-width:220px; max-height:320px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
+                    <div style="display:flex; gap:12px; padding:4px 6px 8px; border-bottom:1px solid #30363d; margin-bottom:6px;">
+                        <span style="cursor:pointer; color:#58a6ff; font-size:12px;" onclick="valSectorSelectAll(true)">전체 선택</span>
+                        <span style="cursor:pointer; color:#58a6ff; font-size:12px;" onclick="valSectorSelectAll(false)">전체 해제</span>
+                    </div>
+                    <div id="val-sector-options"></div>
+                </div>
+            </div>
+            <span class="stk-filter-count" id="val-count"></span>
+        </div>
+        <div class="data-table" id="val-table-container"></div>
+        <div id="val-pagination" style="display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px;"></div>
     </div>
 </div>
 
@@ -1751,6 +1784,218 @@
             stocksLoaded = true;
             loadStockLeaders();
         }
+        if (tabName === 'valuation' && !valuationLoaded) {
+            valuationLoaded = true;
+            loadValuation();
+        }
+    }
+
+    // PER/PBR
+    let valuationLoaded = false, valItems = [], valSortCol = 'per_position', valSortDir = 'asc', valPage = 1;
+    const VAL_PER_PAGE = 50, MIN_CAP_DISPLAY = 5000;
+
+    function fmtN(v) { return v == null ? '—' : Number(v).toFixed(2); }
+    function fmtPos(v) { return v == null ? '—' : Math.round(v) + '%'; }
+    function fmtCap(v) { return v == null ? '—' : Number(v).toLocaleString(); }
+
+    async function loadValuation() {
+        try {
+            const res = await fetch(API_BASE + '/api/valuation');
+            const data = await res.json();
+            valItems = data.items || [];
+            const sectors = [...new Set(valItems.map(i => i.sector).filter(Boolean))].sort();
+            document.getElementById('val-sector-options').innerHTML = sectors.map(s =>
+                `<label style="display:block; padding:4px 6px; cursor:pointer; font-size:13px; color:#c9d1d9; white-space:nowrap;"><input type="checkbox" value="${s}" checked onchange="onValSectorChange()" style="margin-right:6px; vertical-align:middle;">${s}</label>`
+            ).join('');
+            updateValSectorBtnLabel();
+            document.addEventListener('click', function(e) {
+                const dd = document.getElementById('val-sector-dd');
+                if (dd && !dd.contains(e.target)) document.getElementById('val-sector-menu').style.display = 'none';
+            });
+            document.getElementById('val-loading').style.display = 'none';
+            document.getElementById('val-content').style.display = 'block';
+            renderValuationTable();
+        } catch (e) {
+            document.getElementById('val-loading').textContent = '데이터 로드 실패';
+        }
+    }
+
+    function toggleValSectorMenu(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('val-sector-menu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function valSectorSelectAll(checked) {
+        document.querySelectorAll('#val-sector-options input[type=checkbox]').forEach(cb => { cb.checked = checked; });
+        onValSectorChange();
+    }
+
+    function updateValSectorBtnLabel() {
+        const all = document.querySelectorAll('#val-sector-options input[type=checkbox]');
+        const chk = document.querySelectorAll('#val-sector-options input[type=checkbox]:checked');
+        const btn = document.getElementById('val-sector-btn');
+        if (chk.length === all.length) btn.textContent = '섹터: 전체 ▾';
+        else if (chk.length === 0) btn.textContent = '섹터: 없음 ▾';
+        else btn.textContent = `섹터: ${chk.length}개 ▾`;
+    }
+
+    function onValSectorChange() { updateValSectorBtnLabel(); valPage = 1; renderValuationTable(); }
+
+    function sortValuation(col) {
+        if (valSortCol === col) { valSortDir = valSortDir === 'asc' ? 'desc' : 'asc'; }
+        else { valSortCol = col; valSortDir = 'asc'; }
+        valPage = 1;
+        renderValuationTable();
+    }
+
+    function valGoPage(n) { valPage = n; renderValuationTable(); }
+
+    function renderValuationTable() {
+        const checked = Array.from(document.querySelectorAll('#val-sector-options input:checked')).map(cb => cb.value);
+        const checkedSet = new Set(checked);
+        const allCount = document.querySelectorAll('#val-sector-options input[type=checkbox]').length;
+        const isAll = checked.length === allCount;
+        let filtered = valItems.filter(i => (i.market_cap_eok || 0) >= MIN_CAP_DISPLAY);
+        const allLen = filtered.length;
+        filtered = filtered.filter(i => checkedSet.has(i.sector));
+
+        filtered.sort((a, b) => {
+            const av = a[valSortCol], bv = b[valSortCol];
+            if (av == null && bv == null) return 0;
+            if (av == null) return 1;
+            if (bv == null) return -1;
+            return valSortDir === 'asc' ? av - bv : bv - av;
+        });
+
+        document.getElementById('val-count').textContent = isAll ? `${filtered.length} 종목` : `${filtered.length} / ${allLen} 종목`;
+
+        const totalPages = Math.max(1, Math.ceil(filtered.length / VAL_PER_PAGE));
+        valPage = Math.max(1, Math.min(totalPages, valPage));
+        const start = (valPage - 1) * VAL_PER_PAGE;
+        const slice = filtered.slice(start, start + VAL_PER_PAGE);
+
+        const ii = '<span style="opacity:0.4;font-size:12px">ⓘ</span>';
+        const cols = [
+            {label:'종목명', key:null, tip:'클릭하면 상세(주가 차트·PER/PBR 밴드·EPS)를 볼 수 있습니다.'},
+            {label:'섹터', key:null, tip:'WICS 중분류 기준 업종.'},
+            {label:'시총(억)', key:'market_cap_eok', tip:'시가총액(억원).'},
+            {label:'fPER', key:'fper', tip:'선행 PER = 현재가 ÷ 추정 EPS(네이버 컨센서스 내년 추정). 미래 이익 기준.'},
+            {label:'PER', key:'per', tip:'현재 PER = 현재가 ÷ 최신 연간 EPS(DART 사업보고서). EPS 적자면 —.'},
+            {label:'PER P10', key:'per_p10', tip:'최근 5년 월별 PER의 하위 10%(역사적 저점권). PER이 이보다 낮으면 역사적으로 싼 구간.'},
+            {label:'PER%', key:'per_position', tip:'현재 PER의 자기 5년 분포 내 백분위. 0%=역사적 최저(가장 쌈), 100%=최고.'},
+            {label:'fPER%', key:'fper_position', tip:'선행(추정) PER의 자기 5년 PER 분포 내 백분위. 낮을수록 미래 이익 기준 역사적 저평가.'},
+            {label:'fPBR', key:'fpbr', tip:'선행 PBR = 현재가 ÷ (최신 BPS + 추정 EPS − 추정 배당). DART 기준 롤포워드.'},
+            {label:'PBR', key:'pbr', tip:'현재 PBR = 현재가 ÷ 최신 BPS(DART 지배주주지분 ÷ 상장주식수).'},
+            {label:'PBR P10', key:'pbr_p10', tip:'최근 5년 월별 PBR의 하위 10%.'},
+            {label:'PBR%', key:'pbr_position', tip:'현재 PBR의 자기 5년 분포 내 백분위. 0%=최저, 100%=최고.'},
+            {label:'fPBR%', key:'fpbr_position', tip:'선행 PBR의 자기 5년 PBR 분포 내 백분위. 낮을수록 역사적 저평가.'},
+        ];
+
+        let html = '<table class="stk-table val-table"><thead><tr>';
+        for (const c of cols) {
+            const tipAttr = ` title="${c.tip}"`;
+            if (!c.key) {
+                html += `<th${tipAttr}>${c.label} ${ii}</th>`;
+            } else {
+                const active = valSortCol === c.key;
+                const arrow = active ? (valSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+                html += `<th class="sortable${active ? ' sort-active' : ''}" onclick="sortValuation('${c.key}')" style="cursor:pointer"${tipAttr}>${c.label}${arrow} ${ii}</th>`;
+            }
+        }
+        html += '</tr></thead><tbody>';
+
+        for (const r of slice) {
+            const lowPer = r.per_p10 != null && r.fper != null && r.fper <= r.per_p10;
+            const lowPbr = r.pbr_p10 != null && r.fpbr != null && r.fpbr <= r.pbr_p10;
+            const highlight = (lowPer || lowPbr) ? ' style="background:rgba(63,185,80,0.12)"' : '';
+            const code = (r.code || '').replace('.KS','').replace('.KQ','');
+            html += `<tr${highlight} onclick="openValuationModal('${code}')">`;
+            html += `<td style="text-align:left">${r.name || ''}</td>`;
+            html += `<td style="text-align:left">${r.sector || ''}</td>`;
+            html += `<td>${fmtCap(r.market_cap_eok)}</td>`;
+            html += `<td>${fmtN(r.fper)}</td><td>${fmtN(r.per)}</td><td>${fmtN(r.per_p10)}</td><td>${fmtPos(r.per_position)}</td><td>${fmtPos(r.fper_position)}</td>`;
+            html += `<td>${fmtN(r.fpbr)}</td><td>${fmtN(r.pbr)}</td><td>${fmtN(r.pbr_p10)}</td><td>${fmtPos(r.pbr_position)}</td><td>${fmtPos(r.fpbr_position)}</td>`;
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        document.getElementById('val-table-container').innerHTML = html;
+
+        let pHtml = '';
+        if (totalPages > 1) {
+            pHtml += valPage > 1 ? `<span class="period-btn" onclick="valGoPage(${valPage-1})">이전</span>` : '';
+            pHtml += `<span style="color:#8b949e;font-size:13px">${valPage} / ${totalPages}</span>`;
+            pHtml += valPage < totalPages ? `<span class="period-btn" onclick="valGoPage(${valPage+1})">다음</span>` : '';
+        }
+        document.getElementById('val-pagination').innerHTML = pHtml;
+    }
+
+    function openValuationModal(code) {
+        const it = valItems.find(i => i.code === code);
+        if (!it) return;
+        const sym = it.code + (it.market === 'KOSDAQ' ? '.KQ' : '.KS');
+        openChart(sym, it.name);
+        loadQuarterlyEps(sym);
+        document.getElementById('stockDetailSection').style.display = 'block';
+        document.getElementById('newsReason').style.display = 'none';
+        document.getElementById('companyOverviewText').textContent = '로딩 중...';
+        document.getElementById('companySectorIndustry').textContent = it.sector || '';
+        fetch(API_BASE + '/api/valuation/overview/' + encodeURIComponent(it.code) + '?name=' + encodeURIComponent(it.name))
+            .then(r => r.json())
+            .then(d => { document.getElementById('companyOverviewText').textContent = d.overview || '기업 개요 정보가 없습니다.'; })
+            .catch(() => { document.getElementById('companyOverviewText').textContent = '기업 개요를 불러오지 못했습니다.'; });
+        const modal = document.querySelector('.chart-modal');
+        const periods = document.querySelector('.chart-periods');
+        const detail = document.getElementById('stockDetailSection');
+        modal.insertBefore(detail, periods);
+        fetch(API_BASE + '/api/valuation/band/' + encodeURIComponent(it.code))
+            .then(r => r.ok ? r.json() : null)
+            .then(band => {
+                drawBandChart('perBandChart', 'perBandSection', band && band.series, 'per', band && band.per_band, it.per, it.fper, 'PER');
+                drawBandChart('pbrBandChart', 'pbrBandSection', band && band.series, 'pbr', band && band.pbr_band, it.pbr, it.fpbr, 'PBR');
+            })
+            .catch(() => {
+                drawBandChart('perBandChart', 'perBandSection', null, 'per', null, null, null, 'PER');
+                drawBandChart('pbrBandChart', 'pbrBandSection', null, 'pbr', null, null, null, 'PBR');
+            });
+    }
+
+    function drawBandChart(canvasId, sectionId, series, key, band, current, forward, label) {
+        const existing = Chart.getChart(canvasId);
+        if (existing) existing.destroy();
+        const section = document.getElementById(sectionId);
+        if (!series || !band) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+
+        const labels = series.map(s => s.date).concat(['지금']);
+        const n = labels.length;
+        const vals = series.map(s => s[key]);
+
+        const datasets = [
+            { label: label, data: [...vals, null], borderColor: '#58a6ff', pointRadius: 0, borderWidth: 1.5, tension: 0.1, order: 3 },
+            { label: 'P90', data: Array(n).fill(band.p90), borderColor: 'rgba(139,148,158,0.35)', pointRadius: 0, borderWidth: 1, order: 4 },
+            { label: 'P10~P90', data: Array(n).fill(band.p10), borderColor: 'rgba(139,148,158,0.35)', pointRadius: 0, borderWidth: 1, fill: '-1', backgroundColor: 'rgba(88,166,255,0.08)', order: 4 },
+            { label: 'P50(중앙값)', data: Array(n).fill(band.p50), borderColor: '#8b949e', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, order: 4 },
+        ];
+        if (current != null) {
+            datasets.push({ label: '현재', data: [...Array(vals.length).fill(null), current], showLine: false, pointRadius: 6, pointBackgroundColor: '#f0f6fc', order: 1 });
+        }
+        if (forward != null) {
+            datasets.push({ label: '선행(forward)', data: [...Array(vals.length).fill(null), forward], showLine: false, pointRadius: 6, pointBackgroundColor: '#3fb950', order: 1 });
+        }
+
+        new Chart(document.getElementById(canvasId), {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'top', labels: { color: '#8b949e', font: { size: 11 } } } },
+                scales: {
+                    x: { ticks: { color: '#e6edf3', maxTicksLimit: 12, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                    y: { beginAtZero: false, ticks: { color: '#e6edf3', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                },
+            },
+        });
     }
 
     // 주도섹터
@@ -2387,6 +2632,11 @@
         if (epsChartInstance) { epsChartInstance.destroy(); epsChartInstance = null; }
         epsFullSeries = [];
         document.getElementById('epsChartSection').style.display = 'none';
+        ['perBandChart', 'pbrBandChart'].forEach(id => { const c = Chart.getChart(id); if (c) c.destroy(); });
+        document.getElementById('perBandSection').style.display = 'none';
+        document.getElementById('pbrBandSection').style.display = 'none';
+        document.getElementById('newsReason').style.display = 'block';
+        document.querySelector('.chart-modal').appendChild(document.getElementById('stockDetailSection'));
     }
 
     function formatKrw(val) {

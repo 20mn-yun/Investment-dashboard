@@ -800,6 +800,48 @@ def get_stock_leaders():
     return jsonify(cached)
 
 
+@app.route("/api/valuation", methods=["GET"])
+def get_valuation():
+    cache_path = os.path.join(_CACHE_DIR, "valuation_screener.json")
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"error": "아직 배치가 실행되지 않았습니다"}), 503
+    return jsonify(cached)
+
+
+@app.route("/api/valuation/band/<ticker>", methods=["GET"])
+def get_valuation_band(ticker):
+    cache_path = os.path.join(_CACHE_DIR, "valuation_bands.json")
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"error": "아직 배치가 실행되지 않았습니다"}), 503
+    bands = data.get("bands", {})
+    entry = bands.get(ticker)
+    if not entry:
+        return jsonify({"error": "밴드 없음"}), 404
+    return jsonify(entry)
+
+
+@app.route("/api/valuation/overview/<code>", methods=["GET"])
+def get_valuation_overview(code):
+    name = request.args.get("name", "")
+    try:
+        corp_code = earnings_tracker.get_corp_code(code)
+    except Exception:
+        corp_code = None
+    if not corp_code:
+        return jsonify({"overview": None})
+    try:
+        overview = earnings_tracker.get_business_overview_cached(code, name, corp_code)
+    except Exception:
+        overview = None
+    return jsonify({"overview": overview})
+
+
 @app.route("/api/sector-leaders/<region>", methods=["GET"])
 def get_sector_leaders_by_region(region):
     if region not in ("kr", "us"):

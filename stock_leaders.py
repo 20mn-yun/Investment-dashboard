@@ -153,12 +153,6 @@ def _wics_latest_date():
 
 def fetch_wics_mapping():
     dt = _wics_latest_date()
-    target_codes = set()
-    with open(TOP600_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    tickers = data.get("tickers", []) if isinstance(data, dict) else data
-    for t in tickers:
-        target_codes.add(t.get("code", ""))
 
     lcls_map = {}
     for sec_cd in WICS_SECTORS:
@@ -168,7 +162,7 @@ def fetch_wics_mapping():
             items = resp.json().get("list", [])
             for item in items:
                 code = item.get("CMP_CD", "")
-                if code in target_codes:
+                if code:
                     lcls_map[code] = {
                         "wics_lcls_cd": sec_cd,
                         "wics_lcls_nm": item.get("SEC_NM_KOR", ""),
@@ -185,7 +179,7 @@ def fetch_wics_mapping():
             items = resp.json().get("list", [])
             for item in items:
                 code = item.get("CMP_CD", "")
-                if code in target_codes:
+                if code:
                     idx_nm = item.get("IDX_NM_KOR", "")
                     short_nm = idx_nm.replace("WICS ", "") if idx_nm.startswith("WICS ") else idx_nm
                     mcls_map[code] = {
@@ -197,7 +191,7 @@ def fetch_wics_mapping():
         time.sleep(0.1)
 
     result = {}
-    for code in target_codes:
+    for code in (set(lcls_map) | set(mcls_map)):
         entry = {}
         if code in lcls_map:
             entry.update(lcls_map[code])
@@ -206,6 +200,14 @@ def fetch_wics_mapping():
         if entry:
             result[code] = entry
 
+    return result
+
+
+def build_wics_cache():
+    result = fetch_wics_mapping()
+    WICS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(WICS_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump({"mapping": result, "generated_at": time.strftime("%Y-%m-%d %H:%M:%S")}, f, ensure_ascii=False, indent=2)
     return result
 
 
@@ -983,6 +985,9 @@ def snapshot_consensus_today():
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "stocks":
         compute_stock_leaders()
+    elif len(sys.argv) > 1 and sys.argv[1] == "wics":
+        r = build_wics_cache()
+        print(f"WICS 매핑 저장: {len(r)} 종목")
     elif len(sys.argv) > 1 and sys.argv[1] == "snapshot-consensus":
         snapshot_consensus_today()
     else:
