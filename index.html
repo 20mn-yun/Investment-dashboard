@@ -1129,9 +1129,9 @@
     <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
     <div class="tab" onclick="switchTab('stocks')">🔍 주도주</div>
     <div class="tab" onclick="switchTab('valuation')">💰 PER/PBR</div>
-    <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
     <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
     <div class="tab" onclick="switchTab('report')">📄 증권사 Report</div>
+    <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
 </div>
 
 <!-- 글로벌 마켓 탭 -->
@@ -1764,17 +1764,17 @@
             });
         }
         document.getElementById('tab-' + tabName).classList.add('active');
-        if (tabName === 'calendar' && !calLoaded) {
-            calLoaded = true;
-            initCalendar();
+        if (tabName === 'calendar') {
+            if (!calLoaded) { calLoaded = true; initCalendar(); }
+            else { loadCalWatchlist(); loadCalendar(); }
         }
         if (tabName === 'dart' && !dartLoaded) {
             dartLoaded = true;
             initDart();
         }
-        if (tabName === 'report' && !reportLoaded) {
-            reportLoaded = true;
-            initReport();
+        if (tabName === 'report') {
+            if (!reportLoaded) { reportLoaded = true; initReport(); }
+            else { loadWatchlist(); }
         }
         if (tabName === 'leaders' && !leadersLoaded) {
             leadersLoaded = true;

@@ -1635,6 +1635,56 @@ def save_dm_cfg(cfg):
     _sj(DART_MON_CFG_FILE, cfg)
 
 
+def _sync_dart_to_others(added_codes, removed_codes):
+    try:
+        cal = load_cal_watchlist()
+        kr = cal.get("kr_earnings", [])
+        for c in added_codes:
+            if c not in kr:
+                kr.append(c)
+        for c in removed_codes:
+            if c in kr:
+                kr.remove(c)
+        cal["kr_earnings"] = kr
+        save_cal_watchlist(cal)
+    except Exception as e:
+        print(f"[cross-tab-sync] calendar sync failed: {e}", flush=True)
+    try:
+        corp_map = load_dart_corp_map()
+        rcfg = telegram_report.get_config()
+        rwl = rcfg.get("watchlist", [])
+        for c in added_codes:
+            info = corp_map.get(c)
+            if info:
+                name = info.get("name") if isinstance(info, dict) else info
+                if name and name not in rwl:
+                    rwl.append(name)
+        for c in removed_codes:
+            info = corp_map.get(c)
+            if info:
+                name = info.get("name") if isinstance(info, dict) else info
+                if name and name in rwl:
+                    rwl.remove(name)
+        rcfg["watchlist"] = rwl
+        telegram_report.save_config(rcfg)
+    except Exception as e:
+        print(f"[cross-tab-sync] report sync failed: {e}", flush=True)
+
+
+def _migrate_cross_tab_sync():
+    marker = os.path.join(_BD, "cache", "cross_tab_synced.flag")
+    if os.path.exists(marker):
+        return
+    try:
+        wl = load_dm_cfg().get("watchlist", [])
+        if wl:
+            _sync_dart_to_others(set(wl), set())
+        with open(marker, "w") as f:
+            pass
+    except Exception as e:
+        print(f"[cross-tab-sync] migration failed: {e}", flush=True)
+
+
 def _load_seen():
     return set(_lj(DART_SEEN_FILE, []))
 
@@ -2436,6 +2486,11 @@ def _earnings_tracker_loop():
 
 threading.Thread(target=_earnings_tracker_loop, daemon=True).start()
 
+try:
+    _migrate_cross_tab_sync()
+except Exception as e:
+    print("cross-tab sync migration failed:", e, flush=True)
+
 
 @app.route("/api/earnings-tracker/run", methods=["POST"])
 def trigger_earnings_tracker():
@@ -2494,7 +2549,14 @@ def get_dm_cfg():
 
 @app.route("/api/dart/monitor/config", methods=["POST"])
 def set_dm_cfg():
-    save_dm_cfg(request.get_json())
+    old_wl = set(load_dm_cfg().get("watchlist", []))
+    new_cfg = request.get_json()
+    new_wl = set(new_cfg.get("watchlist", []))
+    save_dm_cfg(new_cfg)
+    added = new_wl - old_wl
+    removed = old_wl - new_wl
+    if added or removed:
+        _sync_dart_to_others(added, removed)
     return jsonify({"ok": True})
 
 
