@@ -800,6 +800,32 @@ def get_stock_leaders():
     return jsonify(cached)
 
 
+@app.route("/api/stock-leaders/custom", methods=["GET"])
+def get_stock_leaders_custom():
+    from datetime import datetime, timedelta
+    start = request.args.get("start", "")
+    end = request.args.get("end", "")
+    if not start or not end:
+        return jsonify({"error": "start and end parameters required"}), 400
+    try:
+        dt_s = datetime.strptime(start, "%Y-%m-%d")
+        dt_e = datetime.strptime(end, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "invalid date format, use YYYY-MM-DD"}), 400
+    if dt_s >= dt_e:
+        return jsonify({"error": "start must be before end"}), 400
+    oldest = datetime.now() - timedelta(days=504)
+    if dt_s < oldest:
+        return jsonify({"error": f"start date too old, earliest allowed: {oldest.strftime('%Y-%m-%d')}"}), 400
+    if dt_e > datetime.now():
+        return jsonify({"error": "end date cannot be in the future"}), 400
+    import stock_leaders
+    result = stock_leaders.compute_stock_leaders_custom(start, end)
+    if "error" in result:
+        return jsonify(result), 503
+    return jsonify(result)
+
+
 @app.route("/api/valuation", methods=["GET"])
 def get_valuation():
     cache_path = os.path.join(_CACHE_DIR, "valuation_screener.json")

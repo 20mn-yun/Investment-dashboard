@@ -1070,6 +1070,11 @@
             .mapped-table .col-volume { display: none; }
             .period-selector .period-btn { padding: 4px 10px; font-size: 12px; }
 
+            #stk-custom-panel > div { flex-direction: column; align-items: stretch; }
+            #stk-custom-panel label { font-size: 14px; }
+            #stk-custom-panel input[type=date] { width: 100%; padding: 8px; font-size: 14px; }
+            #stk-custom-panel button { padding: 10px; font-size: 14px; }
+
             #stock-table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             .stk-table { min-width: 1000px; font-size: 13px; }
             .stk-table th { font-size: 12px; padding: 5px 6px; }
@@ -1444,7 +1449,21 @@
             <span class="period-btn active" onclick="changeStkPeriod('3m')">3M</span>
             <span class="period-btn" onclick="changeStkPeriod('6m')">6M</span>
             <span class="period-btn" onclick="changeStkPeriod('1y')">1Y</span>
+            <span class="period-btn" id="stk-custom-btn" onclick="toggleStkCustomPanel()">사용자 지정</span>
             <span class="leaders-updated" id="stocks-updated"></span>
+            <div id="stk-custom-panel" style="display:none; margin-top:8px; padding:10px; background:#161b22; border:1px solid #30363d; border-radius:8px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <label style="color:#8b949e; font-size:13px;">시작
+                        <input type="date" id="stk-custom-start" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    </label>
+                    <label style="color:#8b949e; font-size:13px;">종료
+                        <input type="date" id="stk-custom-end" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    </label>
+                    <button onclick="applyStkCustomPeriod()" style="background:#238636; color:#fff; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-size:13px;">적용</button>
+                    <button onclick="closeStkCustomPanel()" style="background:transparent; color:#8b949e; border:1px solid #30363d; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">닫기</button>
+                    <span id="stk-custom-label" style="color:#58a6ff; font-size:13px;"></span>
+                </div>
+            </div>
         </div>
         <div class="stk-slider-grid">
             <div class="stk-slider-col">
@@ -3211,11 +3230,72 @@
         }
     }
 
+    let stkCustomMode = false;
+
     function changeStkPeriod(p) {
+        stkCustomMode = false;
         stkPeriod = p;
         document.querySelectorAll('#tab-stocks .period-btn').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
+        document.getElementById('stk-custom-btn').classList.remove('active');
+        document.getElementById('stk-custom-label').textContent = '';
+        document.getElementById('stk-custom-panel').style.display = 'none';
         renderStockTable();
+    }
+
+    let _stkPickerBound = false;
+    function toggleStkCustomPanel() {
+        const panel = document.getElementById('stk-custom-panel');
+        const visible = panel.style.display !== 'none';
+        panel.style.display = visible ? 'none' : 'block';
+        if (!visible) {
+            const today = new Date();
+            const yearAgo = new Date(today);
+            yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+            const oldest = new Date(today);
+            oldest.setDate(oldest.getDate() - 504);
+            const fmt = d => d.toISOString().slice(0, 10);
+            const startEl = document.getElementById('stk-custom-start');
+            const endEl = document.getElementById('stk-custom-end');
+            if (!startEl.value) startEl.value = fmt(yearAgo);
+            if (!endEl.value) endEl.value = fmt(today);
+            startEl.min = fmt(oldest);
+            startEl.max = fmt(today);
+            endEl.min = fmt(oldest);
+            endEl.max = fmt(today);
+            if (!_stkPickerBound) {
+                _stkPickerBound = true;
+                [startEl, endEl].forEach(el => el.addEventListener('click', function() { if (this.showPicker) this.showPicker(); }));
+            }
+        }
+    }
+
+    function closeStkCustomPanel() {
+        document.getElementById('stk-custom-panel').style.display = 'none';
+    }
+
+    async function applyStkCustomPeriod() {
+        const startVal = document.getElementById('stk-custom-start').value;
+        const endVal = document.getElementById('stk-custom-end').value;
+        if (!startVal || !endVal) return alert('시작일과 종료일을 모두 선택하세요.');
+        if (startVal >= endVal) return alert('시작일이 종료일보다 앞서야 합니다.');
+        const label = document.getElementById('stk-custom-label');
+        label.textContent = '로딩 중...';
+        try {
+            const res = await fetch(API_BASE + `/api/stock-leaders/custom?start=${startVal}&end=${endVal}`);
+            const data = await res.json();
+            if (data.error) { label.textContent = ''; return alert(data.error); }
+            stkCustomMode = true;
+            stkPeriod = 'custom';
+            stockData.kr_stocks['custom'] = data.stocks;
+            document.querySelectorAll('#tab-stocks .period-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('stk-custom-btn').classList.add('active');
+            label.textContent = `${data.actual_start} ~ ${data.actual_end}`;
+            renderStockTable();
+        } catch (e) {
+            label.textContent = '';
+            alert('사용자 지정 기간 로드 실패: ' + e.message);
+        }
     }
 
     let pendingDrillSector = null;

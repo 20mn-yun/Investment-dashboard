@@ -706,6 +706,55 @@ def _fetch_all_stock_prices(codes):
     return closes, dvols
 
 
+PRICE_CACHE_PATH = Path("cache/stock_price_series.json")
+
+
+def _save_price_cache(closes, dvols):
+    data = {}
+    for code in set(list(closes.keys()) + list(dvols.keys())):
+        entry = {}
+        if code in closes:
+            s = closes[code]
+            entry["close_dates"] = [str(d.date()) for d in s.index]
+            entry["close_vals"] = [float(v) for v in s.values]
+        if code in dvols:
+            s = dvols[code]
+            entry["dvol_dates"] = [str(d.date()) for d in s.index]
+            entry["dvol_vals"] = [float(v) for v in s.values]
+        data[code] = entry
+    PRICE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(PRICE_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump({"ts": time.time(), "data": data}, f)
+    print(f"  Price cache saved: {len(data)} stocks")
+
+
+def _load_price_cache(max_age=86400*2):
+    import pandas as pd
+    if not PRICE_CACHE_PATH.exists():
+        return None, None
+    try:
+        with open(PRICE_CACHE_PATH, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None, None
+    if max_age and time.time() - raw.get("ts", 0) > max_age:
+        return None, None
+    closes = {}
+    dvols = {}
+    for code, entry in raw.get("data", {}).items():
+        if "close_dates" in entry:
+            closes[code] = pd.Series(
+                entry["close_vals"],
+                index=pd.DatetimeIndex(entry["close_dates"])
+            ).sort_index()
+        if "dvol_dates" in entry:
+            dvols[code] = pd.Series(
+                entry["dvol_vals"],
+                index=pd.DatetimeIndex(entry["dvol_dates"])
+            ).sort_index()
+    return closes, dvols
+
+
 def _stock_period_return(prices, period_days):
     if len(prices) < period_days + 1:
         return None
@@ -809,6 +858,8 @@ def compute_stock_leaders():
     all_codes = list(mapping.keys())
     closes, dvols = _fetch_all_stock_prices(all_codes)
     print(f"  {len(closes)} closes, {len(dvols)} dvols in {time.time()-t0:.1f}s")
+
+    _save_price_cache(closes, dvols)
 
     print("[3/5] Fetching earnings estimates (KIS API)...")
     t1 = time.time()
@@ -940,6 +991,172 @@ def compute_stock_leaders():
     with open(STOCK_LEADERS_PATH, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     print(f"  Saved to {STOCK_LEADERS_PATH}")
+    return result
+
+
+_custom_cache = {}
+
+def compute_stock_leaders_custom(start_date, end_date):
+    import pandas as pd
+    from datetime import datetime
+
+    cache_key = f"{start_date}:{end_date}"
+    cached = _custom_cache.get(cache_key)
+    if cached and time.time() - cached["ts"] < 3600:
+        return cached["data"]
+
+    dt_start = pd.Timestamp(start_date)
+    dt_end = pd.Timestamp(end_date)
+
+    if not STOCK_LEADERS_PATH.exists():
+        return {"error": "stock_leaders.json not found – run batch first"}
+    with open(STOCK_LEADERS_PATH, "r", encoding="utf-8") as f:
+        base_data = json.load(f)
+    base_rows_by_ticker = {}
+    first_period = list(base_data.get("kr_stocks", {}).values())
+    if first_period:
+        for r in first_period[0]:
+            base_rows_by_ticker[r["ticker"]] = r
+
+    mapping = load_stock_sector_mapping()
+    with open(TOP600_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    tickers_info = data.get("tickers", []) if isinstance(data, dict) else data
+    ticker_meta = {}
+    for t in tickers_info:
+        ticker_meta[t["code"]] = {"name": t["name"], "market": t.get("market_sub", "")}
+
+    closes, dvols = _load_price_cache()
+    if closes is None:
+        return {"error": "price cache not available – run batch first"}
+
+    kospi_dates, kospi_vals = _load_kospi_benchmark()
+    kospi_series = None
+    kospi_ret = None
+    if kospi_dates and kospi_vals:
+        kospi_series = pd.Series(kospi_vals, index=pd.DatetimeIndex(kospi_dates)).sort_index()
+        ks = kospi_series.loc[dt_start:dt_end]
+        if len(ks) >= 2:
+            kospi_ret = round((float(ks.iloc[-1]) / float(ks.iloc[0]) - 1) * 100, 2)
+
+    wics_series = {}
+    if WICS_CACHE_SERIES_PATH.exists():
+        with open(WICS_CACHE_SERIES_PATH, "r", encoding="utf-8") as f:
+            wics_raw = json.load(f)
+        for sec_code, sec_data in wics_raw.get("series", {}).items():
+            if sec_code.startswith("_"):
+                continue
+            sd = sec_data.get("dates", [])
+            sv = sec_data.get("values", [])
+            if sd and sv:
+                wics_series[sec_code] = pd.Series(sv, index=pd.DatetimeIndex(sd)).sort_index()
+
+    q_eps_cache = {}
+    try:
+        from quarterly_eps_tracker import _load_cache as _load_qeps_cache
+        raw_qeps = _load_qeps_cache()
+        for code, entry in raw_qeps.items():
+            t = entry.get("trend")
+            if t:
+                q_eps_cache[code] = t
+    except Exception:
+        pass
+
+    rows = []
+    actual_start = None
+    actual_end = None
+
+    for code, meta in ticker_meta.items():
+        m = mapping.get(code, {})
+        wics_cd = m.get("wics_mcls_cd")
+        wics_nm = m.get("wics_mcls_nm")
+        lcls_nm = m.get("wics_lcls_nm")
+        themes = m.get("themes", [])
+
+        stock_ret = None
+        rs_market = None
+        rs_sector = None
+        vc = None
+
+        if code in closes:
+            cs = closes[code]
+            window = cs.loc[dt_start:dt_end]
+            if len(window) >= 2:
+                s_price = float(window.iloc[0])
+                e_price = float(window.iloc[-1])
+                if abs(s_price) > 1e-9:
+                    stock_ret = round((e_price / s_price - 1) * 100, 2)
+                if actual_start is None:
+                    actual_start = str(window.index[0].date())
+                    actual_end = str(window.index[-1].date())
+
+        if stock_ret is not None and kospi_ret is not None:
+            rs_market = round(stock_ret - kospi_ret, 2)
+
+        if stock_ret is not None and wics_cd and wics_cd in wics_series:
+            ws = wics_series[wics_cd].loc[dt_start:dt_end]
+            if len(ws) >= 2:
+                sec_ret = round((float(ws.iloc[-1]) / float(ws.iloc[0]) - 1) * 100, 2)
+                rs_sector = round(stock_ret - sec_ret, 2)
+
+        if code in dvols:
+            dv = dvols[code]
+            dv_window = dv.loc[dt_start:dt_end]
+            period_len = len(dv_window)
+            if period_len > 0:
+                prev_start = dt_start - (dt_end - dt_start)
+                dv_prev = dv.loc[prev_start:dt_start - pd.Timedelta(days=1)]
+                if len(dv_prev) > 0:
+                    prev_avg = dv_prev.mean()
+                    if prev_avg > 0:
+                        vc = round((dv_window.mean() / prev_avg - 1) * 100, 2)
+
+        base = base_rows_by_ticker.get(code, {})
+        qe = q_eps_cache.get(code, {})
+        rows.append({
+            "ticker": code,
+            "name": meta["name"],
+            "market": meta["market"],
+            "wics_mcls_cd": wics_cd,
+            "wics_mcls_nm": wics_nm,
+            "wics_lcls_nm": lcls_nm,
+            "themes": themes,
+            "stock_return": stock_ret,
+            "rs_market": rs_market,
+            "rs_sector": rs_sector,
+            "volume_change": vc,
+            "yoy_eps_growth": base.get("yoy_eps_growth"),
+            "fwd_eps_growth": base.get("fwd_eps_growth"),
+            "yoy_eps_z": base.get("yoy_eps_z"),
+            "fwd_eps_z": base.get("fwd_eps_z"),
+            "earnings_z": base.get("earnings_z"),
+            "q_eps_qoq": qe.get("qoq", base.get("q_eps_qoq")),
+            "q_eps_yoy": qe.get("yoy", base.get("q_eps_yoy")),
+            "q_eps_period": qe.get("latest_period", base.get("q_eps_period")),
+        })
+
+    rs_m_vals = [r["rs_market"] for r in rows]
+    rs_s_vals = [r["rs_sector"] for r in rows]
+    vc_vals = [r["volume_change"] for r in rows]
+    rs_m_zs = winsorized_zscores(rs_m_vals)
+    rs_s_zs = winsorized_zscores(rs_s_vals)
+    vc_zs = winsorized_zscores(vc_vals)
+    Z_CAP = 5.0
+    for i, r in enumerate(rows):
+        r["rs_market_z"] = max(-Z_CAP, min(Z_CAP, rs_m_zs[i])) if rs_m_zs[i] is not None else None
+        r["rs_sector_z"] = max(-Z_CAP, min(Z_CAP, rs_s_zs[i])) if rs_s_zs[i] is not None else None
+        r["vc_z"] = max(-Z_CAP, min(Z_CAP, vc_zs[i])) if vc_zs[i] is not None else None
+
+    rows.sort(key=lambda x: (x["rs_market"] is None, -(x["rs_market"] or 0)))
+
+    result = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "actual_start": actual_start or start_date,
+        "actual_end": actual_end or end_date,
+        "stocks": rows,
+    }
+    _custom_cache[cache_key] = {"ts": time.time(), "data": result}
     return result
 
 
