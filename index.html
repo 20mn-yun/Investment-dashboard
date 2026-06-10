@@ -1300,13 +1300,8 @@
             <span class="chart-title" id="chart-title"></span>
             <span class="chart-close" onclick="closeChart()">x</span>
         </div>
-        <div class="chart-periods">
-            <button class="period-btn" data-cperiod="5y" onclick="loadChart('5y')">5Y</button>
-            <button class="period-btn" data-cperiod="2y" onclick="loadChart('2y')">2Y</button>
-            <button class="period-btn active" data-cperiod="1y" onclick="loadChart('1y')">1Y</button>
-            <button class="period-btn" data-cperiod="6mo" onclick="loadChart('6mo')">6M</button>
-            <button class="period-btn" data-cperiod="ytd" onclick="loadChart('ytd')">YTD</button>
-        </div>
+        <div id="chart-period-selector"></div>
+        <div id="chartRangeNotice" style="display:none; font-size:12px; color:#8b949e; margin-top:6px;"></div>
         <div id="periodReturnDisplay" style="text-align:center; padding:8px 0 12px 0; border-bottom:1px solid #30363d; margin-bottom:12px;">
             <div id="periodReturnValue" style="font-size:28px; font-weight:700; line-height:1.1; color:#c9d1d9;">—</div>
             <div id="periodReturnLabel" style="font-size:12px; color:#8b949e; margin-top:4px;">기간 수익률</div>
@@ -1985,9 +1980,9 @@
             .then(d => { document.getElementById('companyOverviewText').textContent = d.overview || '기업 개요 정보가 없습니다.'; })
             .catch(() => { document.getElementById('companyOverviewText').textContent = '기업 개요를 불러오지 못했습니다.'; });
         const modal = document.querySelector('.chart-modal');
-        const periods = document.querySelector('.chart-periods');
+        const periods = document.getElementById('chart-period-selector');
         const detail = document.getElementById('stockDetailSection');
-        modal.insertBefore(detail, periods);
+        if (periods && periods.parentNode === modal) modal.insertBefore(detail, periods);
         fetch(API_BASE + '/api/valuation/band/' + encodeURIComponent(it.code))
             .then(r => r.ok ? r.json() : null)
             .then(band => {
@@ -2004,7 +1999,25 @@
         const existing = Chart.getChart(canvasId);
         if (existing) existing.destroy();
         const section = document.getElementById(sectionId);
-        if (!series || !band) { section.style.display = 'none'; return; }
+        const canvas = document.getElementById(canvasId);
+        const wrap = canvas.parentNode;
+        let msg = wrap.querySelector('.band-empty-msg');
+        const nonNull = Array.isArray(series) ? series.filter(s => s && s[key] != null).length : 0;
+        if (!band || nonNull < 2) {
+            section.style.display = 'block';
+            canvas.style.display = 'none';
+            if (!msg) {
+                msg = document.createElement('div');
+                msg.className = 'band-empty-msg';
+                msg.style.cssText = 'display:flex; align-items:center; justify-content:center; height:100%; color:#6e7681; font-size:13px; text-align:center; padding:0 12px;';
+                wrap.appendChild(msg);
+            }
+            msg.textContent = `이 종목은 해당 기간에 ${label} 밴드 데이터가 없습니다 (적자·상장 기간 부족 등).`;
+            msg.style.display = 'flex';
+            return;
+        }
+        if (msg) msg.style.display = 'none';
+        canvas.style.display = '';
         section.style.display = 'block';
 
         const labels = series.map(s => s.date).concat(['지금']);
@@ -2718,7 +2731,7 @@
         document.getElementById('chart-title').textContent = title;
         document.getElementById('chart-overlay').classList.add('active');
         // display:none→flex 전환 후 canvas 크기 인식을 위해 딜레이
-        setTimeout(() => loadChart('1y'), 50);
+        setTimeout(() => createPeriodSelector(document.getElementById('chart-period-selector'), (s, e) => loadChart(s, e)), 50);
 
         const detailSection = document.getElementById('stockDetailSection');
         if (changePct !== undefined) {
@@ -3018,14 +3031,115 @@
         drawEpsChart(epsFullSeries, q);
     });
 
-    async function loadChart(period) {
-        document.querySelectorAll('[data-cperiod]').forEach(b =>
-            b.classList.toggle('active', b.dataset.cperiod === period));
+    function createPeriodSelector(containerEl, onRangeChange) {
+        function fmtLocal(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+        const presets = [
+            { key: '1w', label: '1주' },
+            { key: '1m', label: '1달' },
+            { key: '3m', label: '3달' },
+            { key: '6m', label: '6달' },
+            { key: '1y', label: '1년' },
+            { key: '3y', label: '3년' },
+            { key: '5y', label: '5년' },
+            { key: 'ytd', label: 'YTD' },
+        ];
+        function presetRange(key) {
+            const today = new Date();
+            const end = new Date(today);
+            let start = new Date(today);
+            if (key === '1w') start.setDate(start.getDate() - 7);
+            else if (key === '1m') start.setMonth(start.getMonth() - 1);
+            else if (key === '3m') start.setMonth(start.getMonth() - 3);
+            else if (key === '6m') start.setMonth(start.getMonth() - 6);
+            else if (key === '1y') start.setFullYear(start.getFullYear() - 1);
+            else if (key === '3y') start.setFullYear(start.getFullYear() - 3);
+            else if (key === '5y') start.setFullYear(start.getFullYear() - 5);
+            else if (key === 'ytd') start = new Date(today.getFullYear(), 0, 1);
+            return { start: fmtLocal(start), end: fmtLocal(end) };
+        }
+        const inputStyle = 'background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;';
+        let html = '<div class="chart-periods" style="flex-wrap:wrap;">';
+        for (const p of presets) {
+            html += `<button class="period-btn" data-pkey="${p.key}">${p.label}</button>`;
+        }
+        html += '<button class="period-btn" data-pkey="custom">직접지정</button>';
+        html += '</div>';
+        html += '<div class="ps-custom-panel" style="display:none; margin-top:8px; padding:8px; background:#161b22; border:1px solid #30363d; border-radius:6px;">';
+        html += '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">';
+        html += `<input type="date" class="ps-start" style="${inputStyle}">`;
+        html += '<span style="color:#8b949e;">~</span>';
+        html += `<input type="date" class="ps-end" style="${inputStyle}">`;
+        html += '</div></div>';
+        containerEl.innerHTML = html;
+
+        const btns = containerEl.querySelectorAll('.period-btn');
+        const panel = containerEl.querySelector('.ps-custom-panel');
+        const startEl = containerEl.querySelector('.ps-start');
+        const endEl = containerEl.querySelector('.ps-end');
+
+        function setActive(key) {
+            btns.forEach(b => b.classList.toggle('active', b.dataset.pkey === key));
+        }
+        function tryCustom() {
+            const s = startEl.value, e = endEl.value;
+            startEl.style.borderColor = '#30363d';
+            endEl.style.borderColor = '#30363d';
+            if (!s || !e) return;
+            if (s >= e) {
+                startEl.style.borderColor = '#f85149';
+                endEl.style.borderColor = '#f85149';
+                return;
+            }
+            onRangeChange(s, e);
+        }
+        btns.forEach(b => {
+            b.addEventListener('click', function() {
+                const key = this.dataset.pkey;
+                if (key === 'custom') {
+                    setActive('custom');
+                    panel.style.display = 'block';
+                    return;
+                }
+                panel.style.display = 'none';
+                setActive(key);
+                const r = presetRange(key);
+                onRangeChange(r.start, r.end);
+            });
+        });
+        [startEl, endEl].forEach(el => {
+            el.addEventListener('click', function() {
+                try { if (this.showPicker) this.showPicker(); } catch (e) {}
+            });
+            el.addEventListener('change', tryCustom);
+        });
+
+        setActive('ytd');
+        const init = presetRange('ytd');
+        onRangeChange(init.start, init.end);
+    }
+
+    async function loadChart(start, end) {
         if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        const noticeEl = document.getElementById('chartRangeNotice');
+        if (noticeEl) noticeEl.style.display = 'none';
         try {
-            const res = await fetch(API_BASE + '/api/chart?symbol=' + encodeURIComponent(chartSymbol) + '&period=' + period);
+            const res = await fetch(API_BASE + '/api/chart?symbol=' + encodeURIComponent(chartSymbol) + '&start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end));
             const data = await res.json();
             if (!data.dates.length) return;
+            if (noticeEl && data.dates[0]) {
+                const reqStart = new Date(start);
+                const firstDate = new Date(data.dates[0]);
+                const diffDays = (firstDate - reqStart) / 86400000;
+                if (diffDays >= 30) {
+                    noticeEl.textContent = `데이터 보유 범위(${data.dates[0]}~)만 표시됩니다.`;
+                    noticeEl.style.display = 'block';
+                }
+            }
             const ctx = document.getElementById('price-chart').getContext('2d');
             chartInstance = new Chart(ctx, {
                 type: 'line',
@@ -3047,11 +3161,11 @@
                     }
                 }
             });
-            updatePeriodReturn(data.prices, period);
+            updatePeriodReturn(data.prices);
         } catch(e) { console.error('Chart load failed:', e); }
     }
 
-    function updatePeriodReturn(prices, periodLabel) {
+    function updatePeriodReturn(prices) {
         const valueEl = document.getElementById('periodReturnValue');
         const labelEl = document.getElementById('periodReturnLabel');
         if (!prices || prices.length < 2) {
@@ -3067,8 +3181,7 @@
         if (returnPct > 0) valueEl.style.color = '#f85149';
         else if (returnPct < 0) valueEl.style.color = '#58a6ff';
         else valueEl.style.color = '#c9d1d9';
-        const labelMap = {'5y':'5년 수익률','2y':'2년 수익률','1y':'1년 수익률','6mo':'6개월 수익률','ytd':'연초 이후 수익률'};
-        labelEl.textContent = labelMap[periodLabel] || (periodLabel + ' 수익률');
+        labelEl.textContent = '기간 수익률';
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChart(); });

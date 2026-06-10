@@ -447,12 +447,31 @@ def get_stock_quarterly_eps(ticker):
 @app.route("/api/chart", methods=["GET"])
 def get_chart():
     """차트용 히스토리컬 데이터"""
+    from datetime import datetime, timedelta
     symbol = request.args.get("symbol", "^GSPC")
     period = request.args.get("period", "1y")
-    if period not in {"5y", "2y", "1y", "6mo", "ytd"}:
+    start = request.args.get("start", "")
+    end = request.args.get("end", "")
+    use_range = False
+    dl_start = None
+    dl_end = None
+    if start and end:
+        try:
+            dt_s = datetime.strptime(start, "%Y-%m-%d")
+            dt_e = datetime.strptime(end, "%Y-%m-%d")
+            if dt_s < dt_e:
+                dl_start = dt_s.strftime("%Y-%m-%d")
+                dl_end = (dt_e + timedelta(days=1)).strftime("%Y-%m-%d")
+                use_range = True
+        except ValueError:
+            use_range = False
+    if not use_range and period not in {"5y", "2y", "1y", "6mo", "ytd"}:
         period = "1y"
     try:
-        data = yf.download(symbol, period=period, progress=False, threads=False)
+        if use_range:
+            data = yf.download(symbol, start=dl_start, end=dl_end, interval="1d", progress=False, threads=False)
+        else:
+            data = yf.download(symbol, period=period, progress=False, threads=False)
         if data.empty:
             return jsonify({"dates": [], "prices": []})
         # yfinance MultiIndex 컬럼 처리
