@@ -559,6 +559,11 @@
         .drill-btn:hover { background: #21262d; border-color: #58a6ff; }
         #tab-valuation .val-table td, #tab-valuation .val-table th { font-size: 12px; font-weight: normal; }
         #tab-valuation .val-table th { white-space: nowrap; vertical-align: middle; }
+        #tab-valuation .val-table { table-layout: fixed; width: 100%; }
+        #tab-valuation .val-table td, #tab-valuation .val-table th { padding-left: 4px; padding-right: 4px; overflow: hidden; text-overflow: ellipsis; }
+        #tab-valuation .val-table thead th { position: sticky; top: 0; z-index: 5; background: #161b22; }
+        #tab-valuation .val-table th:first-child, #tab-valuation .val-table td:first-child { width: 12%; }
+        #tab-valuation .val-table th:nth-child(2), #tab-valuation .val-table td:nth-child(2) { width: 8%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* 그룹 카드 */
         .group-card {
@@ -1915,13 +1920,13 @@
             {label:'종목명', key:null, tip:'클릭하면 상세(주가 차트·PER/PBR 밴드·EPS)를 볼 수 있습니다.'},
             {label:'섹터', key:null, tip:'WICS 중분류 기준 업종.'},
             {label:'시총(억)', key:'market_cap_eok', tip:'시가총액(억원).'},
-            {label:'fPER', key:'fper', tip:'선행 PER = 현재가 ÷ 추정 EPS(네이버 컨센서스 내년 추정). 미래 이익 기준.'},
             {label:'PER', key:'per', tip:'현재 PER = 현재가 ÷ 최신 연간 EPS(DART 사업보고서). EPS 적자면 —.'},
+            {label:'fPER', key:'fper', tip:'선행 PER = 현재가 ÷ 추정 EPS(네이버 컨센서스 내년 추정). 미래 이익 기준.'},
             {label:'PER P10', key:'per_p10', tip:'최근 5년 월별 PER의 하위 10%(역사적 저점권). PER이 이보다 낮으면 역사적으로 싼 구간.'},
             {label:'PER%', key:'per_position', tip:'현재 PER의 자기 5년 분포 내 백분위. 0%=역사적 최저(가장 쌈), 100%=최고.'},
             {label:'fPER%', key:'fper_position', tip:'선행(추정) PER의 자기 5년 PER 분포 내 백분위. 낮을수록 미래 이익 기준 역사적 저평가.'},
-            {label:'fPBR', key:'fpbr', tip:'선행 PBR = 현재가 ÷ (최신 BPS + 추정 EPS − 추정 배당). DART 기준 롤포워드.'},
             {label:'PBR', key:'pbr', tip:'현재 PBR = 현재가 ÷ 최신 BPS(DART 지배주주지분 ÷ 상장주식수).'},
+            {label:'fPBR', key:'fpbr', tip:'선행 PBR = 현재가 ÷ (최신 BPS + 추정 EPS − 추정 배당). DART 기준 롤포워드.'},
             {label:'PBR P10', key:'pbr_p10', tip:'최근 5년 월별 PBR의 하위 10%.'},
             {label:'PBR%', key:'pbr_position', tip:'현재 PBR의 자기 5년 분포 내 백분위. 0%=최저, 100%=최고.'},
             {label:'fPBR%', key:'fpbr_position', tip:'선행 PBR의 자기 5년 PBR 분포 내 백분위. 낮을수록 역사적 저평가.'},
@@ -1949,8 +1954,8 @@
             html += `<td style="text-align:left">${r.name || ''}</td>`;
             html += `<td style="text-align:left">${r.sector || ''}</td>`;
             html += `<td>${fmtCap(r.market_cap_eok)}</td>`;
-            html += `<td>${fmtN(r.fper)}</td><td>${fmtN(r.per)}</td><td>${fmtN(r.per_p10)}</td><td>${fmtPos(r.per_position)}</td><td>${fmtPos(r.fper_position)}</td>`;
-            html += `<td>${fmtN(r.fpbr)}</td><td>${fmtN(r.pbr)}</td><td>${fmtN(r.pbr_p10)}</td><td>${fmtPos(r.pbr_position)}</td><td>${fmtPos(r.fpbr_position)}</td>`;
+            html += `<td>${fmtN(r.per)}</td><td>${fmtN(r.fper)}</td><td>${fmtN(r.per_p10)}</td><td>${fmtPos(r.per_position)}</td><td>${fmtPos(r.fper_position)}</td>`;
+            html += `<td>${fmtN(r.pbr)}</td><td>${fmtN(r.fpbr)}</td><td>${fmtN(r.pbr_p10)}</td><td>${fmtPos(r.pbr_position)}</td><td>${fmtPos(r.fpbr_position)}</td>`;
             html += '</tr>';
         }
         html += '</tbody></table>';
