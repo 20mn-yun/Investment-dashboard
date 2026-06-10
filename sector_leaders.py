@@ -579,6 +579,12 @@ def compute_wics_us_etfs():
         bench_series = pd.Series(dtype=float)
 
     result = {"last_updated": datetime.now().isoformat(timespec="seconds"), "etfs": {}}
+    if len(bench_series) > 0:
+        bench_sorted = bench_series.sort_index()
+        result["benchmark_series"] = {
+            "dates": [d.strftime("%Y-%m-%d") for d in bench_sorted.index],
+            "closes": [_safe_float(v) for v in bench_sorted.values],
+        }
 
     for ticker in tickers:
         try:
@@ -623,6 +629,12 @@ def compute_wics_us_etfs():
                 "rs": rs,
                 "volume_change": vc,
             }
+
+        close_sorted = close_s.sort_index()
+        etf_data["series"] = {
+            "dates": [d.strftime("%Y-%m-%d") for d in close_sorted.index],
+            "closes": [_safe_float(v) for v in close_sorted.values],
+        }
 
         result["etfs"][ticker] = etf_data
         print(f"  {ticker}: {len(close_s)} close days, {len(vol_s)} vol days")
@@ -825,6 +837,355 @@ def _build_wics_us_result():
         _add_zscores(rows)
         rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
         result[period_name] = rows
+    return result
+
+
+_sector_custom_cache = {}
+WICS_CACHE_SERIES_PATH = Path("cache/wics_sectors.json")
+STOCK_PRICE_CACHE_PATH = Path("cache/stock_price_series.json")
+STOCK_WICS_PATH = Path("cache/stock_wics.json")
+STOCK_THEMES_PATH = Path("cache/stock_themes.json")
+
+
+def _pd_series(dates, values):
+    import pandas as pd
+    pairs = [(d, v) for d, v in zip(dates, values) if v is not None]
+    if not pairs:
+        return pd.Series(dtype=float)
+    idx = pd.DatetimeIndex([p[0] for p in pairs])
+    s = pd.Series([p[1] for p in pairs], index=idx).sort_index()
+    return s[~s.index.duplicated(keep="first")]
+
+
+def _ret_abs_window(s, dt_s, dt_e):
+    w = s.loc[dt_s:dt_e].dropna()
+    if len(w) < 2:
+        return None, None, None
+    first = float(w.iloc[0])
+    if abs(first) < 1e-9:
+        return None, str(w.index[0].date()), str(w.index[-1].date())
+    r = round((float(w.iloc[-1]) / first - 1) * 100, 2)
+    return r, str(w.index[0].date()), str(w.index[-1].date())
+
+
+def _ret_cum_window(s, dt_s, dt_e):
+    w = s.loc[dt_s:dt_e].dropna()
+    if len(w) < 2:
+        return None
+    denom = 1 + float(w.iloc[0]) / 100
+    if abs(denom) < 1e-9:
+        return None
+    return round(((1 + float(w.iloc[-1]) / 100) / denom - 1) * 100, 2)
+
+
+def _load_dvol_by_code():
+    import pandas as pd
+    if not STOCK_PRICE_CACHE_PATH.exists():
+        return {}
+    try:
+        with open(STOCK_PRICE_CACHE_PATH, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+    out = {}
+    for code, entry in raw.get("data", {}).items():
+        if "dvol_dates" in entry and "dvol_vals" in entry:
+            s = pd.Series(
+                entry["dvol_vals"],
+                index=pd.DatetimeIndex(entry["dvol_dates"]),
+            ).sort_index()
+            out[code] = s[~s.index.duplicated(keep="first")]
+    return out
+
+
+def _custom_group_vc(dvol_by_code, code_groups, dt_s, dt_e):
+    import pandas as pd
+    span = dt_e - dt_s
+    prev_s = dt_s - span
+    prev_e = dt_s - pd.Timedelta(days=1)
+    out = {}
+    for gk, codes in code_groups.items():
+        series_list = [dvol_by_code[c] for c in codes if c in dvol_by_code]
+        if not series_list:
+            continue
+        combined = pd.concat(series_list, axis=1).sum(axis=1).dropna()
+        cur = combined.loc[dt_s:dt_e]
+        prev = combined.loc[prev_s:prev_e]
+        if len(cur) > 0 and len(prev) > 0:
+            pa = prev.mean()
+            if pa > 0:
+                out[gk] = round((cur.mean() / pa - 1) * 100, 2)
+    return out
+
+
+def get_custom_bounds():
+    starts = []
+    ends = []
+
+    def _scan(dates):
+        if dates:
+            starts.append(dates[0])
+            ends.append(dates[-1])
+
+    if CACHE_PATH.exists():
+        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+            sl = json.load(f)
+        for path in [
+            ("kr", "themes"), ("kr", "sizes"),
+        ]:
+            ser = sl.get(path[0], {}).get(path[1], {}).get("series", {})
+            _scan(ser.get("_benchmark", {}).get("dates", []))
+        _scan(sl.get("us", {}).get("series", {}).get("_benchmark", {}).get("dates", []))
+        _scan(sl.get("us", {}).get("themes", {}).get("series", {}).get("_benchmark", {}).get("dates", []))
+        _scan(sl.get("us", {}).get("sizes", {}).get("series", {}).get("_benchmark", {}).get("dates", []))
+
+    if WICS_CACHE_SERIES_PATH.exists():
+        with open(WICS_CACHE_SERIES_PATH, "r", encoding="utf-8") as f:
+            wraw = json.load(f)
+        _scan(wraw.get("series", {}).get("_benchmark", {}).get("dates", []))
+
+    if WICS_US_CACHE_PATH.exists():
+        with open(WICS_US_CACHE_PATH, "r", encoding="utf-8") as f:
+            wus = json.load(f)
+        _scan(wus.get("benchmark_series", {}).get("dates", []))
+
+    if not starts or not ends:
+        return {"oldest": None, "newest": None}
+    return {"oldest": max(starts), "newest": min(ends)}
+
+
+def compute_sector_leaders_custom(start_date, end_date):
+    import pandas as pd
+
+    cache_key = f"{start_date}:{end_date}"
+    cached = _sector_custom_cache.get(cache_key)
+    if cached and time.time() - cached["ts"] < 3600:
+        return cached["data"]
+
+    dt_s = pd.Timestamp(start_date)
+    dt_e = pd.Timestamp(end_date)
+
+    if not CACHE_PATH.exists():
+        return {"error": "sector_leaders.json 캐시가 없습니다 – 먼저 배치를 실행하세요"}
+    with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        sl = json.load(f)
+
+    wics_kr_series = {}
+    wics_kr_bench = pd.Series(dtype=float)
+    wics_kr_base = {}
+    if WICS_CACHE_SERIES_PATH.exists():
+        with open(WICS_CACHE_SERIES_PATH, "r", encoding="utf-8") as f:
+            wraw = json.load(f)
+        wser = wraw.get("series", {})
+        wbench = wser.get("_benchmark", {})
+        wdates = wbench.get("dates", [])
+        wics_kr_bench = _pd_series(wdates, wbench.get("values", []))
+        for code, sd in wser.items():
+            if code.startswith("_"):
+                continue
+            wics_kr_series[code] = _pd_series(wdates, sd.get("values", []))
+        for row in (wraw.get("kr_wics", {}).get("1y", [])):
+            wics_kr_base[row["code"]] = row
+
+    dvol_by_code = _load_dvol_by_code()
+
+    wics_map = {}
+    if STOCK_WICS_PATH.exists():
+        with open(STOCK_WICS_PATH, "r", encoding="utf-8") as f:
+            wmap_raw = json.load(f)
+        wics_map = wmap_raw.get("mapping", wmap_raw)
+    wics_groups = {}
+    for code, info in wics_map.items():
+        mcls = info.get("wics_mcls_cd")
+        if mcls:
+            wics_groups.setdefault(mcls, []).append(code)
+
+    theme_groups = {}
+    if STOCK_THEMES_PATH.exists():
+        with open(STOCK_THEMES_PATH, "r", encoding="utf-8") as f:
+            traw = json.load(f)
+        for _code, entry in traw.get("themes", {}).items():
+            nm = entry.get("name")
+            cons = entry.get("constituents", [])
+            if nm and cons:
+                theme_groups[nm] = cons
+
+    actual = {"start": None, "end": None}
+
+    def _track(a, b):
+        if a and (actual["start"] is None or a < actual["start"]):
+            actual["start"] = a
+        if b and (actual["end"] is None or b > actual["end"]):
+            actual["end"] = b
+
+    kr_wics_vc = _custom_group_vc(dvol_by_code, wics_groups, dt_s, dt_e)
+    kr_theme_vc = _custom_group_vc(dvol_by_code, theme_groups, dt_s, dt_e)
+
+    kr_wics_rows = []
+    for code, s in wics_kr_series.items():
+        base = wics_kr_base.get(code, {})
+        sec_ret = _ret_cum_window(s, dt_s, dt_e)
+        bench_ret, a0, a1 = _ret_abs_window(wics_kr_bench, dt_s, dt_e)
+        _track(a0, a1)
+        rs = None
+        if sec_ret is not None and bench_ret is not None:
+            rs = round(sec_ret - bench_ret, 2)
+        kr_wics_rows.append({
+            "code": code,
+            "name": base.get("name", WICS_TO_US_ETF.get(code, {}).get("name", code)),
+            "lcls_code": base.get("lcls_code", ""),
+            "lcls_name": base.get("lcls_name", ""),
+            "sector_return": sec_ret,
+            "benchmark_return": bench_ret,
+            "rs": rs,
+            "volume_change": kr_wics_vc.get(code),
+            "mapped_us": WICS_TO_US_ETF.get(code, {}).get("us_etf"),
+        })
+    _add_zscores(kr_wics_rows)
+    kr_wics_rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
+
+    def _kr_group_rows(group_key, mapping, vc_dict):
+        grp = sl.get("kr", {}).get(group_key, {})
+        gser = grp.get("series", {})
+        gbench = gser.get("_benchmark", {})
+        gdates = gbench.get("dates", [])
+        bench_s = _pd_series(gdates, gbench.get("values", []))
+        bench_ret, a0, a1 = _ret_abs_window(bench_s, dt_s, dt_e)
+        _track(a0, a1)
+        rows = []
+        for name, sd in gser.items():
+            if name.startswith("_"):
+                continue
+            s = _pd_series(gdates, sd.get("values", []))
+            sec_ret, _, _ = _ret_abs_window(s, dt_s, dt_e)
+            rs = None
+            if sec_ret is not None and bench_ret is not None:
+                rs = round(sec_ret - bench_ret, 2)
+            rows.append({
+                "sector": name,
+                "rs": rs,
+                "sector_return": sec_ret,
+                "benchmark_return": bench_ret,
+                "mapped_us": mapping.get(name),
+                "volume_change": vc_dict.get(name),
+            })
+        _add_zscores(rows)
+        rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
+        return rows
+
+    kr_theme_rows = _kr_group_rows("themes", THEME_MAPPING, kr_theme_vc)
+    kr_size_rows = _kr_group_rows("sizes", SIZE_MAPPING, {})
+
+    def _us_rs_rows(series_dict, name_map, mapped_map, label_field):
+        bench = series_dict.get("_benchmark", {})
+        bdates = bench.get("dates", [])
+        bench_s = _pd_series(bdates, bench.get("values", []))
+        bench_ret, a0, a1 = _ret_abs_window(bench_s, dt_s, dt_e)
+        _track(a0, a1)
+        rows = []
+        for key, sd in series_dict.items():
+            if key.startswith("_"):
+                continue
+            s = _pd_series(bdates, sd.get("values", []))
+            sec_ret, _, _ = _ret_abs_window(s, dt_s, dt_e)
+            rs = None
+            if sec_ret is not None and bench_ret is not None:
+                rs = round(sec_ret - bench_ret, 2)
+            row = {
+                label_field: key,
+                "rs": rs,
+                "sector_return": sec_ret,
+                "benchmark_return": bench_ret,
+                "volume_change": None,
+            }
+            if name_map is not None:
+                row["name"] = name_map.get(key, "")
+            if mapped_map is not None:
+                row["mapped_kr"] = mapped_map.get(key, [])
+            rows.append(row)
+        rs_zs = winsorized_zscores([r["rs"] for r in rows])
+        for i, r in enumerate(rows):
+            r["rs_z"] = rs_zs[i]
+            r["vc_z"] = None
+        rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
+        return rows
+
+    rev_map = _reverse_mapping()
+    us_legacy = _us_rs_rows(sl.get("us", {}).get("series", {}), US_SECTORS, rev_map, "ticker")
+
+    us_theme_rev = {}
+    for kr_name, us_t in THEME_MAPPING.items():
+        us_theme_rev.setdefault(us_t, []).append(kr_name)
+    us_themes = _us_rs_rows(
+        sl.get("us", {}).get("themes", {}).get("series", {}),
+        {t: US_THEMES.get(t, "") for t in US_THEMES},
+        us_theme_rev, "ticker",
+    )
+
+    us_size_rev = {}
+    for kr_name, us_t in SIZE_MAPPING.items():
+        us_size_rev.setdefault(us_t, []).append(kr_name)
+    us_sizes = _us_rs_rows(
+        sl.get("us", {}).get("sizes", {}).get("series", {}),
+        {t: US_SIZES.get(t, "") for t in US_SIZES},
+        us_size_rev, "ticker",
+    )
+
+    us_wics_rows = []
+    if WICS_US_CACHE_PATH.exists():
+        with open(WICS_US_CACHE_PATH, "r", encoding="utf-8") as f:
+            wus = json.load(f)
+        wus_bench = wus.get("benchmark_series", {})
+        wus_bench_s = _pd_series(wus_bench.get("dates", []), wus_bench.get("closes", []))
+        bench_ret, a0, a1 = _ret_abs_window(wus_bench_s, dt_s, dt_e)
+        _track(a0, a1)
+        us_to_wics = {}
+        for code, mp in WICS_TO_US_ETF.items():
+            etf = mp.get("us_etf")
+            if etf:
+                us_to_wics.setdefault(etf, []).append((code, mp["name"]))
+        for ticker, etf_data in wus.get("etfs", {}).items():
+            ser = etf_data.get("series", {})
+            s = _pd_series(ser.get("dates", []), ser.get("closes", []))
+            sec_ret, _, _ = _ret_abs_window(s, dt_s, dt_e)
+            rs = None
+            if sec_ret is not None and bench_ret is not None:
+                rs = round(sec_ret - bench_ret, 2)
+            mapped = us_to_wics.get(ticker, [])
+            us_wics_rows.append({
+                "etf": ticker,
+                "mapped_kr_wics": [c for c, _ in mapped],
+                "mapped_kr_names": [n for _, n in mapped],
+                "sector_return": sec_ret,
+                "benchmark_return": bench_ret,
+                "rs": rs,
+                "volume_change": None,
+            })
+        rs_zs = winsorized_zscores([r["rs"] for r in us_wics_rows])
+        for i, r in enumerate(us_wics_rows):
+            r["rs_z"] = rs_zs[i]
+            r["vc_z"] = None
+        us_wics_rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
+
+    result = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "actual_start": actual["start"] or start_date,
+        "actual_end": actual["end"] or end_date,
+        "kr": {
+            "wics_sectors": kr_wics_rows,
+            "themes": kr_theme_rows,
+            "sizes": kr_size_rows,
+        },
+        "us": {
+            "sectors": us_legacy,
+            "wics_sectors": us_wics_rows,
+            "themes": us_themes,
+            "sizes": us_sizes,
+        },
+    }
+
+    _sector_custom_cache[cache_key] = {"ts": time.time(), "data": result}
     return result
 
 

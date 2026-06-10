@@ -362,6 +362,11 @@
             border-bottom: 1px solid #21262d;
             color: #e6edf3;
         }
+        .sector-table th, .sector-table td { word-break: keep-all; }
+        .sector-table th:first-child, .sector-table td:first-child {
+            min-width: 96px;
+            line-height: 1.3;
+        }
         .sector-table tr:last-child td { border-bottom: none; }
         .sector-table tr {
             cursor: pointer;
@@ -395,6 +400,8 @@
             color: #8b949e;
             cursor: pointer;
             font-size: 13px;
+            white-space: nowrap;
+            flex-shrink: 0;
             transition: all 0.15s;
         }
         .period-selector .period-btn:hover { color: #e6edf3; border-color: #58a6ff; }
@@ -1070,10 +1077,10 @@
             .mapped-table .col-volume { display: none; }
             .period-selector .period-btn { padding: 4px 10px; font-size: 12px; }
 
-            #stk-custom-panel > div { flex-direction: column; align-items: stretch; }
-            #stk-custom-panel label { font-size: 14px; }
-            #stk-custom-panel input[type=date] { width: 100%; padding: 8px; font-size: 14px; }
-            #stk-custom-panel button { padding: 10px; font-size: 14px; }
+            #stk-custom-panel > div, #sec-custom-panel > div { flex-direction: column; align-items: stretch; }
+            #stk-custom-panel label, #sec-custom-panel label { font-size: 14px; }
+            #stk-custom-panel input[type=date], #sec-custom-panel input[type=date] { width: 100%; padding: 8px; font-size: 14px; }
+            #stk-custom-panel button, #sec-custom-panel button { padding: 10px; font-size: 14px; }
 
             #stock-table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             .stk-table { min-width: 1000px; font-size: 13px; }
@@ -1410,7 +1417,21 @@
             <span class="period-btn active" onclick="changePeriod('3m')">3M</span>
             <span class="period-btn" onclick="changePeriod('6m')">6M</span>
             <span class="period-btn" onclick="changePeriod('1y')">1Y</span>
+            <span class="period-btn" id="sec-custom-btn" onclick="toggleSecCustomPanel()">사용자 지정</span>
             <span class="leaders-updated" id="leaders-updated"></span>
+            <div id="sec-custom-panel" style="display:none; margin-top:8px; padding:10px; background:#161b22; border:1px solid #30363d; border-radius:8px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <label style="color:#8b949e; font-size:13px;">시작
+                        <input type="date" id="sec-custom-start" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    </label>
+                    <label style="color:#8b949e; font-size:13px;">종료
+                        <input type="date" id="sec-custom-end" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    </label>
+                    <button onclick="applySecCustomPeriod()" style="background:#238636; color:#fff; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-size:13px;">적용</button>
+                    <span id="sec-custom-label" style="color:#58a6ff; font-size:13px;"></span>
+                </div>
+                <div style="margin-top:6px; color:#6e7681; font-size:12px;">⚠ 임의 기간에서 미국은 상대강도(RS)만 지원 — 거래대금 컬럼은 「—」로 표시됩니다.</div>
+            </div>
         </div>
         <div class="weight-slider-wrap">
             <span class="slider-label slider-label-left">상대강도</span>
@@ -1420,11 +1441,11 @@
         <div class="weight-slider-status" id="weight-status">상대강도 50% · 거래대금 50%</div>
         <div class="sector-grid">
             <div>
-                <div class="sector-panel-title">🇰🇷 한국 (KRX 업종)</div>
+                <div class="sector-panel-title">🇰🇷 한국 (WICS 업종)</div>
                 <div class="data-table" id="sector-container-kr"></div>
             </div>
             <div>
-                <div class="sector-panel-title">🇺🇸 미국 (SPDR ETF)</div>
+                <div class="sector-panel-title">🇺🇸 미국 (섹터 ETF)</div>
                 <div class="data-table" id="sector-container-us"></div>
             </div>
         </div>
@@ -2074,7 +2095,7 @@
     function renderSeriesChart(canvas, krLabel, krVals, usLabel, usVals, dates) {
         if (activeChartInstance) { activeChartInstance.destroy(); activeChartInstance = null; }
         const n = Math.min(krVals.length, usVals.length, dates.length);
-        const periodN = Math.min(PERIOD_DAYS[currentPeriod] || 63, n);
+        const periodN = sectorCustomMode ? n : Math.min(PERIOD_DAYS[currentPeriod] || 63, n);
         const krSlice = normalizeBase100(krVals.slice(-periodN));
         const usSlice = normalizeBase100(usVals.slice(-periodN));
         const dateSlice = dates.slice(-periodN);
@@ -2178,6 +2199,13 @@
         return `<span class="${cls}">${sign}${v.toFixed(1)}%</span>`;
     }
 
+    function formatVc(v, isUs) {
+        if ((v == null || isNaN(v)) && isUs && sectorCustomMode) {
+            return '<span class="sync-none" title="사용자 지정 기간에서는 미지원">—</span>';
+        }
+        return formatPct(v);
+    }
+
     function closeSectorChart() {
         if (activeChartInstance) { activeChartInstance.destroy(); activeChartInstance = null; }
         if (activeChartRow) { activeChartRow.remove(); activeChartRow = null; }
@@ -2221,16 +2249,24 @@
             ? (region === 'kr' ? (US_SECTORS_KR[mappedKey] || mappedKey) : mappedKey)
             : null;
 
-        const myVals = myData ? myData.values : [];
+        let myVals = myData ? myData.values : [];
+        let myDatesEff = myDates;
 
-        const otherDates = otherData
+        let otherDates = otherData
             ? ((otherData.dates && otherData.dates.length > 0)
                 ? otherData.dates
                 : ((otherSeries._benchmark || {}).dates || []))
             : [];
-        const otherVals = otherData ? otherData.values : [];
+        let otherVals = otherData ? otherData.values : [];
 
-        const chartDates = myDates.length > 0 ? myDates : otherDates;
+        if (sectorCustomMode && sectorCustomStart && sectorCustomEnd) {
+            const ms = sliceSeriesByDate(myVals, myDatesEff, sectorCustomStart, sectorCustomEnd);
+            myVals = ms.values; myDatesEff = ms.dates;
+            const os = sliceSeriesByDate(otherVals, otherDates, sectorCustomStart, sectorCustomEnd);
+            otherVals = os.values; otherDates = os.dates;
+        }
+
+        const chartDates = myDatesEff.length > 0 ? myDatesEff : otherDates;
         if (myVals.length > 0 && otherVals.length > 0) {
             renderSeriesChart(canvas,
                 region === 'kr' ? myLabel : otherLabel,
@@ -2239,7 +2275,7 @@
                 region === 'us' ? myVals : otherVals,
                 chartDates);
         } else if (myVals.length > 0) {
-            renderSeriesChart(canvas, myLabel, myVals, '', myVals, myDates);
+            renderSeriesChart(canvas, myLabel, myVals, '', myVals, myDatesEff);
         } else if (otherVals.length > 0) {
             const label = region === 'kr' ? (US_SECTORS_KR[mappedKey] || mappedKey) : (trElement.dataset.name || mappedKey);
             renderSeriesChart(canvas, label, otherVals, '', otherVals, otherDates);
@@ -2258,7 +2294,8 @@
         if (!krData || !krData.values) return;
 
         const usData = usTicker ? usGroup[usTicker] : null;
-        const dates = (krGroup._benchmark || {}).dates || [];
+        let dates = (krGroup._benchmark || {}).dates || [];
+        const usDates = (usGroup._benchmark || {}).dates || [];
 
         const chartTr = document.createElement('tr');
         chartTr.className = 'chart-row';
@@ -2275,8 +2312,17 @@
         trElement.classList.add('chart-active');
         activeChartRow = chartTr;
 
-        const krVals = krData.values;
-        const usVals = usData ? usData.values : [];
+        let krVals = krData.values;
+        let usVals = usData ? usData.values : [];
+
+        if (sectorCustomMode && sectorCustomStart && sectorCustomEnd) {
+            const ks = sliceSeriesByDate(krVals, dates, sectorCustomStart, sectorCustomEnd);
+            krVals = ks.values; dates = ks.dates;
+            if (usData) {
+                const us = sliceSeriesByDate(usVals, usDates, sectorCustomStart, sectorCustomEnd);
+                usVals = us.values;
+            }
+        }
 
         if (usData && usVals.length > 0) {
             renderSeriesChart(canvas, krName, krVals, usTicker, usVals, dates);
@@ -2335,7 +2381,7 @@
                 <td>${name}${ticker}</td>
                 <td>${formatPct(row.sector_return)}</td>
                 <td>${formatPct(row.rs)}</td>
-                <td>${formatPct(row.volume_change)}</td>
+                <td>${formatVc(row.volume_change, region === 'us')}</td>
                 <td>${formatScore(row)}</td>
                 <td>${mappedStr}</td>
                 ${drillTd}
@@ -2388,7 +2434,7 @@
             const usLabel = us ? `${us.name} <span class="mapped-info">${us.ticker}</span>` : '<span class="sync-none">—</span>';
             const usReturn = us ? formatPct(us.sector_return) : '<span class="sync-none">—</span>';
             const usRs = us ? formatPct(us.rs) : '<span class="sync-none">—</span>';
-            const usVc = us ? formatPct(us.volume_change) : '<span class="sync-none">—</span>';
+            const usVc = us ? formatVc(us.volume_change, true) : '<span class="sync-none">—</span>';
             const sync = us ? syncMarker(kr.rs, us.rs) : '<span class="sync-none">—</span>';
             html += `<tr data-group="${groupKey}" data-kr="${kr.sector}" data-us="${usTicker || ''}">
                 <td>${kr.sector}</td>
@@ -2418,10 +2464,90 @@
 
     function changePeriod(period) {
         currentPeriod = period;
-        document.querySelectorAll('.period-selector .period-btn').forEach(btn => {
+        sectorCustomMode = false;
+        document.querySelectorAll('#tab-leaders .period-selector .period-btn').forEach(btn => {
             btn.classList.toggle('active', btn.textContent.trim() === period.toUpperCase());
         });
+        document.getElementById('sec-custom-btn').classList.remove('active');
+        document.getElementById('sec-custom-label').textContent = '';
+        document.getElementById('sec-custom-panel').style.display = 'none';
         reRenderAllTables();
+    }
+
+    let sectorCustomMode = false;
+    let sectorCustomStart = null;
+    let sectorCustomEnd = null;
+    let _secPickerBound = false;
+    let _secBounds = null;
+
+    async function toggleSecCustomPanel() {
+        const panel = document.getElementById('sec-custom-panel');
+        const visible = panel.style.display !== 'none';
+        panel.style.display = visible ? 'none' : 'block';
+        if (visible) return;
+        if (!_secBounds) {
+            try {
+                const res = await fetch(API_BASE + '/api/sector-leaders/bounds');
+                _secBounds = await res.json();
+            } catch (e) { _secBounds = {}; }
+        }
+        const startEl = document.getElementById('sec-custom-start');
+        const endEl = document.getElementById('sec-custom-end');
+        const oldest = (_secBounds && _secBounds.oldest) || null;
+        const newest = (_secBounds && _secBounds.newest) || null;
+        if (newest) { startEl.max = newest; endEl.max = newest; }
+        if (oldest) { startEl.min = oldest; endEl.min = oldest; }
+        if (!startEl.value && oldest) startEl.value = oldest;
+        if (!endEl.value && newest) endEl.value = newest;
+        if (!_secPickerBound) {
+            _secPickerBound = true;
+            [startEl, endEl].forEach(el => el.addEventListener('click', function() { if (this.showPicker) this.showPicker(); }));
+        }
+    }
+
+    async function applySecCustomPeriod() {
+        const startVal = document.getElementById('sec-custom-start').value;
+        const endVal = document.getElementById('sec-custom-end').value;
+        if (!startVal || !endVal) return alert('시작일과 종료일을 모두 선택하세요.');
+        if (startVal >= endVal) return alert('시작일이 종료일보다 앞서야 합니다.');
+        const label = document.getElementById('sec-custom-label');
+        label.textContent = '로딩 중...';
+        try {
+            const res = await fetch(API_BASE + `/api/sector-leaders/custom?start=${startVal}&end=${endVal}`);
+            const data = await res.json();
+            if (data.error) { label.textContent = ''; return alert(data.error); }
+            leadersData.kr.wics_sectors = leadersData.kr.wics_sectors || {};
+            leadersData.kr.themes = leadersData.kr.themes || {};
+            leadersData.kr.sizes = leadersData.kr.sizes || {};
+            leadersData.us.themes = leadersData.us.themes || {};
+            leadersData.us.sizes = leadersData.us.sizes || {};
+            leadersData.kr.wics_sectors['custom'] = data.kr.wics_sectors;
+            leadersData.kr.themes['custom'] = data.kr.themes;
+            leadersData.kr.sizes['custom'] = data.kr.sizes;
+            leadersData.us['custom'] = data.us.sectors;
+            leadersData.us.themes['custom'] = data.us.themes;
+            leadersData.us.sizes['custom'] = data.us.sizes;
+            sectorCustomMode = true;
+            sectorCustomStart = data.actual_start;
+            sectorCustomEnd = data.actual_end;
+            currentPeriod = 'custom';
+            document.querySelectorAll('#tab-leaders .period-selector .period-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('sec-custom-btn').classList.add('active');
+            label.textContent = `${data.actual_start} ~ ${data.actual_end}`;
+            reRenderAllTables();
+        } catch (e) {
+            label.textContent = '';
+            alert('사용자 지정 기간 로드 실패: ' + e.message);
+        }
+    }
+
+    function sliceSeriesByDate(values, dates, start, end) {
+        if (!dates || dates.length === 0) return { values: values, dates: dates };
+        const outV = [], outD = [];
+        for (let i = 0; i < dates.length; i++) {
+            if (dates[i] >= start && dates[i] <= end) { outV.push(values[i]); outD.push(dates[i]); }
+        }
+        return { values: outV, dates: outD };
     }
 
     // 그룹 관리 (서버 저장)

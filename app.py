@@ -868,6 +868,41 @@ def get_valuation_overview(code):
     return jsonify({"overview": overview})
 
 
+@app.route("/api/sector-leaders/custom", methods=["GET"])
+def get_sector_leaders_custom():
+    from datetime import datetime
+    start = request.args.get("start", "")
+    end = request.args.get("end", "")
+    if not start or not end:
+        return jsonify({"error": "start와 end 파라미터가 필요합니다"}), 400
+    try:
+        dt_s = datetime.strptime(start, "%Y-%m-%d")
+        dt_e = datetime.strptime(end, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "날짜 형식이 잘못되었습니다 (YYYY-MM-DD)"}), 400
+    if dt_s >= dt_e:
+        return jsonify({"error": "시작일이 종료일보다 앞서야 합니다"}), 400
+    import sector_leaders
+    bounds = sector_leaders.get_custom_bounds()
+    oldest = bounds.get("oldest")
+    newest = bounds.get("newest")
+    if oldest and start < oldest:
+        return jsonify({"error": f"시작일이 캐시 범위({oldest}~)를 벗어났습니다", "bounds": bounds}), 400
+    if newest and end > newest:
+        return jsonify({"error": f"종료일이 캐시 범위(~{newest})를 벗어났습니다", "bounds": bounds}), 400
+    result = sector_leaders.compute_sector_leaders_custom(start, end)
+    if "error" in result:
+        return jsonify(result), 503
+    result["bounds"] = bounds
+    return jsonify(result)
+
+
+@app.route("/api/sector-leaders/bounds", methods=["GET"])
+def get_sector_leaders_bounds():
+    import sector_leaders
+    return jsonify(sector_leaders.get_custom_bounds())
+
+
 @app.route("/api/sector-leaders/<region>", methods=["GET"])
 def get_sector_leaders_by_region(region):
     if region not in ("kr", "us"):
