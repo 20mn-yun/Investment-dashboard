@@ -913,6 +913,74 @@
         }
         .dart-digest-pager button:hover { color: #e6edf3; border-color: #58a6ff; }
         .dart-digest-pager button:disabled { opacity: 0.4; cursor: default; }
+
+        #tab-inbox .inbox-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+        #tab-inbox .inbox-toolbar .period-btn { font-size: 12px; padding: 4px 12px; }
+        #tab-inbox .inbox-toolbar .period-btn b { color: #58a6ff; font-weight: 600; margin-left: 2px; }
+        #tab-inbox .inbox-poll-btn { background: #1f6feb; border: none; border-radius: 6px; padding: 5px 14px; color: #fff; cursor: pointer; font-size: 12px; white-space: nowrap; }
+        #tab-inbox .inbox-poll-btn:hover { background: #388bfd; }
+        #tab-inbox .inbox-poll-btn:disabled { opacity: 0.5; cursor: default; }
+        #tab-inbox .inbox-day-group { font-size: 11px; color: #484f58; padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid #21262d; }
+        #tab-inbox .inbox-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+        #tab-inbox .inbox-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+        #tab-inbox .inbox-ch { font-size: 13px; color: #e6edf3; font-weight: 600; }
+        #tab-inbox .inbox-time { font-size: 11px; color: #8b949e; }
+        #tab-inbox .inbox-alsoin { font-size: 10px; color: #58a6ff; background: rgba(88,166,255,0.12); border-radius: 10px; padding: 1px 8px; }
+        #tab-inbox .inbox-text { font-size: 13px; color: #c9d1d9; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        #tab-inbox .inbox-text.collapsed { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        #tab-inbox .inbox-text.clickable { cursor: pointer; }
+        #tab-inbox .inbox-expire { font-size: 10px; color: #484f58; margin-top: 6px; }
+        #tab-inbox .inbox-empty { font-size: 13px; color: #484f58; text-align: center; padding: 24px 0; }
+        #tab-inbox .inbox-imgs { margin-top: 8px; }
+        #tab-inbox .inbox-imgs.single img { max-height: 240px; max-width: 100%; border-radius: 6px; cursor: pointer; display: block; }
+        #tab-inbox .inbox-imgs.multi { display: flex; gap: 6px; flex-wrap: wrap; }
+        #tab-inbox .inbox-imgs.multi img { max-height: 120px; border-radius: 6px; cursor: pointer; }
+        #tab-inbox .inbox-topic-badge { font-size: 10px; color: #3fb950; background: rgba(63,185,80,0.12); border-radius: 10px; padding: 1px 8px; }
+        #tab-inbox .inbox-topic-badge.editable { cursor: pointer; }
+        #tab-inbox .inbox-topic-badge.unclassified { color: #8b949e; background: rgba(139,148,158,0.14); }
+        #tab-inbox .inbox-topic-badge .manual-chk { margin-left: 3px; color: #3fb950; font-weight: 700; }
+        .inbox-correct-menu { position: absolute; z-index: 1000; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 4px; max-height: 280px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .inbox-correct-menu .opt { padding: 5px 14px; font-size: 12px; color: #c9d1d9; cursor: pointer; border-radius: 4px; white-space: nowrap; }
+        .inbox-correct-menu .opt:hover { background: #1f6feb; color: #fff; }
+        #tab-inbox .inbox-body { display: flex; gap: 16px; align-items: flex-start; }
+        #tab-inbox .inbox-topics { flex: 0 0 150px; display: flex; flex-direction: column; gap: 3px; }
+        #tab-inbox .inbox-main { flex: 1; min-width: 0; }
+        #tab-inbox .inbox-topic-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #8b949e; white-space: nowrap; }
+        #tab-inbox .inbox-topic-item:hover { background: #161b22; color: #e6edf3; }
+        #tab-inbox .inbox-topic-item.active { background: #1f6feb; color: #fff; }
+        #tab-inbox .inbox-topic-item .cnt { font-size: 11px; color: #6e7681; }
+        #tab-inbox .inbox-topic-item.active .cnt { color: #cfe3ff; }
+        #tab-inbox .inbox-topic-item .tx { color: #f85149; font-size: 12px; padding: 0 2px; cursor: pointer; }
+        #tab-inbox .inbox-topic-item .lbl { display: inline-flex; align-items: center; gap: 6px; }
+        #tab-inbox .inbox-topic-item .drag-handle { color: #6e7681; cursor: grab; font-size: 13px; touch-action: none; user-select: none; }
+        #tab-inbox .inbox-topic-item.dragging { opacity: 0.4; touch-action: none; }
+        body.inbox-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+        #tab-inbox .inbox-topic-item[data-topic] { border-top: 1px solid transparent; }
+        #tab-inbox .inbox-channels { margin-bottom: 14px; }
+        #tab-inbox .inbox-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        #tab-inbox .inbox-chip { display: inline-flex; align-items: center; gap: 6px; background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 3px 10px; font-size: 12px; color: #c9d1d9; }
+        #tab-inbox .inbox-chip .x { color: #8b949e; cursor: pointer; font-weight: 700; }
+        #tab-inbox .inbox-chip .x:hover { color: #f85149; }
+        #tab-inbox .inbox-ch-add { display: flex; gap: 6px; }
+        #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 10px; font-size: 12px; }
+        #tab-inbox .inbox-ch-add button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        #tab-inbox .inbox-ch-add button:disabled { opacity: 0.5; cursor: default; }
+        #tab-inbox .inbox-ch-err, #tab-inbox .inbox-ta-err { color: #f85149; font-size: 12px; margin-top: 5px; min-height: 14px; }
+        #tab-inbox .inbox-topics-wrap { flex: 0 0 170px; }
+        #tab-inbox .inbox-topic-admin-toggle { margin-top: 8px; }
+        #tab-inbox .inbox-topic-admin-toggle button, #tab-inbox .inbox-reclassify-btn { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; width: 100%; }
+        #tab-inbox .inbox-topic-admin-toggle button.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+        #tab-inbox .inbox-topic-admin { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+        #tab-inbox .inbox-ta-row { display: flex; flex-direction: column; gap: 4px; }
+        #tab-inbox .inbox-ta-row input { background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 8px; font-size: 12px; }
+        #tab-inbox .inbox-ta-row button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 8px; font-size: 12px; cursor: pointer; }
+        #tab-inbox .inbox-reclassify-status { font-size: 11px; color: #8b949e; }
+        @media (max-width: 768px) {
+            #tab-inbox .inbox-body { flex-direction: column; }
+            #tab-inbox .inbox-topics-wrap { flex: none; width: 100%; }
+            #tab-inbox .inbox-topics { flex: none; width: 100%; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+            #tab-inbox .inbox-topic-item { flex: 0 0 auto; border: 1px solid #30363d; }
+        }
         .dart-tg-toggle-row {
             display: flex; align-items: center; gap: 8px;
             margin-bottom: 12px; font-size: 13px; color: #e6edf3;
@@ -1147,6 +1215,7 @@
     <div class="tab" onclick="switchTab('stocks')">🔍 주도주</div>
     <div class="tab" onclick="switchTab('valuation')">💰 PER/PBR</div>
     <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
+    <div class="tab" onclick="switchTab('inbox')">📨 텔레 인박스</div>
     <div class="tab" onclick="switchTab('report')">📄 증권사 Report</div>
     <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
 </div>
@@ -1699,6 +1768,53 @@
     </div>
 </div>
 
+<!-- 텔레 인박스 탭 -->
+<div class="tab-content" id="tab-inbox">
+    <div class="inbox-channels" id="inbox-channels-bar">
+        <div class="inbox-chips" id="inbox-chips"></div>
+        <div class="inbox-ch-add">
+            <input type="text" id="inbox-ch-input" placeholder="채널 추가 (@이름 또는 t.me/이름)" autocomplete="off">
+            <button id="inbox-ch-add-btn" onclick="addInboxChannel()">채널 추가</button>
+        </div>
+        <div class="inbox-ch-err" id="inbox-ch-err"></div>
+    </div>
+    <div class="inbox-toolbar">
+        <span class="period-btn active" onclick="loadInbox('all', this)">전체 <b id="inbox-cnt-all">0</b></span>
+        <span class="period-btn" onclick="loadInbox('today', this)">오늘 <b id="inbox-cnt-today">0</b></span>
+        <span class="period-btn" onclick="loadInbox('week', this)">이번 주 <b id="inbox-cnt-week">0</b></span>
+        <span class="period-btn" onclick="loadInbox('month', this)">이번 달 <b id="inbox-cnt-month">0</b></span>
+        <button class="inbox-poll-btn" id="inbox-poll-btn" onclick="pollInbox()" style="margin-left:auto;">지금 수집</button>
+    </div>
+    <div class="inbox-body">
+        <div class="inbox-topics-wrap">
+            <div class="inbox-topics" id="inbox-topics"></div>
+            <div class="inbox-topic-admin-toggle">
+                <button id="inbox-admin-btn" onclick="toggleTopicAdmin()">분류 관리</button>
+            </div>
+            <div class="inbox-topic-admin" id="inbox-topic-admin" style="display:none;">
+                <div class="inbox-ta-row">
+                    <input type="text" id="inbox-topic-name" placeholder="주제명" autocomplete="off">
+                    <input type="text" id="inbox-topic-def" placeholder="정의문(선택)" autocomplete="off">
+                    <button onclick="addInboxTopic()">분류 추가</button>
+                </div>
+                <div class="inbox-ta-err" id="inbox-topic-err"></div>
+                <button class="inbox-reclassify-btn" id="inbox-reclassify-btn" onclick="startReclassify()">전체 재분류</button>
+                <span class="inbox-reclassify-status" id="inbox-reclassify-status"></span>
+            </div>
+        </div>
+        <div class="inbox-main">
+            <div id="inbox-list">
+                <div class="inbox-empty">로딩 중...</div>
+            </div>
+            <div class="dart-digest-pager" id="inbox-pager" style="display:none;">
+                <button onclick="inboxPage(-1)" id="inbox-prev">← 이전</button>
+                <span id="inbox-page-info"></span>
+                <button onclick="inboxPage(1)" id="inbox-next">다음 →</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 증권사 Report 탭 -->
 <div class="tab-content" id="tab-report">
     <!-- 채널 설정 -->
@@ -1811,6 +1927,11 @@
         if (tabName === 'dart' && !dartLoaded) {
             dartLoaded = true;
             initDart();
+        }
+        if (tabName === 'inbox' && !inboxLoaded) {
+            inboxLoaded = true;
+            loadInboxChannels();
+            loadInbox('all');
         }
         if (tabName === 'report') {
             if (!reportLoaded) { reportLoaded = true; initReport(); }
@@ -4186,6 +4307,433 @@
             document.getElementById('dart-digest-next').disabled = _digestPage >= total;
         } else {
             pager.style.display = 'none';
+        }
+    }
+
+    let inboxLoaded = false;
+    let _inboxItems = [];
+    let _inboxPage = 1;
+    let _inboxPeriod = 'all';
+    let _inboxTopic = 'all';
+    let _inboxRetention = 6;
+    let _inboxTotal = 0;
+    const _inboxPerPage = 20;
+
+    function _inboxUrl() {
+        return API_BASE + '/api/tg-inbox?period=' + encodeURIComponent(_inboxPeriod)
+            + '&topic=' + encodeURIComponent(_inboxTopic) + '&page=' + _inboxPage;
+    }
+
+    async function loadInbox(period, btnEl) {
+        _inboxPeriod = period || _inboxPeriod;
+        _inboxPage = 1;
+        if (btnEl) {
+            document.querySelectorAll('#tab-inbox .inbox-toolbar .period-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
+        try {
+            const res = await fetch(_inboxUrl());
+            const data = await res.json();
+            _inboxItems = data.items || [];
+            _inboxRetention = data.retention_days || 6;
+            _inboxTotal = data.total || 0;
+            const c = data.counts || {};
+            document.getElementById('inbox-cnt-all').textContent = c.all || 0;
+            document.getElementById('inbox-cnt-today').textContent = c.today || 0;
+            document.getElementById('inbox-cnt-week').textContent = c.week || 0;
+            document.getElementById('inbox-cnt-month').textContent = c.month || 0;
+            renderInboxTopics(data.topics || [], data.topic_counts || {});
+            renderInbox();
+        } catch (e) {
+            document.getElementById('inbox-list').innerHTML = '<div class="inbox-empty">로드 실패</div>';
+            document.getElementById('inbox-pager').style.display = 'none';
+        }
+    }
+
+    let _inboxTopicsList = [];
+    let _inboxTopicCounts = {};
+    let _topicAdmin = false;
+
+    function renderInboxTopics(topics, topicCounts) {
+        _inboxTopicsList = topics;
+        _inboxTopicCounts = topicCounts;
+        const cont = document.getElementById('inbox-topics');
+        const order = ['all'].concat(topics).concat(['기타', '미분류']);
+        const reserved = new Set(['all', '기타', '미분류']);
+        let totalAll = 0;
+        for (const k in topicCounts) totalAll += topicCounts[k];
+        let html = '';
+        for (const t of order) {
+            const label = (t === 'all') ? '전체' : t;
+            const cnt = (t === 'all') ? totalAll : (topicCounts[t] || 0);
+            const active = (_inboxTopic === t) ? ' active' : '';
+            const draggable = !reserved.has(t);
+            const delX = (_topicAdmin && draggable)
+                ? `<span class="tx" onclick="event.stopPropagation();removeInboxTopic('${inboxEsc(t)}')">×</span>` : '';
+            const handle = (_topicAdmin && draggable)
+                ? `<span class="drag-handle">≡</span>` : '';
+            const dataAttr = draggable ? ` data-topic="${inboxEsc(t)}"` : '';
+            html += `<div class="inbox-topic-item${active}"${dataAttr} onclick="selectInboxTopic('${inboxEsc(t)}')">
+                <span class="lbl">${handle}${inboxEsc(label)}</span><span class="cnt">${cnt}${delX}</span></div>`;
+        }
+        cont.innerHTML = html;
+        attachTopicDrag();
+    }
+
+    let _dragEl = null;
+    function attachTopicDrag() {
+        if (!_topicAdmin) return;
+        const cont = document.getElementById('inbox-topics');
+        cont.querySelectorAll('.inbox-topic-item[data-topic] .drag-handle').forEach(h => {
+            h.addEventListener('pointerdown', startTopicDrag);
+        });
+    }
+
+    function startTopicDrag(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const el = e.target.closest('.inbox-topic-item');
+        if (!el) return;
+        _dragEl = el;
+        el.classList.add('dragging');
+        document.body.classList.add('inbox-dragging');
+        const cont = document.getElementById('inbox-topics');
+        try { cont.setPointerCapture(e.pointerId); } catch (_) {}
+        document.addEventListener('pointermove', onTopicDragMove);
+        document.addEventListener('pointerup', onTopicDragEnd);
+    }
+
+    function onTopicDragMove(e) {
+        if (!_dragEl) return;
+        e.preventDefault();
+        const cont = document.getElementById('inbox-topics');
+        const others = Array.from(cont.querySelectorAll('.inbox-topic-item[data-topic]')).filter(x => x !== _dragEl);
+        let placed = false;
+        for (const t of others) {
+            const r = t.getBoundingClientRect();
+            if (e.clientY < r.top + r.height / 2) {
+                cont.insertBefore(_dragEl, t);
+                placed = true;
+                break;
+            }
+        }
+        if (!placed && others.length) {
+            cont.insertBefore(_dragEl, others[others.length - 1].nextSibling);
+        }
+    }
+
+    async function onTopicDragEnd(e) {
+        document.removeEventListener('pointermove', onTopicDragMove);
+        document.removeEventListener('pointerup', onTopicDragEnd);
+        document.body.classList.remove('inbox-dragging');
+        if (!_dragEl) return;
+        const el = _dragEl;
+        el.classList.remove('dragging');
+        const cont = document.getElementById('inbox-topics');
+        try { cont.releasePointerCapture(e.pointerId); } catch (_) {}
+        const newOrder = Array.from(cont.querySelectorAll('.inbox-topic-item[data-topic]')).map(x => x.dataset.topic);
+        _dragEl = null;
+        await saveTopicOrder(newOrder);
+    }
+
+    async function saveTopicOrder(newOrder) {
+        const prev = _inboxTopicsList.slice();
+        if (JSON.stringify(prev) === JSON.stringify(newOrder)) return;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/topics-order', {
+                method: 'PUT', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({topics: newOrder})
+            });
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+                renderInboxTopics(prev, _inboxTopicCounts);
+                return;
+            }
+            _inboxTopicsList = newOrder;
+            renderInboxTopics(newOrder, _inboxTopicCounts);
+        } catch (e) {
+            alert('순서 저장 실패');
+            renderInboxTopics(prev, _inboxTopicCounts);
+        }
+    }
+
+    function selectInboxTopic(topic) {
+        if (_inboxTopic === topic) return;
+        _inboxTopic = topic;
+        loadInbox(_inboxPeriod);
+    }
+
+    function toggleTopicAdmin() {
+        _topicAdmin = !_topicAdmin;
+        document.getElementById('inbox-admin-btn').classList.toggle('active', _topicAdmin);
+        document.getElementById('inbox-topic-admin').style.display = _topicAdmin ? 'flex' : 'none';
+        renderInboxTopics(_inboxTopicsList, _inboxTopicCounts);
+    }
+
+    async function addInboxTopic() {
+        const nameEl = document.getElementById('inbox-topic-name');
+        const defEl = document.getElementById('inbox-topic-def');
+        const errEl = document.getElementById('inbox-topic-err');
+        errEl.textContent = '';
+        const name = nameEl.value.trim();
+        if (!name) { errEl.textContent = '주제명을 입력하세요'; return; }
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/topics', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({name: name, definition: defEl.value.trim()})
+            });
+            const data = await res.json();
+            if (data.error) { errEl.textContent = data.error; return; }
+            nameEl.value = ''; defEl.value = '';
+            loadInbox(_inboxPeriod);
+        } catch (e) { errEl.textContent = '추가 실패'; }
+    }
+
+    async function removeInboxTopic(name) {
+        if (!confirm(`'${name}' 분류를 삭제하시겠습니까? 해당 글은 다음 주기에 재분류됩니다.`)) return;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/topics', {
+                method: 'DELETE', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({name: name})
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            if (_inboxTopic === name) _inboxTopic = 'all';
+            loadInbox(_inboxPeriod);
+        } catch (e) { alert('삭제 실패'); }
+    }
+
+    async function loadInboxChannels() {
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/channels');
+            const data = await res.json();
+            renderInboxChannels(data.channels || []);
+        } catch (e) {}
+    }
+
+    function renderInboxChannels(channels) {
+        const cont = document.getElementById('inbox-chips');
+        let html = '';
+        for (const c of channels) {
+            html += `<span class="inbox-chip">${inboxEsc(c.title || c.channel)}
+                <span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
+        }
+        cont.innerHTML = html || '<span style="font-size:12px;color:#6e7681;">등록된 채널이 없습니다</span>';
+    }
+
+    async function addInboxChannel() {
+        const inp = document.getElementById('inbox-ch-input');
+        const btn = document.getElementById('inbox-ch-add-btn');
+        const err = document.getElementById('inbox-ch-err');
+        err.textContent = '';
+        const val = inp.value.trim();
+        if (!val) { err.textContent = '채널을 입력하세요'; return; }
+        btn.disabled = true;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/channels', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({channel: val})
+            });
+            const data = await res.json();
+            if (data.error) { err.textContent = data.error; return; }
+            inp.value = '';
+            await loadInboxChannels();
+            loadInbox(_inboxPeriod);
+        } catch (e) { err.textContent = '추가 실패'; }
+        finally { btn.disabled = false; }
+    }
+
+    async function removeInboxChannel(channel) {
+        if (!confirm(`'${channel}' 채널을 삭제하시겠습니까? 수집된 글은 6일 후 자동 소멸합니다.`)) return;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/channels', {
+                method: 'DELETE', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({channel: channel})
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            await loadInboxChannels();
+            loadInbox(_inboxPeriod);
+        } catch (e) { alert('삭제 실패'); }
+    }
+
+    let _reclassifyPoll = null;
+    async function startReclassify() {
+        if (!confirm('모든 메시지를 다시 분류합니다. 수 분 소요될 수 있습니다. 진행할까요?')) return;
+        const statusEl = document.getElementById('inbox-reclassify-status');
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/reclassify', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({scope: 'all'})
+            });
+            const data = await res.json();
+            if (data.status === 'already_running') {
+                statusEl.textContent = '이미 재분류 중입니다';
+            } else {
+                statusEl.textContent = '재분류가 시작되었습니다. 수 분 소요됩니다.';
+            }
+            if (_reclassifyPoll) clearInterval(_reclassifyPoll);
+            _reclassifyPoll = setInterval(pollReclassifyStatus, 10000);
+        } catch (e) { statusEl.textContent = '시작 실패'; }
+    }
+
+    async function pollReclassifyStatus() {
+        const statusEl = document.getElementById('inbox-reclassify-status');
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/reclassify-status');
+            const s = await res.json();
+            if (s.running) {
+                statusEl.textContent = `재분류 중... 남은 미분류 ${s.remaining}건`;
+            } else {
+                statusEl.textContent = '재분류 완료';
+                if (_reclassifyPoll) { clearInterval(_reclassifyPoll); _reclassifyPoll = null; }
+                loadInbox(_inboxPeriod);
+            }
+        } catch (e) {}
+    }
+
+    async function inboxPage(delta) {
+        const total = Math.max(1, Math.ceil(_inboxTotal / _inboxPerPage));
+        const next = Math.max(1, Math.min(total, _inboxPage + delta));
+        if (next === _inboxPage) return;
+        _inboxPage = next;
+        try {
+            const res = await fetch(_inboxUrl());
+            const data = await res.json();
+            _inboxItems = data.items || [];
+            _inboxTotal = data.total || 0;
+            renderInbox();
+        } catch (e) {}
+    }
+
+    function inboxEsc(s) {
+        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function renderInbox() {
+        const container = document.getElementById('inbox-list');
+        const pager = document.getElementById('inbox-pager');
+        if (!_inboxItems.length) {
+            container.innerHTML = '<div class="inbox-empty">수집된 메시지가 없습니다</div>';
+            pager.style.display = 'none';
+            return;
+        }
+        let lastDay = '';
+        let html = '';
+        for (const it of _inboxItems) {
+            const dt = new Date(it.date);
+            const dayStr = isNaN(dt) ? (it.date || '').slice(0, 10) : dt.toISOString().slice(0, 10);
+            if (dayStr !== lastDay) {
+                html += `<div class="inbox-day-group">${dayStr}</div>`;
+                lastDay = dayStr;
+            }
+            const timeStr = isNaN(dt) ? '' : (it.date || '').slice(11, 16);
+            const manualMark = it.manual ? '<span class="manual-chk">✓</span>' : '';
+            const topicBadge = (it.topic && it.topic !== '')
+                ? `<span class="inbox-topic-badge editable" onclick="event.stopPropagation();toggleCorrectMenu(event,'${inboxEsc(it.id)}')">${inboxEsc(it.topic)}${manualMark}</span>`
+                : `<span class="inbox-topic-badge unclassified editable" onclick="event.stopPropagation();toggleCorrectMenu(event,'${inboxEsc(it.id)}')">분류</span>`;
+            const alsoIn = (it.also_in && it.also_in.length)
+                ? `<span class="inbox-alsoin">외 ${it.also_in.length}개 채널</span>` : '';
+            let expireStr = '';
+            if (!isNaN(dt)) {
+                const expire = new Date(dt.getTime());
+                expire.setDate(expire.getDate() + _inboxRetention);
+                const daysLeft = Math.max(0, Math.ceil((expire - new Date()) / 86400000));
+                expireStr = `${daysLeft}일 후 삭제`;
+            }
+            const hasText = !!(it.text && it.text.trim());
+            const textBlock = hasText
+                ? `<div class="inbox-text collapsed clickable" onclick="this.classList.toggle('collapsed')">${inboxEsc(it.text)}</div>`
+                : '';
+            const imgs = it.images || [];
+            let imgBlock = '';
+            if (imgs.length === 1) {
+                const u = API_BASE + '/api/tg-inbox/media/' + encodeURIComponent(imgs[0]);
+                imgBlock = `<div class="inbox-imgs single"><img loading="lazy" src="${u}" onclick="window.open('${u}','_blank')"></div>`;
+            } else if (imgs.length > 1) {
+                const thumbs = imgs.map(fn => {
+                    const u = API_BASE + '/api/tg-inbox/media/' + encodeURIComponent(fn);
+                    return `<img loading="lazy" src="${u}" onclick="window.open('${u}','_blank')">`;
+                }).join('');
+                imgBlock = `<div class="inbox-imgs multi">${thumbs}</div>`;
+            }
+            html += `<div class="inbox-card">
+                <div class="inbox-card-head">
+                    <span class="inbox-ch">${inboxEsc(it.channel_title || it.channel)}</span>
+                    ${topicBadge}
+                    <span class="inbox-time">${timeStr}</span>
+                    ${alsoIn}
+                </div>
+                ${textBlock}
+                ${imgBlock}
+                <div class="inbox-expire">${expireStr}</div>
+            </div>`;
+        }
+        container.innerHTML = html;
+
+        const total = Math.ceil(_inboxTotal / _inboxPerPage);
+        if (total > 1) {
+            pager.style.display = 'flex';
+            document.getElementById('inbox-page-info').textContent = `${_inboxPage} / ${total}`;
+            document.getElementById('inbox-prev').disabled = _inboxPage <= 1;
+            document.getElementById('inbox-next').disabled = _inboxPage >= total;
+        } else {
+            pager.style.display = 'none';
+        }
+    }
+
+    let _correctMenuEl = null;
+    function closeCorrectMenu() {
+        if (_correctMenuEl) { _correctMenuEl.remove(); _correctMenuEl = null; }
+    }
+    document.addEventListener('click', closeCorrectMenu);
+
+    function toggleCorrectMenu(event, id) {
+        const sameOpen = _correctMenuEl && _correctMenuEl.dataset.id === id;
+        closeCorrectMenu();
+        if (sameOpen) return;
+        const menu = document.createElement('div');
+        menu.className = 'inbox-correct-menu';
+        menu.dataset.id = id;
+        const opts = _inboxTopicsList.concat(['기타']);
+        menu.innerHTML = opts.map(t =>
+            `<div class="opt" onclick="event.stopPropagation();correctItem('${id}','${inboxEsc(t)}')">${inboxEsc(t)}</div>`
+        ).join('');
+        document.body.appendChild(menu);
+        const r = event.target.getBoundingClientRect();
+        menu.style.left = (r.left + window.scrollX) + 'px';
+        menu.style.top = (r.bottom + window.scrollY + 4) + 'px';
+        _correctMenuEl = menu;
+    }
+
+    async function correctItem(id, topic) {
+        closeCorrectMenu();
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/correct', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({id: id, topic: topic})
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            const it = _inboxItems.find(x => x.id === id);
+            if (it) { it.topic = topic; it.manual = true; }
+            renderInbox();
+        } catch (e) { alert('정정 실패'); }
+    }
+
+    async function pollInbox() {
+        const btn = document.getElementById('inbox-poll-btn');
+        btn.disabled = true;
+        const orig = btn.textContent;
+        btn.textContent = '수집 중...';
+        try {
+            await fetch(API_BASE + '/api/tg-inbox/poll', { method: 'POST' });
+            await loadInbox(_inboxPeriod);
+        } catch (e) {
+        } finally {
+            btn.disabled = false;
+            btn.textContent = orig;
         }
     }
 

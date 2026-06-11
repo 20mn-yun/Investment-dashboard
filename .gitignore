@@ -24,3 +24,10 @@ report_config.json
 report_index.db
 report_index.db-journal
 downloads/
+
+# 텔레 인박스 데이터·개인설정 (public repo: 절대 커밋 금지)
+cache/tg_inbox.json
+cache/tg_media/
+tg_inbox_config.json
+tg_inbox_corrections.json
+dart_daily_history.json.bak

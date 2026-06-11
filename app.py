@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 from datetime import date, timedelta, datetime
 import pandas as pd
 import telegram_report
+import tg_inbox
 import dart_report
 import earnings_tracker
 
@@ -33,6 +34,7 @@ if os.environ.get("TG_API_ID") and os.environ.get("TG_API_HASH"):
         os.environ.get("TG_API_HASH"),
         os.environ.get("TG_SESSION_PATH", "sessions/tg_report"),
     )
+    tg_inbox.start_inbox_collector()
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # 티커 매핑
@@ -2619,6 +2621,176 @@ def get_dart_dates():
     h = _load_daily_history()
     dates = sorted(h.get("days", {}).keys(), reverse=True)
     return jsonify({"dates": dates})
+
+
+@app.route("/api/tg-inbox", methods=["GET"])
+def get_tg_inbox():
+    from datetime import timezone
+    period = request.args.get("period", "all")
+    try:
+        page = int(request.args.get("page", 1))
+    except ValueError:
+        page = 1
+    page = max(1, page)
+    per_page = 20
+
+    data = tg_inbox._load_data()
+    items = sorted(data.get("items", []), key=lambda x: x.get("date", ""), reverse=True)
+
+    kst = timezone(timedelta(hours=9))
+    now_kst = datetime.now(kst)
+    today_start = now_kst.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=today_start.weekday())
+    month_start = today_start.replace(day=1)
+
+    def _dt(it):
+        try:
+            return datetime.fromisoformat(it.get("date", ""))
+        except ValueError:
+            return None
+
+    def _in_period(it, start):
+        d = _dt(it)
+        return d is not None and d >= start
+
+    counts = {
+        "all": len(items),
+        "today": sum(1 for it in items if _in_period(it, today_start)),
+        "week": sum(1 for it in items if _in_period(it, week_start)),
+        "month": sum(1 for it in items if _in_period(it, month_start)),
+    }
+
+    if period == "today":
+        period_items = [it for it in items if _in_period(it, today_start)]
+    elif period == "week":
+        period_items = [it for it in items if _in_period(it, week_start)]
+    elif period == "month":
+        period_items = [it for it in items if _in_period(it, month_start)]
+    else:
+        period_items = items
+
+    cfg = tg_inbox.get_config()
+    topics = cfg.get("topics", [])
+
+    topic_counts = {}
+    for t in topics + ["기타", "미분류"]:
+        topic_counts[t] = 0
+    for it in period_items:
+        tp = it.get("topic", "") or ""
+        key = tp if tp else "미분류"
+        topic_counts[key] = topic_counts.get(key, 0) + 1
+
+    topic = request.args.get("topic", "all")
+    if topic == "all":
+        filtered = period_items
+    elif topic == "미분류":
+        filtered = [it for it in period_items if not (it.get("topic", "") or "")]
+    else:
+        filtered = [it for it in period_items if (it.get("topic", "") or "") == topic]
+
+    total = len(filtered)
+    start = (page - 1) * per_page
+    page_items = filtered[start:start + per_page]
+
+    return jsonify({
+        "items": page_items,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "counts": counts,
+        "topic_counts": topic_counts,
+        "topics": topics,
+        "retention_days": cfg.get("retention_days", 6),
+    })
+
+
+@app.route("/api/tg-inbox/poll", methods=["POST"])
+def post_tg_inbox_poll():
+    result = tg_inbox.collect_once()
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/reclassify", methods=["POST"])
+def post_tg_inbox_reclassify():
+    body = request.get_json(silent=True) or {}
+    scope = body.get("scope", "all")
+    result = tg_inbox.start_reclassify(scope)
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/reclassify-status", methods=["GET"])
+def get_tg_inbox_reclassify_status():
+    return jsonify(tg_inbox.get_reclassify_status())
+
+
+@app.route("/api/tg-inbox/channels", methods=["GET"])
+def get_tg_inbox_channels():
+    return jsonify({"channels": tg_inbox.list_channels()})
+
+
+@app.route("/api/tg-inbox/channels", methods=["POST"])
+def post_tg_inbox_channels():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.add_channel(body.get("channel", ""))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/channels", methods=["DELETE"])
+def delete_tg_inbox_channels():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.remove_channel(body.get("channel", ""))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/topics", methods=["POST"])
+def post_tg_inbox_topics():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.add_topic(body.get("name", ""), body.get("definition", ""))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/topics", methods=["DELETE"])
+def delete_tg_inbox_topics():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.remove_topic(body.get("name", ""))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/correct", methods=["POST"])
+def post_tg_inbox_correct():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.correct(body.get("id", ""), body.get("topic", ""))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/topics-order", methods=["PUT"])
+def put_tg_inbox_topics_order():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.reorder_topics(body.get("topics"))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/media/<path:filename>", methods=["GET"])
+def get_tg_inbox_media(filename):
+    if "/" in filename or "\\" in filename or os.path.basename(filename) != filename:
+        return jsonify({"error": "invalid filename"}), 400
+    media_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "tg_media")
+    path = os.path.join(media_dir, filename)
+    if not os.path.isfile(path):
+        return jsonify({"error": "not found"}), 404
+    return send_from_directory(media_dir, filename)
 
 
 # --- DART Monitor API ---
