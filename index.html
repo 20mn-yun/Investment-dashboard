@@ -42,7 +42,12 @@
             border-bottom: 1px solid #30363d;
             display: flex;
             gap: 4px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
         }
+        .tabs::-webkit-scrollbar { display: none; }
 
         .tab {
             padding: 12px 20px;
@@ -50,6 +55,8 @@
             color: #8b949e;
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .tab.active {
@@ -915,66 +922,66 @@
         .dart-digest-pager button:disabled { opacity: 0.4; cursor: default; }
 
         #tab-inbox .inbox-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-        #tab-inbox .inbox-toolbar .period-btn { font-size: 12px; padding: 4px 12px; }
+        #tab-inbox .inbox-toolbar .period-btn { font-size: 14px; padding: 4px 12px; }
         #tab-inbox .inbox-toolbar .period-btn b { color: #58a6ff; font-weight: 600; margin-left: 2px; }
-        #tab-inbox .inbox-poll-btn { background: #1f6feb; border: none; border-radius: 6px; padding: 5px 14px; color: #fff; cursor: pointer; font-size: 12px; white-space: nowrap; }
+        #tab-inbox .inbox-poll-btn { background: #1f6feb; border: none; border-radius: 6px; padding: 5px 14px; color: #fff; cursor: pointer; font-size: 14px; white-space: nowrap; }
         #tab-inbox .inbox-poll-btn:hover { background: #388bfd; }
         #tab-inbox .inbox-poll-btn:disabled { opacity: 0.5; cursor: default; }
-        #tab-inbox .inbox-day-group { font-size: 11px; color: #484f58; padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid #21262d; }
+        #tab-inbox .inbox-day-group { font-size: 13px; color: #484f58; padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid #21262d; }
         #tab-inbox .inbox-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
         #tab-inbox .inbox-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-        #tab-inbox .inbox-ch { font-size: 13px; color: #e6edf3; font-weight: 600; }
-        #tab-inbox .inbox-time { font-size: 11px; color: #8b949e; }
-        #tab-inbox .inbox-alsoin { font-size: 10px; color: #58a6ff; background: rgba(88,166,255,0.12); border-radius: 10px; padding: 1px 8px; }
-        #tab-inbox .inbox-text { font-size: 13px; color: #c9d1d9; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        #tab-inbox .inbox-ch { font-size: 15px; color: #e6edf3; font-weight: 600; }
+        #tab-inbox .inbox-time { font-size: 13px; color: #8b949e; }
+        #tab-inbox .inbox-alsoin { font-size: 12px; color: #58a6ff; background: rgba(88,166,255,0.12); border-radius: 10px; padding: 1px 8px; }
+        #tab-inbox .inbox-text { font-size: 15px; color: #c9d1d9; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
         #tab-inbox .inbox-text.collapsed { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         #tab-inbox .inbox-text.clickable { cursor: pointer; }
-        #tab-inbox .inbox-expire { font-size: 10px; color: #484f58; margin-top: 6px; }
-        #tab-inbox .inbox-empty { font-size: 13px; color: #484f58; text-align: center; padding: 24px 0; }
+        #tab-inbox .inbox-expire { font-size: 12px; color: #484f58; margin-top: 6px; }
+        #tab-inbox .inbox-empty { font-size: 15px; color: #484f58; text-align: center; padding: 24px 0; }
         #tab-inbox .inbox-imgs { margin-top: 8px; }
         #tab-inbox .inbox-imgs.single img { max-height: 240px; max-width: 100%; border-radius: 6px; cursor: pointer; display: block; }
         #tab-inbox .inbox-imgs.multi { display: flex; gap: 6px; flex-wrap: wrap; }
         #tab-inbox .inbox-imgs.multi img { max-height: 120px; border-radius: 6px; cursor: pointer; }
-        #tab-inbox .inbox-topic-badge { font-size: 10px; color: #3fb950; background: rgba(63,185,80,0.12); border-radius: 10px; padding: 1px 8px; }
+        #tab-inbox .inbox-topic-badge { font-size: 12px; color: #3fb950; background: rgba(63,185,80,0.12); border-radius: 10px; padding: 1px 8px; }
         #tab-inbox .inbox-topic-badge.editable { cursor: pointer; }
         #tab-inbox .inbox-topic-badge.unclassified { color: #8b949e; background: rgba(139,148,158,0.14); }
         #tab-inbox .inbox-topic-badge .manual-chk { margin-left: 3px; color: #3fb950; font-weight: 700; }
         .inbox-correct-menu { position: absolute; z-index: 1000; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 4px; max-height: 280px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-        .inbox-correct-menu .opt { padding: 5px 14px; font-size: 12px; color: #c9d1d9; cursor: pointer; border-radius: 4px; white-space: nowrap; }
+        .inbox-correct-menu .opt { padding: 5px 14px; font-size: 14px; color: #c9d1d9; cursor: pointer; border-radius: 4px; white-space: nowrap; }
         .inbox-correct-menu .opt:hover { background: #1f6feb; color: #fff; }
         #tab-inbox .inbox-body { display: flex; gap: 16px; align-items: flex-start; }
         #tab-inbox .inbox-topics { flex: 0 0 150px; display: flex; flex-direction: column; gap: 3px; }
         #tab-inbox .inbox-main { flex: 1; min-width: 0; }
-        #tab-inbox .inbox-topic-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #8b949e; white-space: nowrap; }
+        #tab-inbox .inbox-topic-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 15px; color: #8b949e; white-space: nowrap; }
         #tab-inbox .inbox-topic-item:hover { background: #161b22; color: #e6edf3; }
         #tab-inbox .inbox-topic-item.active { background: #1f6feb; color: #fff; }
-        #tab-inbox .inbox-topic-item .cnt { font-size: 11px; color: #6e7681; }
+        #tab-inbox .inbox-topic-item .cnt { font-size: 13px; color: #6e7681; }
         #tab-inbox .inbox-topic-item.active .cnt { color: #cfe3ff; }
-        #tab-inbox .inbox-topic-item .tx { color: #f85149; font-size: 12px; padding: 0 2px; cursor: pointer; }
+        #tab-inbox .inbox-topic-item .tx { color: #f85149; font-size: 14px; padding: 0 2px; cursor: pointer; }
         #tab-inbox .inbox-topic-item .lbl { display: inline-flex; align-items: center; gap: 6px; }
-        #tab-inbox .inbox-topic-item .drag-handle { color: #6e7681; cursor: grab; font-size: 13px; touch-action: none; user-select: none; }
+        #tab-inbox .inbox-topic-item .drag-handle { color: #6e7681; cursor: grab; font-size: 15px; touch-action: none; user-select: none; }
         #tab-inbox .inbox-topic-item.dragging { opacity: 0.4; touch-action: none; }
         body.inbox-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
         #tab-inbox .inbox-topic-item[data-topic] { border-top: 1px solid transparent; }
         #tab-inbox .inbox-channels { margin-bottom: 14px; }
         #tab-inbox .inbox-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-        #tab-inbox .inbox-chip { display: inline-flex; align-items: center; gap: 6px; background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 3px 10px; font-size: 12px; color: #c9d1d9; }
+        #tab-inbox .inbox-chip { display: inline-flex; align-items: center; gap: 6px; background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 3px 10px; font-size: 14px; color: #c9d1d9; }
         #tab-inbox .inbox-chip .x { color: #8b949e; cursor: pointer; font-weight: 700; }
         #tab-inbox .inbox-chip .x:hover { color: #f85149; }
         #tab-inbox .inbox-ch-add { display: flex; gap: 6px; }
-        #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 10px; font-size: 12px; }
-        #tab-inbox .inbox-ch-add button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 10px; font-size: 14px; }
+        #tab-inbox .inbox-ch-add button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer; white-space: nowrap; }
         #tab-inbox .inbox-ch-add button:disabled { opacity: 0.5; cursor: default; }
-        #tab-inbox .inbox-ch-err, #tab-inbox .inbox-ta-err { color: #f85149; font-size: 12px; margin-top: 5px; min-height: 14px; }
+        #tab-inbox .inbox-ch-err, #tab-inbox .inbox-ta-err { color: #f85149; font-size: 14px; margin-top: 5px; min-height: 14px; }
         #tab-inbox .inbox-topics-wrap { flex: 0 0 170px; }
         #tab-inbox .inbox-topic-admin-toggle { margin-top: 8px; }
-        #tab-inbox .inbox-topic-admin-toggle button, #tab-inbox .inbox-reclassify-btn { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; width: 100%; }
+        #tab-inbox .inbox-topic-admin-toggle button, #tab-inbox .inbox-reclassify-btn { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 5px 10px; font-size: 14px; cursor: pointer; width: 100%; }
         #tab-inbox .inbox-topic-admin-toggle button.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
         #tab-inbox .inbox-topic-admin { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
         #tab-inbox .inbox-ta-row { display: flex; flex-direction: column; gap: 4px; }
-        #tab-inbox .inbox-ta-row input { background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 8px; font-size: 12px; }
-        #tab-inbox .inbox-ta-row button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 8px; font-size: 12px; cursor: pointer; }
-        #tab-inbox .inbox-reclassify-status { font-size: 11px; color: #8b949e; }
+        #tab-inbox .inbox-ta-row input { background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 8px; font-size: 14px; }
+        #tab-inbox .inbox-ta-row button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 8px; font-size: 14px; cursor: pointer; }
+        #tab-inbox .inbox-reclassify-status { font-size: 13px; color: #8b949e; }
         @media (max-width: 768px) {
             #tab-inbox .inbox-body { flex-direction: column; }
             #tab-inbox .inbox-topics-wrap { flex: none; width: 100%; }
