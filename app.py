@@ -2634,8 +2634,12 @@ def get_tg_inbox():
     page = max(1, page)
     per_page = 20
 
+    saved_only = request.args.get("saved_only", "false").lower() in ("1", "true", "yes")
+
     data = tg_inbox._load_data()
     items = sorted(data.get("items", []), key=lambda x: x.get("date", ""), reverse=True)
+    if saved_only:
+        items = [it for it in items if it.get("saved")]
 
     kst = timezone(timedelta(hours=9))
     now_kst = datetime.now(kst)
@@ -2768,6 +2772,17 @@ def delete_tg_inbox_topics():
 def post_tg_inbox_correct():
     body = request.get_json(silent=True) or {}
     result = tg_inbox.correct(body.get("id", ""), body.get("topic", ""))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/save", methods=["POST"])
+def post_tg_inbox_save():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.set_saved(body.get("id", ""), bool(body.get("saved", False)))
+    if result.get("status") == 404:
+        return jsonify({"error": result.get("error", "not found")}), 404
     if "error" in result:
         return jsonify(result), 400
     return jsonify(result)

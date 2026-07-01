@@ -930,12 +930,15 @@
         #tab-inbox .inbox-day-group { font-size: 13px; color: #484f58; padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid #21262d; }
         #tab-inbox .inbox-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
         #tab-inbox .inbox-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+        #tab-inbox .inbox-star { margin-left: auto; cursor: pointer; font-size: 18px; line-height: 1; color: #6e7681; background: none; border: none; padding: 0 2px; -webkit-user-select: none; user-select: none; }
+        #tab-inbox .inbox-star.on { color: #f1c40f; }
         #tab-inbox .inbox-ch { font-size: 15px; color: #e6edf3; font-weight: 600; }
         #tab-inbox .inbox-time { font-size: 13px; color: #8b949e; }
         #tab-inbox .inbox-alsoin { font-size: 12px; color: #58a6ff; background: rgba(88,166,255,0.12); border-radius: 10px; padding: 1px 8px; }
         #tab-inbox .inbox-text { font-size: 15px; color: #c9d1d9; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
         #tab-inbox .inbox-text.collapsed { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         #tab-inbox .inbox-text.clickable { cursor: pointer; }
+        #tab-inbox .inbox-text a { color: #58a6ff; text-decoration: underline; }
         #tab-inbox .inbox-expire { font-size: 12px; color: #484f58; margin-top: 6px; }
         #tab-inbox .inbox-empty { font-size: 15px; color: #484f58; text-align: center; padding: 24px 0; }
         #tab-inbox .inbox-imgs { margin-top: 8px; }
@@ -964,6 +967,9 @@
         body.inbox-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
         #tab-inbox .inbox-topic-item[data-topic] { border-top: 1px solid transparent; }
         #tab-inbox .inbox-channels { margin-bottom: 14px; }
+        #tab-inbox .inbox-subtabs { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid #30363d; }
+        #tab-inbox .inbox-subtab { padding: 8px 16px; cursor: pointer; color: #8b949e; font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        #tab-inbox .inbox-subtab.active { color: #c9d1d9; border-bottom-color: #58a6ff; }
         #tab-inbox .inbox-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
         #tab-inbox .inbox-chip { display: inline-flex; align-items: center; gap: 6px; background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 3px 10px; font-size: 14px; color: #c9d1d9; }
         #tab-inbox .inbox-chip .x { color: #8b949e; cursor: pointer; font-weight: 700; }
@@ -1784,6 +1790,10 @@
             <button id="inbox-ch-add-btn" onclick="addInboxChannel()">채널 추가</button>
         </div>
         <div class="inbox-ch-err" id="inbox-ch-err"></div>
+    </div>
+    <div class="inbox-subtabs">
+        <span class="inbox-subtab active" id="inbox-subtab-inbox" onclick="switchInboxView('inbox')">인박스</span>
+        <span class="inbox-subtab" id="inbox-subtab-saved" onclick="switchInboxView('saved')">자료</span>
     </div>
     <div class="inbox-toolbar">
         <span class="period-btn active" onclick="loadInbox('all', this)">전체 <b id="inbox-cnt-all">0</b></span>
@@ -4324,11 +4334,23 @@
     let _inboxTopic = 'all';
     let _inboxRetention = 6;
     let _inboxTotal = 0;
+    let _inboxView = 'inbox';   // 'inbox' | 'saved'
     const _inboxPerPage = 20;
 
     function _inboxUrl() {
-        return API_BASE + '/api/tg-inbox?period=' + encodeURIComponent(_inboxPeriod)
+        let u = API_BASE + '/api/tg-inbox?period=' + encodeURIComponent(_inboxPeriod)
             + '&topic=' + encodeURIComponent(_inboxTopic) + '&page=' + _inboxPage;
+        if (_inboxView === 'saved') u += '&saved_only=true';
+        return u;
+    }
+
+    function switchInboxView(view) {
+        if (_inboxView === view) return;
+        _inboxView = view;
+        _inboxPage = 1;   // 뷰 전환 시 페이지 1로 리셋
+        document.getElementById('inbox-subtab-inbox').classList.toggle('active', view === 'inbox');
+        document.getElementById('inbox-subtab-saved').classList.toggle('active', view === 'saved');
+        loadInbox(_inboxPeriod);
     }
 
     async function loadInbox(period, btnEl) {
@@ -4611,6 +4633,9 @@
             _inboxItems = data.items || [];
             _inboxTotal = data.total || 0;
             renderInbox();
+            // 페이지 전환 시 목록 상단으로 스크롤 (최초 로드 loadInbox에는 미적용)
+            const listEl = document.getElementById('inbox-list');
+            if (listEl) listEl.scrollIntoView({ behavior: 'auto', block: 'start' });
         } catch (e) {}
     }
 
@@ -4618,11 +4643,25 @@
         return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    // HTML 이스케이프를 먼저 적용한 뒤, 이스케이프된 문자열에서 URL을 링크로 감싼다 (순서 필수: XSS 방지).
+    function inboxLinkify(s) {
+        const esc = inboxEsc(s);
+        // <,>,"는 이미 &lt; &gt; &quot;로 이스케이프됨 → 그 앞에서 매칭 중단. &amp;(쿼리스트링)는 URL에 포함.
+        return esc.replace(/https?:\/\/(?:(?!&lt;|&gt;|&quot;)\S)+/g, function(m) {
+            let url = m, trail = '';
+            const tm = url.match(/[.,;!?)\]]+$/);
+            if (tm) { trail = tm[0]; url = url.slice(0, -trail.length); }
+            if (!url) return m;
+            return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">' + url + '</a>' + trail;
+        });
+    }
+
     function renderInbox() {
         const container = document.getElementById('inbox-list');
         const pager = document.getElementById('inbox-pager');
         if (!_inboxItems.length) {
-            container.innerHTML = '<div class="inbox-empty">수집된 메시지가 없습니다</div>';
+            const emptyMsg = _inboxView === 'saved' ? '저장된 메시지가 없습니다' : '수집된 메시지가 없습니다';
+            container.innerHTML = '<div class="inbox-empty">' + emptyMsg + '</div>';
             pager.style.display = 'none';
             return;
         }
@@ -4651,7 +4690,7 @@
             }
             const hasText = !!(it.text && it.text.trim());
             const textBlock = hasText
-                ? `<div class="inbox-text collapsed clickable" onclick="this.classList.toggle('collapsed')">${inboxEsc(it.text)}</div>`
+                ? `<div class="inbox-text collapsed clickable" onclick="this.classList.toggle('collapsed')">${inboxLinkify(it.text)}</div>`
                 : '';
             const imgs = it.images || [];
             let imgBlock = '';
@@ -4665,12 +4704,14 @@
                 }).join('');
                 imgBlock = `<div class="inbox-imgs multi">${thumbs}</div>`;
             }
+            const starBtn = `<button class="inbox-star${it.saved ? ' on' : ''}" title="저장" onclick="event.stopPropagation();toggleInboxSave(event,'${inboxEsc(it.id)}',${it.saved ? 'true' : 'false'})">${it.saved ? '★' : '☆'}</button>`;
             html += `<div class="inbox-card">
                 <div class="inbox-card-head">
                     <span class="inbox-ch">${inboxEsc(it.channel_title || it.channel)}</span>
                     ${topicBadge}
                     <span class="inbox-time">${timeStr}</span>
                     ${alsoIn}
+                    ${starBtn}
                 </div>
                 ${textBlock}
                 ${imgBlock}
@@ -4688,6 +4729,27 @@
         } else {
             pager.style.display = 'none';
         }
+    }
+
+    async function toggleInboxSave(ev, id, currentlySaved) {
+        if (ev) ev.stopPropagation();
+        const next = !currentlySaved;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, saved: next })
+            });
+            if (!res.ok) return;
+            const item = _inboxItems.find(x => x.id === id);
+            if (item) item.saved = next;
+            if (_inboxView === 'saved' && !next) {
+                // 자료 뷰에서 저장 해제 → 목록에서 즉시 제거 + 저장 건수 갱신
+                _inboxItems = _inboxItems.filter(x => x.id !== id);
+                _inboxTotal = Math.max(0, _inboxTotal - 1);
+            }
+            renderInbox();
+        } catch (e) {}
     }
 
     let _correctMenuEl = null;

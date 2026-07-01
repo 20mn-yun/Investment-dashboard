@@ -411,9 +411,10 @@ def collect_once():
             state[username] = {"last_message_id": new_last}
 
         cutoff_iso = (now_utc.astimezone(KST) - timedelta(days=retention_days)).isoformat()
-        kept_items = [it for it in items if (it.get("date") or "") >= cutoff_iso]
+        # 저장(saved=true) 항목은 롤링 보존 기간이 지나도 삭제하지 않고 영구 보관한다.
+        kept_items = [it for it in items if (it.get("date") or "") >= cutoff_iso or it.get("saved")]
         for it in items:
-            if (it.get("date") or "") < cutoff_iso:
+            if (it.get("date") or "") < cutoff_iso and not it.get("saved"):
                 _delete_item_images(it)
         data["items"] = kept_items
 
@@ -654,7 +655,7 @@ def classify_pending():
                 if it.get("topic", "") != "":
                     continue
                 topic = (results or {}).get(m["id"])
-                if topic == "잡담":
+                if topic == "잡담" and not it.get("saved"):
                     remove_ids.add(it["id"])
                     chat_removed += 1
                     continue
@@ -720,7 +721,7 @@ def classify_pending():
             items_list = data["items"]
             it = next((x for x in items_list if x["id"] == it0["id"]), None)
             if it is not None and it.get("topic", "") == "":
-                if topic == "잡담":
+                if topic == "잡담" and not it.get("saved"):
                     _delete_item_images(it)
                     data["items"] = [x for x in items_list if x["id"] != it["id"]]
                     chat_removed += 1
@@ -1027,6 +1028,25 @@ def correct(item_id, topic):
     })
     _save_corrections(corr)
     return {"status": "corrected", "id": item_id, "topic": topic, "manual": True}
+
+
+def set_saved(item_id, saved):
+    item_id = str(item_id or "")
+    if not item_id:
+        return {"error": "항목 id가 필요합니다"}
+    saved = bool(saved)
+    with _data_lock:
+        data = _load_data()
+        target = None
+        for it in data["items"]:
+            if it.get("id") == item_id:
+                target = it
+                break
+        if target is None:
+            return {"error": "항목을 찾을 수 없습니다", "status": 404}
+        target["saved"] = saved
+        _save_data(data)
+    return {"status": "ok", "id": item_id, "saved": saved}
 
 
 def start_inbox_collector():
