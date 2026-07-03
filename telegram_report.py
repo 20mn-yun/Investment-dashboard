@@ -272,9 +272,39 @@ def start_realtime_watcher(api_id, api_hash, session_path):
 
     def _thread_main():
         global _shared_loop
+        import time as _time
         _shared_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(_shared_loop)
-        _shared_loop.run_until_complete(_run())
+
+        async def _reconnect_and_wait():
+            # 기존 _shared_client 객체를 새로 만들지 않고 그대로 재접속한다
+            # (tg_inbox 등 다른 모듈이 telegram_report._shared_client 참조를 사용하므로).
+            # Telethon은 같은 클라이언트 객체에 connect()로 재접속 가능하며 등록된 핸들러도 유지된다.
+            if not _shared_client.is_connected():
+                await _shared_client.connect()
+            await _shared_client.run_until_disconnected()
+
+        backoff = 60
+        while True:
+            try:
+                if _shared_client is None:
+                    # 최초 1회: 클라이언트 생성·start·핸들러 등록 후 run_until_disconnected
+                    _shared_loop.run_until_complete(_run())
+                else:
+                    _shared_loop.run_until_complete(_reconnect_and_wait())
+                # 예외 없이 반환 = 연결이 정상적으로 끊긴 것 → 즉시 재접속 시도, 백오프 리셋
+                print("[telegram] shared client disconnected (normal return), reconnecting...", flush=True)
+                backoff = 60
+                _time.sleep(3)
+            except (KeyboardInterrupt, SystemExit):
+                print("[telegram] shared client thread stopping (interrupt/exit)", flush=True)
+                break
+            except Exception as e:
+                print(f"[telegram] shared client connection lost: {type(e).__name__}: {e} "
+                      f"— {backoff}s 후 재접속 시도", flush=True)
+                _time.sleep(backoff)
+                backoff = 120 if backoff == 60 else 300   # 60 → 120 → 300 (최대 300)
+                continue
 
     _shared_thread = threading.Thread(target=_thread_main, daemon=True)
     _shared_thread.start()

@@ -5,6 +5,7 @@ import time
 import base64
 import hashlib
 import asyncio
+import concurrent.futures
 import threading
 from datetime import datetime, timezone, timedelta
 
@@ -348,6 +349,13 @@ def collect_once():
     if client is None or loop is None:
         return {"status": "client_not_ready"}
 
+    # 재접속 가드가 클라이언트를 살리는 동안에는 fetch를 시도하지 않고 명확한 상태를 반환
+    try:
+        if not client.is_connected():
+            return {"status": "client_disconnected"}
+    except Exception:
+        return {"status": "client_disconnected"}
+
     cfg = get_config()
     channels = cfg.get("channels", [])
     retention_days = int(cfg.get("retention_days", 6))
@@ -358,11 +366,15 @@ def collect_once():
     retention_cutoff_utc = now_utc - timedelta(days=retention_days)
 
     snapshot = _load_data()
-    fetch = asyncio.run_coroutine_threadsafe(
-        _collect_all(client, channels, snapshot.get("state", {}),
-                     limit, retention_cutoff_utc, min_text_chars, snapshot.get("dedup", {})),
-        loop,
-    ).result()
+    try:
+        fetch = asyncio.run_coroutine_threadsafe(
+            _collect_all(client, channels, snapshot.get("state", {}),
+                         limit, retention_cutoff_utc, min_text_chars, snapshot.get("dedup", {})),
+            loop,
+        ).result(timeout=180)
+    except (concurrent.futures.TimeoutError, asyncio.TimeoutError):
+        # 클라이언트가 응답하지 않는 경우 무한 대기를 막고 명확한 에러를 반환
+        return {"status": "error", "error": "telegram fetch timeout (클라이언트 응답 없음)"}
 
     with _data_lock:
         data = _load_data()
