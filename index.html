@@ -666,6 +666,11 @@
             padding:24px 0 8px 0; margin-top:-24px;
         }
         .chart-title { font-size:18px; font-weight:bold; color:#58a6ff; }
+        .chart-current-price {
+            margin-left:auto; margin-right:14px; text-align:right; line-height:1.2;
+        }
+        .ccp-label { display:block; font-size:11px; color:#8b949e; }
+        .ccp-value { display:block; font-size:17px; font-weight:700; color:#e6edf3; }
         .chart-close {
             cursor:pointer; color:#8b949e; font-size:24px;
             min-width:44px; min-height:44px;
@@ -1190,9 +1195,11 @@
             .stk-filters select { padding: 6px 10px; font-size: 13px; }
             .stk-filter-count { font-size: 12px; width: 100%; text-align: right; }
 
+            .chart-overlay { align-items: flex-start; }
             .chart-modal {
                 width: 100vw !important; max-width: 100% !important;
                 height: 100vh; max-height: 100vh;
+                height: 100dvh; max-height: 100dvh;
                 border-radius: 0; margin: 0;
                 padding: 12px;
             }
@@ -1385,6 +1392,10 @@
     <div class="chart-modal">
         <div class="chart-header">
             <span class="chart-title" id="chart-title"></span>
+            <div class="chart-current-price" id="chart-current-price" style="display:none;">
+                <span class="ccp-label">현재가</span>
+                <span class="ccp-value" id="ccp-value">—</span>
+            </div>
             <span class="chart-close" onclick="closeChart()">x</span>
         </div>
         <div id="chart-period-selector"></div>
@@ -2915,6 +2926,8 @@
     function closeChart() {
         document.getElementById('chart-overlay').classList.remove('active');
         if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        document.getElementById('chart-current-price').style.display = 'none';
+        document.getElementById('ccp-value').textContent = '—';
         document.getElementById('periodReturnValue').textContent = '—';
         document.getElementById('periodReturnValue').style.color = '#c9d1d9';
         document.getElementById('periodReturnLabel').textContent = '기간 수익률';
@@ -3305,7 +3318,27 @@
                 }
             });
             updatePeriodReturn(data.prices);
+            updateCurrentPrice(data.prices);
         } catch(e) { console.error('Chart load failed:', e); }
+    }
+
+    function formatCurrentPrice(v, symbol) {
+        const isKr = /\.(KS|KQ)$/i.test(symbol || '');
+        if (isKr) return Math.round(v).toLocaleString('ko-KR') + '원';
+        return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function updateCurrentPrice(prices) {
+        const el = document.getElementById('chart-current-price');
+        const valEl = document.getElementById('ccp-value');
+        if (!prices || !prices.length) {
+            el.style.display = 'none';
+            valEl.textContent = '—';
+            return;
+        }
+        const last = prices[prices.length - 1];
+        valEl.textContent = formatCurrentPrice(last, chartSymbol);
+        el.style.display = 'block';
     }
 
     function updatePeriodReturn(prices) {
