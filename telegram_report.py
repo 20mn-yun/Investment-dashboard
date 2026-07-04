@@ -6,10 +6,13 @@ import uuid
 import sqlite3
 import shutil
 import subprocess
+import requests
 from datetime import datetime, timezone
 
 from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaDocument, DocumentAttributeFilename
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 CONFIG_PATH = "report_config.json"
 REPORT_DB = "report_index.db"
@@ -39,6 +42,41 @@ def _mask_brokerages(text, watchlist):
             continue
         text = text.replace(bl, " ")
     return text
+
+
+def _gemini_yes_no(prompt):
+    try:
+        res = requests.post(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+            f"?key={GEMINI_API_KEY}",
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=30,
+        )
+        text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return text.strip().upper()
+    except Exception:
+        return ""
+
+
+def _ai_relevance(filename, caption, watchlist):
+    wl = ", ".join(watchlist)
+    prompt = (
+        "너는 증권사 리포트 필터다. 아래는 텔레그램 채널에 올라온 리포트의 파일명과 메시지 본문 일부다.\n\n"
+        f"관심 종목 목록: {wl}\n\n"
+        f"파일명: {filename}\n"
+        f"본문: {caption[:500]}\n\n"
+        "이 리포트가 다음 중 하나에 해당하면 YES, 아니면 NO 라고만 답해라.\n"
+        "1. 관심 종목 중 하나를 주요 분석 대상으로 하는 기업 리포트\n"
+        "2. 관심 종목들이 속한 산업이나 밸류체인을 직접 다루는 산업 리포트 (예: 반도체, 반도체 장비, 전력기기)\n"
+        "다음은 NO 다: 시황·매크로·주간전망 리포트에서 관심 종목이 스치듯 언급만 되는 경우, 관심 종목과 무관한 기업·산업 리포트.\n"
+        "답은 YES 또는 NO 한 단어만 출력해라."
+    )
+    ans = _gemini_yes_no(prompt)
+    if ans.startswith("YES"):
+        return True
+    if ans.startswith("NO"):
+        return False
+    return None
 
 
 _jobs = {}
@@ -259,14 +297,25 @@ def start_realtime_watcher(api_id, api_hash, session_path):
                     filename = attr.file_name
                     break
             text = message.message or ""
-            cleaned_filename = _mask_brokerages(filename.lower(), watchlist)
-            cleaned_text = _mask_brokerages(text.lower(), watchlist)
-            for stock in watchlist:
-                kw = stock.lower()
-                if kw in cleaned_filename or kw in cleaned_text:
-                    for ch in personal_channels:
-                        await _shared_client.forward_messages(ch, [message.id], event.chat_id)
-                    break
+            should_forward = None
+            if cfg.get("ai_filter_enabled", True) and GEMINI_API_KEY:
+                loop = asyncio.get_event_loop()
+                should_forward = await loop.run_in_executor(
+                    None, _ai_relevance, filename, text, watchlist
+                )
+                print(f"[Report AI필터] {filename[:60]} -> {should_forward}", flush=True)
+            if should_forward is None:
+                cleaned_filename = _mask_brokerages(filename.lower(), watchlist)
+                cleaned_text = _mask_brokerages(text.lower(), watchlist)
+                should_forward = False
+                for stock in watchlist:
+                    kw = stock.lower()
+                    if kw in cleaned_filename or kw in cleaned_text:
+                        should_forward = True
+                        break
+            if should_forward:
+                for ch in personal_channels:
+                    await _shared_client.forward_messages(ch, [message.id], event.chat_id)
 
         await _shared_client.run_until_disconnected()
 
