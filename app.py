@@ -20,6 +20,7 @@ import telegram_report
 import tg_inbox
 import dart_report
 import earnings_tracker
+import disparity_tracker
 
 app = Flask(__name__)
 
@@ -2806,6 +2807,54 @@ def get_tg_inbox_media(filename):
     if not os.path.isfile(path):
         return jsonify({"error": "not found"}), 404
     return send_from_directory(media_dir, filename)
+
+
+@app.route("/api/disparity", methods=["GET"])
+def get_disparity():
+    """이격도 모니터링 데이터. 캐시 로직 경유(캐시 미스 시 요청 스레드에서 동기 재수집).
+    시계열(KOSPI/KOSDAQ/종목)은 최근 250영업일로 잘라 반환, 업종 28개는 최신 이격도만."""
+    force = request.args.get("force", "").lower() in ("1", "true", "yes")
+    try:
+        data = disparity_tracker.get_disparity_data(force=force)
+    except Exception as e:
+        return jsonify({"error": f"이격도 데이터를 불러오지 못했습니다: {e}"}), 500
+
+    def _slice_series(rows, n=250):
+        return [
+            {"date": r["date"], "close": r["close"], "ma50": r["ma50"],
+             "disp20": r["disp20"], "disp50": r["disp50"], "disp120": r["disp120"]}
+            for r in (rows or [])[-n:]
+        ]
+
+    indices = {}
+    for name, obj in (data.get("indices") or {}).items():
+        indices[name] = {
+            "name": obj.get("name", name),
+            "series": _slice_series(obj.get("series", [])),
+            "latest": obj.get("latest", {}),
+            "peaks": obj.get("peaks", []),
+            "peak_trend": obj.get("peak_trend"),
+        }
+
+    stocks = {}
+    for code, obj in (data.get("stocks") or {}).items():
+        stocks[code] = {
+            "code": code,
+            "name": obj.get("name", code),
+            "series": _slice_series(obj.get("series", [])),
+            "latest": obj.get("latest", {}),
+        }
+
+    return jsonify({
+        "base_date": data.get("base_date_iso"),
+        "as_of": data.get("as_of"),
+        "generated_at": data.get("generated_at"),
+        "cached": data.get("cached"),
+        "indices": indices,
+        "stocks": stocks,
+        "sectors": data.get("sectors", {}),
+        "errors": data.get("errors", {}),
+    })
 
 
 # --- DART Monitor API ---

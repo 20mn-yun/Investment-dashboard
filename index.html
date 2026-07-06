@@ -116,6 +116,44 @@
             border-bottom: 1px solid #30363d;
         }
 
+        /* ===== 한국 마켓 탭 ===== */
+        .korea-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .korea-asof { font-size: 13px; color: #8b949e; }
+        .korea-stale { font-size: 12px; color: #f0883e; background: rgba(240,136,62,0.12); border-radius: 10px; padding: 2px 10px; }
+        .korea-loading { color: #8b949e; padding: 40px 0; text-align: center; font-size: 14px; }
+        .korea-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+        .korea-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px; }
+        .korea-card .kc-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 8px; }
+        .korea-card .kc-name { font-size: 14px; font-weight: 600; color: #e6edf3; }
+        .korea-card .kc-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+        .kc-badge.hot { color: #ff7b72; background: rgba(248,81,73,0.15); }
+        .kc-badge.neutral { color: #8b949e; background: rgba(139,148,158,0.15); }
+        .kc-badge.cool { color: #58a6ff; background: rgba(88,166,255,0.15); }
+        .korea-card .kc-price { font-size: 15px; color: #c9d1d9; margin-bottom: 2px; }
+        .korea-card .kc-chg { font-size: 12px; }
+        .korea-card .kc-chg.up { color: #ff7b72; }
+        .korea-card .kc-chg.down { color: #58a6ff; }
+        .korea-card .kc-disp50 { font-size: 30px; font-weight: 800; line-height: 1.15; margin: 8px 0 2px; }
+        .korea-card .kc-disp50-lbl { font-size: 11px; color: #8b949e; }
+        .korea-card .kc-sub { font-size: 12px; color: #8b949e; margin-top: 6px; }
+        .korea-card .kc-trend { font-size: 11px; color: #8b949e; margin-top: 6px; }
+        .korea-chart-ctrls { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+        .korea-target-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+        .korea-target-btns .kt-btn { padding: 5px 12px; border: 1px solid #30363d; border-radius: 14px; background: #161b22; color: #8b949e; cursor: pointer; font-size: 13px; }
+        .korea-target-btns .kt-btn.active { background: rgba(88,166,255,0.15); color: #58a6ff; border-color: #58a6ff; }
+        .korea-toggles { display: flex; gap: 14px; font-size: 12px; color: #8b949e; }
+        .korea-toggles label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+        .korea-chart-wrap { position: relative; height: 420px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px; }
+        .korea-sector-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #30363d; border-radius: 8px; }
+        .korea-sector-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 460px; }
+        .korea-sector-table th { position: sticky; top: 0; background: #161b22; color: #8b949e; font-weight: 500; text-align: right; padding: 9px 12px; cursor: pointer; white-space: nowrap; border-bottom: 1px solid #30363d; z-index: 2; }
+        .korea-sector-table th:first-child { text-align: left; }
+        .korea-sector-table td { padding: 8px 12px; text-align: right; color: #c9d1d9; border-bottom: 1px solid #21262d; white-space: nowrap; }
+        .korea-sector-table td:first-child { text-align: left; position: sticky; left: 0; background: #0d1117; z-index: 1; font-weight: 500; box-shadow: 2px 0 4px rgba(0,0,0,0.35); }
+        .korea-sector-table th:first-child { position: sticky; left: 0; z-index: 3; }
+        .korea-sector-table tbody tr:hover td { background: rgba(88,166,255,0.05); }
+        .korea-sector-table tbody tr:hover td:first-child { background: #12171e; }
+
         /* 2단 레이아웃 */
         .two-column {
             display: grid;
@@ -1131,6 +1169,13 @@
             .metric-card .value { font-size: 18px; }
             .metric-card .change { font-size: 11px; }
 
+            .korea-cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .korea-card { padding: 11px; }
+            .korea-card .kc-disp50 { font-size: 24px; }
+            .korea-chart-wrap { height: 320px; padding: 6px; }
+            .korea-sector-table { font-size: 13px; }
+            .korea-sector-table th, .korea-sector-table td { padding: 7px 9px; }
+
             .two-column {
                 grid-template-columns: 1fr;
                 gap: 12px;
@@ -1249,6 +1294,7 @@
 <!-- 탭 -->
 <div class="tabs">
     <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
+    <div class="tab" onclick="switchTab('korea')">🇰🇷 한국 마켓</div>
     <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
     <div class="tab" onclick="switchTab('stocks')">🔍 주도주</div>
     <div class="tab" onclick="switchTab('valuation')">💰 PER/PBR</div>
@@ -1521,6 +1567,44 @@
                     <div id="moatMeta" style="text-align:right; margin-top:6px; font-size:11px; color:#484f58;"></div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- 한국 마켓 탭 -->
+<div class="tab-content" id="tab-korea">
+    <div class="korea-header">
+        <span class="section-title" style="margin:0; border:none;">🇰🇷 한국 마켓 · 이격도 모니터링</span>
+        <span class="korea-asof" id="korea-asof"></span>
+        <span class="korea-stale" id="korea-stale" style="display:none;"></span>
+    </div>
+    <div class="korea-loading" id="korea-loading">이격도 데이터 수집 중 (최초 로딩 시 약 10초 소요)…</div>
+    <div id="korea-content" style="display:none;">
+        <div class="korea-cards" id="korea-cards"></div>
+
+        <div class="section-title" style="margin-top:24px;">이격도 차트</div>
+        <div class="korea-chart-ctrls">
+            <div class="korea-target-btns" id="korea-target-btns"></div>
+            <div class="korea-toggles">
+                <label><input type="checkbox" id="korea-tg-d20" onchange="renderKoreaChart()"> 20일 이격도</label>
+                <label><input type="checkbox" id="korea-tg-d120" onchange="renderKoreaChart()"> 120일 이격도</label>
+            </div>
+        </div>
+        <div class="korea-chart-wrap"><canvas id="korea-chart"></canvas></div>
+
+        <div class="section-title" style="margin-top:24px;">업종별 이격도 (WICS 28)</div>
+        <div class="korea-sector-wrap" id="korea-sector-wrap">
+            <table class="korea-sector-table" id="korea-sector-table">
+                <thead>
+                    <tr>
+                        <th data-sort="name" onclick="koreaSectorSortBy('name')">업종명</th>
+                        <th data-sort="disp20" onclick="koreaSectorSortBy('disp20')">20일</th>
+                        <th data-sort="disp50" onclick="koreaSectorSortBy('disp50')">50일</th>
+                        <th data-sort="disp120" onclick="koreaSectorSortBy('disp120')">120일</th>
+                    </tr>
+                </thead>
+                <tbody id="korea-sector-body"></tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -1994,6 +2078,10 @@
             leadersLoaded = true;
             loadLeadersData();
         }
+        if (tabName === 'korea' && !koreaLoaded) {
+            koreaLoaded = true;
+            loadKorea();
+        }
         if (tabName === 'stocks' && !stocksLoaded) {
             stocksLoaded = true;
             loadStockLeaders();
@@ -2228,6 +2316,269 @@
                 },
             },
         });
+    }
+
+    // ===== 한국 마켓 (이격도) =====
+    let koreaLoaded = false;
+    let koreaData = null;
+    let koreaChart = null;
+    let koreaTarget = null;        // 현재 선택된 차트 대상 키
+    let koreaTargets = {};         // key -> {name, series, peaks, isIndex}
+    let koreaSectorSort = { col: 'disp50', dir: 'asc' };
+
+    async function loadKorea() {
+        const loading = document.getElementById('korea-loading');
+        const content = document.getElementById('korea-content');
+        loading.style.display = 'block';
+        content.style.display = 'none';
+        try {
+            const res = await fetch(API_BASE + '/api/disparity');
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            koreaData = data;
+            renderKoreaHeader(data);
+            renderKoreaCards(data);
+            buildKoreaTargets(data);
+            renderKoreaTargetBtns();
+            renderKoreaChart();
+            renderKoreaSectorTable();
+            loading.style.display = 'none';
+            content.style.display = 'block';
+        } catch (e) {
+            loading.textContent = '이격도 데이터를 불러오지 못했습니다: ' + e.message;
+        }
+    }
+
+    function koreaBusinessDaysAgo(baseIso) {
+        // 기준일이 오늘로부터 몇 영업일 과거인지 (주말 제외 근사)
+        if (!baseIso) return 0;
+        const base = new Date(baseIso + 'T00:00:00');
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        let days = 0;
+        let cur = new Date(base);
+        while (cur < today) {
+            cur.setDate(cur.getDate() + 1);
+            if (cur.getDay() !== 0 && cur.getDay() !== 6) days++;
+        }
+        return days;
+    }
+
+    function renderKoreaHeader(data) {
+        document.getElementById('korea-asof').textContent = '기준일 ' + (data.as_of || data.base_date || '-');
+        const stale = document.getElementById('korea-stale');
+        const gap = koreaBusinessDaysAgo(data.base_date);
+        if (gap >= 3) {
+            stale.textContent = `⚠ 데이터가 ${gap}영업일 전 기준입니다 (수집 지연 가능)`;
+            stale.style.display = 'inline-block';
+        } else {
+            stale.style.display = 'none';
+        }
+    }
+
+    function koreaDispBadge(d50) {
+        if (d50 == null) return '';
+        if (d50 >= 130) return '<span class="kc-badge hot">과열권</span>';
+        if (d50 > 105) return '<span class="kc-badge neutral">중립</span>';
+        return '<span class="kc-badge cool">과열 해소</span>';
+    }
+
+    function koreaFmtPrice(v) {
+        if (v == null) return '-';
+        return v >= 1000 ? Math.round(v).toLocaleString() : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+
+    function koreaChangePct(series) {
+        if (!series || series.length < 2) return null;
+        const a = series[series.length - 2].close, b = series[series.length - 1].close;
+        if (a == null || b == null || a === 0) return null;
+        return (b / a - 1) * 100;
+    }
+
+    // 카드·버튼 공통 순서: 지수(KOSPI→KOSDAQ→그 외) 다음 종목(config 순서).
+    // 백엔드 jsonify가 키를 알파벳순 정렬하므로 프론트에서 순서를 명시적으로 고정한다.
+    const KOREA_INDEX_ORDER = { 'KOSPI': 0, 'KOSDAQ': 1 };
+    function koreaOrderedEntries(data) {
+        const entries = [];
+        Object.keys(data.indices || {})
+            .sort((a, b) => (KOREA_INDEX_ORDER[a] ?? 99) - (KOREA_INDEX_ORDER[b] ?? 99) || a.localeCompare(b))
+            .forEach(k => entries.push({ key: k, obj: data.indices[k], isIndex: true }));
+        koreaStockOrder(data).forEach(k => entries.push({ key: k, obj: data.stocks[k], isIndex: false }));
+        return entries;
+    }
+
+    // 종목 순서: disparity_config.json 순서를 프론트 우선순위 목록으로 고정한다.
+    // (백엔드 jsonify가 키를 정렬하므로 응답만으로는 config 순서를 알 수 없어 여기서 명시)
+    // 목록에 없는(새로 추가된) 종목은 뒤에 코드 오름차순으로 자동 추가 → 카드는 계속 자동 생성됨.
+    const KOREA_STOCK_ORDER = ['005930', '000660'];   // 삼성전자, SK하이닉스
+    function koreaStockOrder(data) {
+        const keys = Object.keys(data.stocks || {});
+        const known = KOREA_STOCK_ORDER.filter(c => keys.includes(c));
+        const unknown = keys.filter(c => !KOREA_STOCK_ORDER.includes(c)).sort();
+        return [...known, ...unknown];
+    }
+
+    function renderKoreaCards(data) {
+        const wrap = document.getElementById('korea-cards');
+        let html = '';
+        // 지수(배지·고점추세 있음) → 종목(배지 없음) 순
+        const build = (obj, isIndex) => {
+            const lt = obj.latest || {};
+            const chg = koreaChangePct(obj.series);
+            const chgHtml = chg == null ? '' :
+                `<span class="kc-chg ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%</span>`;
+            const badge = isIndex ? koreaDispBadge(lt.disp50) : '';
+            let trend = '';
+            if (isIndex && obj.peaks && obj.peaks.length >= 2 && obj.peak_trend) {
+                const p = obj.peaks;
+                trend = `<div class="kc-trend">고점 추세 ${obj.peak_trend} (${p[p.length - 2].value} → ${p[p.length - 1].value})</div>`;
+            }
+            html += `<div class="korea-card">
+                <div class="kc-top"><span class="kc-name">${obj.name}</span>${badge}</div>
+                <div class="kc-price">${koreaFmtPrice(lt.close)} <span style="font-size:11px;color:#8b949e;">${chgHtml}</span></div>
+                <div class="kc-disp50-lbl">50일 이격도</div>
+                <div class="kc-disp50">${lt.disp50 != null ? lt.disp50.toFixed(2) : '-'}</div>
+                <div class="kc-sub">20일 ${lt.disp20 != null ? lt.disp20.toFixed(2) : '-'} · 120일 ${lt.disp120 != null ? lt.disp120.toFixed(2) : '-'}</div>
+                ${trend}
+            </div>`;
+        };
+        koreaOrderedEntries(data).forEach(e => build(e.obj, e.isIndex));
+        wrap.innerHTML = html;
+    }
+
+    // 버튼/차트 대상 순서를 배열로 보관해 순서를 보장한다
+    let koreaTargetOrder = [];
+    function buildKoreaTargets(data) {
+        koreaTargets = {};
+        koreaTargetOrder = [];
+        koreaOrderedEntries(data).forEach(e => {
+            koreaTargets[e.key] = {
+                name: e.obj.name, series: e.obj.series,
+                peaks: e.isIndex ? (e.obj.peaks || []) : [], isIndex: e.isIndex,
+            };
+            koreaTargetOrder.push(e.key);
+        });
+        if (!koreaTarget || !koreaTargets[koreaTarget]) {
+            koreaTarget = koreaTargets['KOSPI'] ? 'KOSPI' : koreaTargetOrder[0];   // 기본 KOSPI 유지
+        }
+    }
+
+    function renderKoreaTargetBtns() {
+        const wrap = document.getElementById('korea-target-btns');
+        wrap.innerHTML = koreaTargetOrder.map(k =>
+            `<span class="kt-btn ${k === koreaTarget ? 'active' : ''}" onclick="selectKoreaTarget('${k}')">${koreaTargets[k].name}</span>`
+        ).join('');
+    }
+
+    function selectKoreaTarget(k) {
+        koreaTarget = k;
+        renderKoreaTargetBtns();
+        renderKoreaChart();
+    }
+
+    function renderKoreaChart() {
+        const t = koreaTargets[koreaTarget];
+        if (!t) return;
+        const series = t.series || [];
+        const labels = series.map(s => s.date);
+        const closes = series.map(s => s.close);
+        const ma50 = series.map(s => s.ma50);
+        const disp50 = series.map(s => s.disp50);
+        const disp20 = series.map(s => s.disp20);
+        const disp120 = series.map(s => s.disp120);
+        const showD20 = document.getElementById('korea-tg-d20').checked;
+        const showD120 = document.getElementById('korea-tg-d120').checked;
+
+        // 고점 마커 (지수만): disp50 축 위에 점으로
+        const peakPoints = labels.map(() => null);
+        if (t.isIndex && t.peaks) {
+            const idxByDate = {};
+            labels.forEach((d, i) => { idxByDate[d] = i; });
+            t.peaks.forEach(p => { if (idxByDate[p.date] !== undefined) peakPoints[idxByDate[p.date]] = p.value; });
+        }
+
+        // pointStyle:'line' → 범례 마커가 각 데이터셋의 선 색·굵기·점선을 그대로 반영
+        const datasets = [
+            { label: '종가', data: closes, yAxisID: 'yPrice', borderColor: '#8b949e', backgroundColor: 'rgba(139,148,158,0.06)', pointStyle: 'line', pointRadius: 0, borderWidth: 1, tension: 0.1, fill: true, order: 5 },
+            { label: '50일 이평', data: ma50, yAxisID: 'yPrice', borderColor: '#d29922', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, borderDash: [4, 3], tension: 0.1, order: 4 },
+            { label: '50일 이격도', data: disp50, yAxisID: 'yDisp', borderColor: '#58a6ff', pointStyle: 'line', pointRadius: 0, borderWidth: 3, tension: 0.1, order: 1 },
+        ];
+        if (showD20) datasets.push({ label: '20일 이격도', data: disp20, yAxisID: 'yDisp', borderColor: '#3fb950', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, tension: 0.1, order: 2 });
+        if (showD120) datasets.push({ label: '120일 이격도', data: disp120, yAxisID: 'yDisp', borderColor: '#bc8cff', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, tension: 0.1, order: 2 });
+        if (t.isIndex) datasets.push({ label: '50일 이격도 고점', data: peakPoints, yAxisID: 'yDisp', showLine: false, pointRadius: 5, pointStyle: 'triangle', pointBackgroundColor: '#f85149', pointBorderColor: '#f85149', order: 0 });
+
+        // 우축 기준선(130/105/100) — annotation 플러그인 없이 얇은 데이터셋으로 표현
+        [[130, 'rgba(248,81,73,0.5)'], [105, 'rgba(210,153,34,0.5)'], [100, 'rgba(139,148,158,0.5)']].forEach(([lv, col]) => {
+            datasets.push({ label: '기준' + lv, data: labels.map(() => lv), yAxisID: 'yDisp', borderColor: col, borderDash: [6, 4], borderWidth: 1, pointRadius: 0, order: 6, _ref: true });
+        });
+
+        if (koreaChart) koreaChart.destroy();
+        koreaChart = new Chart(document.getElementById('korea-chart'), {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        display: true, position: 'top',
+                        labels: { color: '#8b949e', font: { size: 11 }, usePointStyle: true, filter: (it) => !it.text.startsWith('기준') },
+                    },
+                    tooltip: { callbacks: { label: (c) => c.dataset._ref ? null : `${c.dataset.label}: ${c.parsed.y != null ? c.parsed.y.toLocaleString() : '-'}` } },
+                },
+                scales: {
+                    x: { ticks: { color: '#8b949e', maxTicksLimit: 10, font: { size: 9 } }, grid: { color: 'rgba(48,54,61,0.4)' } },
+                    yPrice: { position: 'left', ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: 'rgba(48,54,61,0.35)' }, title: { display: true, text: '지수/종가', color: '#8b949e', font: { size: 10 } } },
+                    yDisp: { position: 'right', ticks: { color: '#58a6ff', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: '이격도', color: '#58a6ff', font: { size: 10 } } },
+                },
+            },
+        });
+    }
+
+    function koreaSectorCellStyle(d50) {
+        // 105 이하 파랑, 130 이상 빨강 옅은 그라데이션
+        if (d50 == null) return '';
+        if (d50 <= 105) {
+            const t = Math.max(0, Math.min(1, (105 - d50) / 25));
+            return `background: rgba(88,166,255,${(0.08 + t * 0.32).toFixed(3)});`;
+        }
+        if (d50 >= 130) {
+            const t = Math.max(0, Math.min(1, (d50 - 130) / 25));
+            return `background: rgba(248,81,73,${(0.08 + t * 0.32).toFixed(3)});`;
+        }
+        return '';
+    }
+
+    function renderKoreaSectorTable() {
+        const body = document.getElementById('korea-sector-body');
+        const sectors = Object.values(koreaData.sectors || {});
+        const { col, dir } = koreaSectorSort;
+        sectors.sort((a, b) => {
+            let av = a[col], bv = b[col];
+            if (col === 'name') return dir === 'asc' ? String(av).localeCompare(bv, 'ko') : String(bv).localeCompare(av, 'ko');
+            av = av == null ? Infinity : av; bv = bv == null ? Infinity : bv;   // null은 뒤로
+            return dir === 'asc' ? av - bv : bv - av;
+        });
+        body.innerHTML = sectors.map(s => {
+            const f = (v) => v == null ? '-' : v.toFixed(2);
+            return `<tr>
+                <td>${s.name}</td>
+                <td>${f(s.disp20)}</td>
+                <td style="${koreaSectorCellStyle(s.disp50)}">${f(s.disp50)}</td>
+                <td>${f(s.disp120)}</td>
+            </tr>`;
+        }).join('');
+        // 헤더 정렬 표식
+        document.querySelectorAll('#korea-sector-table thead th').forEach(th => {
+            const c = th.getAttribute('data-sort');
+            const base = th.textContent.replace(/[▲▼]/g, '').trim();
+            th.textContent = base + (c === col ? (dir === 'asc' ? ' ▲' : ' ▼') : '');
+        });
+    }
+
+    function koreaSectorSortBy(col) {
+        if (koreaSectorSort.col === col) koreaSectorSort.dir = koreaSectorSort.dir === 'asc' ? 'desc' : 'asc';
+        else koreaSectorSort = { col, dir: col === 'name' ? 'asc' : 'asc' };
+        renderKoreaSectorTable();
     }
 
     // 주도섹터

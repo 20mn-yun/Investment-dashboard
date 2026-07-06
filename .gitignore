@@ -31,3 +31,7 @@ cache/tg_media/
 tg_inbox_config.json
 tg_inbox_corrections.json
 dart_daily_history.json.bak
+
+# 한국 마켓(이격도) 개인설정·데이터
+disparity_config.json
+cache/disparity.json
