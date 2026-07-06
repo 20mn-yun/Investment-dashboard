@@ -950,6 +950,24 @@
         #tab-inbox .inbox-imgs.single img { max-height: 240px; max-width: 100%; border-radius: 6px; cursor: pointer; display: block; }
         #tab-inbox .inbox-imgs.multi { display: flex; gap: 6px; flex-wrap: wrap; }
         #tab-inbox .inbox-imgs.multi img { max-height: 120px; border-radius: 6px; cursor: pointer; }
+        /* 인박스 이미지 라이트박스 */
+        .inbox-lb { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.92);
+                    align-items: center; justify-content: center; touch-action: none; overflow: hidden; }
+        .inbox-lb.active { display: flex; }
+        .inbox-lb-img { max-width: 94vw; max-height: 92vh; object-fit: contain; border-radius: 4px;
+                        user-select: none; -webkit-user-select: none; -webkit-user-drag: none;
+                        transform-origin: center center; will-change: transform; }
+        .inbox-lb-nav { position: fixed; top: 50%; transform: translateY(-50%); width: 48px; height: 48px;
+                        border-radius: 50%; border: none; background: rgba(255,255,255,0.15); color: #fff;
+                        font-size: 20px; line-height: 1; cursor: pointer; display: flex; align-items: center;
+                        justify-content: center; -webkit-user-select: none; user-select: none; }
+        .inbox-lb-nav:hover { background: rgba(255,255,255,0.28); }
+        .inbox-lb-nav.prev { left: 16px; }
+        .inbox-lb-nav.next { right: 16px; }
+        .inbox-lb-nav:disabled { opacity: 0.25; cursor: default; }
+        .inbox-lb-count { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+                          background: rgba(0,0,0,0.5); color: #fff; font-size: 14px; padding: 4px 12px;
+                          border-radius: 12px; -webkit-user-select: none; user-select: none; }
         #tab-inbox .inbox-topic-badge { font-size: 12px; color: #3fb950; background: rgba(63,185,80,0.12); border-radius: 10px; padding: 1px 8px; }
         #tab-inbox .inbox-topic-badge.editable { cursor: pointer; }
         #tab-inbox .inbox-topic-badge.unclassified { color: #8b949e; background: rgba(139,148,158,0.14); }
@@ -1388,6 +1406,13 @@
 </div>
 
 <!-- 차트 모달 -->
+<div class="inbox-lb" id="inbox-lightbox">
+    <button class="inbox-lb-nav prev" id="inbox-lb-prev" onclick="event.stopPropagation();inboxLbNav(-1)">◀</button>
+    <img class="inbox-lb-img" id="inbox-lb-img" src="" alt="">
+    <button class="inbox-lb-nav next" id="inbox-lb-next" onclick="event.stopPropagation();inboxLbNav(1)">▶</button>
+    <div class="inbox-lb-count" id="inbox-lb-count"></div>
+</div>
+
 <div class="chart-overlay" id="chart-overlay" onclick="if(event.target===this)closeChart()">
     <div class="chart-modal">
         <div class="chart-header">
@@ -4727,15 +4752,14 @@
                 : '';
             const imgs = it.images || [];
             let imgBlock = '';
-            if (imgs.length === 1) {
-                const u = API_BASE + '/api/tg-inbox/media/' + encodeURIComponent(imgs[0]);
-                imgBlock = `<div class="inbox-imgs single"><img loading="lazy" src="${u}" onclick="window.open('${u}','_blank')"></div>`;
-            } else if (imgs.length > 1) {
-                const thumbs = imgs.map(fn => {
-                    const u = API_BASE + '/api/tg-inbox/media/' + encodeURIComponent(fn);
-                    return `<img loading="lazy" src="${u}" onclick="window.open('${u}','_blank')">`;
-                }).join('');
-                imgBlock = `<div class="inbox-imgs multi">${thumbs}</div>`;
+            if (imgs.length >= 1) {
+                const urls = imgs.map(fn => API_BASE + '/api/tg-inbox/media/' + encodeURIComponent(fn));
+                // JSON 배열을 속성값에 안전하게 임베드(브라우저가 &quot;를 "로 디코딩 → 유효한 JS 배열)
+                const attr = JSON.stringify(urls).replace(/"/g, '&quot;');
+                const cls = urls.length === 1 ? 'single' : 'multi';
+                const thumbs = urls.map((u, i) =>
+                    `<img loading="lazy" src="${u}" onclick="openInboxLightbox(${attr}, ${i})">`).join('');
+                imgBlock = `<div class="inbox-imgs ${cls}">${thumbs}</div>`;
             }
             const starBtn = `<button class="inbox-star${it.saved ? ' on' : ''}" title="저장" onclick="event.stopPropagation();toggleInboxSave(event,'${inboxEsc(it.id)}',${it.saved ? 'true' : 'false'})">${it.saved ? '★' : '☆'}</button>`;
             html += `<div class="inbox-card">
@@ -4763,6 +4787,256 @@
             pager.style.display = 'none';
         }
     }
+
+    // ===== 인박스 이미지 라이트박스 (좌우 넘기기 + 핀치 줌) =====
+    let _inboxLbImgs = [];
+    let _inboxLbIdx = 0;
+    let _inboxLbSwiped = false;
+
+    // 줌/패닝 상태 (transform: translate + scale, origin 중앙 고정)
+    let _lbScale = 1, _lbTx = 0, _lbTy = 0;
+    let _lbPinch = null;      // 핀치: {startDist, startScale}
+    let _lbPan = null;        // 확대 상태 한 손가락 패닝: {x, y, tx, ty}
+    let _lbStartTouch = null; // 스와이프/탭 후보 (한 손가락, scale==1)
+    let _lbLastTap = null;    // 더블탭 감지 {t, x, y}
+    let _lbCloseTimer = null; // 단일탭 지연 닫기
+    let _lbMouse = null;      // 마우스 드래그 패닝
+
+    function _inboxLbPreload(i) {
+        if (i >= 0 && i < _inboxLbImgs.length) { const im = new Image(); im.src = _inboxLbImgs[i]; }
+    }
+
+    function _lbApplyTransform() {
+        const img = document.getElementById('inbox-lb-img');
+        img.style.transform = 'translate(' + _lbTx + 'px,' + _lbTy + 'px) scale(' + _lbScale + ')';
+        img.style.cursor = _lbScale > 1 ? 'grab' : 'zoom-in';
+    }
+
+    // 이미지가 화면 밖으로 완전히 나가지 않도록 확대 크기 기준 클램프
+    function _lbClampTranslate() {
+        const img = document.getElementById('inbox-lb-img');
+        const sw = img.offsetWidth * _lbScale, sh = img.offsetHeight * _lbScale;
+        const maxX = Math.max(0, (sw - window.innerWidth) / 2);
+        const maxY = Math.max(0, (sh - window.innerHeight) / 2);
+        _lbTx = Math.max(-maxX, Math.min(maxX, _lbTx));
+        _lbTy = Math.max(-maxY, Math.min(maxY, _lbTy));
+    }
+
+    // 초점(focalX,Y: 뷰포트 좌표)을 향해 확대/축소 (1~5 제한)
+    function _lbApplyZoom(newScale, focalX, focalY) {
+        newScale = Math.max(1, Math.min(5, newScale));
+        const fx = focalX - window.innerWidth / 2;
+        const fy = focalY - window.innerHeight / 2;
+        const ratio = newScale / _lbScale;
+        _lbTx = fx - (fx - _lbTx) * ratio;
+        _lbTy = fy - (fy - _lbTy) * ratio;
+        _lbScale = newScale;
+        _lbClampTranslate();
+        _lbApplyTransform();
+    }
+
+    function _lbResetZoom() {
+        _lbScale = 1; _lbTx = 0; _lbTy = 0;
+        _lbApplyTransform();
+    }
+
+    function _lbDist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+    function _lbMid(a, b) { return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; }
+    function _lbCancelCloseTimer() { if (_lbCloseTimer) { clearTimeout(_lbCloseTimer); _lbCloseTimer = null; } }
+
+    function _inboxLbRender() {
+        const img = document.getElementById('inbox-lb-img');
+        _lbResetZoom();                       // 이미지 전환 시 줌 리셋
+        img.src = _inboxLbImgs[_inboxLbIdx];
+        const multi = _inboxLbImgs.length > 1;
+        const prev = document.getElementById('inbox-lb-prev');
+        const next = document.getElementById('inbox-lb-next');
+        const cnt = document.getElementById('inbox-lb-count');
+        prev.style.display = multi ? 'flex' : 'none';
+        next.style.display = multi ? 'flex' : 'none';
+        cnt.style.display = multi ? 'block' : 'none';
+        prev.disabled = _inboxLbIdx <= 0;                          // 첫 장에서 ◀ 비활성 (순환 없음)
+        next.disabled = _inboxLbIdx >= _inboxLbImgs.length - 1;    // 마지막 장에서 ▶ 비활성
+        cnt.textContent = (_inboxLbIdx + 1) + ' / ' + _inboxLbImgs.length;
+        _inboxLbPreload(_inboxLbIdx + 1);   // 다음/이전 미리 로드
+        _inboxLbPreload(_inboxLbIdx - 1);
+    }
+
+    function openInboxLightbox(imgs, idx) {
+        _inboxLbImgs = Array.isArray(imgs) ? imgs : [imgs];
+        if (!_inboxLbImgs.length) return;
+        _inboxLbIdx = Math.max(0, Math.min(idx || 0, _inboxLbImgs.length - 1));
+        _inboxLbRender();
+        document.getElementById('inbox-lightbox').classList.add('active');
+        document.body.style.overflow = 'hidden';   // 배경 스크롤 잠금
+    }
+
+    function closeInboxLightbox() {
+        _lbCancelCloseTimer();
+        document.getElementById('inbox-lightbox').classList.remove('active');
+        _lbResetZoom();
+        document.getElementById('inbox-lb-img').src = '';   // src 해제
+        document.body.style.overflow = '';
+        _inboxLbImgs = [];
+        _lbPinch = _lbPan = _lbStartTouch = _lbLastTap = _lbMouse = null;
+    }
+
+    function inboxLbNav(delta) {
+        const n = _inboxLbIdx + delta;
+        if (n < 0 || n >= _inboxLbImgs.length) return;   // 순환 없음
+        _inboxLbIdx = n;
+        _inboxLbRender();   // 내부에서 줌 리셋
+    }
+
+    (function _wireInboxLightbox() {
+        const lb = document.getElementById('inbox-lightbox');
+        if (!lb) return;
+        const isActive = () => lb.classList.contains('active');
+
+        // 더블탭/단일탭 지연 판정 (선언 호이스팅으로 아래 핸들러에서 사용 가능)
+        function _lbHandleTap(x, y, e) {
+            const now = Date.now();
+            if (_lbLastTap && (now - _lbLastTap.t) < 300 &&
+                Math.abs(x - _lbLastTap.x) < 30 && Math.abs(y - _lbLastTap.y) < 30) {
+                // 더블탭 → scale 1 ↔ 2 토글 (확대는 탭 지점을 향해), 닫기 처리 안 함
+                _lbCancelCloseTimer();
+                _lbLastTap = null;
+                _lbSwiped = true;
+                if (e.cancelable) e.preventDefault();
+                if (_lbScale > 1) _lbResetZoom();
+                else _lbApplyZoom(2, x, y);
+            } else {
+                // 첫 탭 → 300ms 대기 후 두 번째 탭 없으면 닫기
+                _lbLastTap = { t: now, x: x, y: y };
+                _lbSwiped = true;                 // 합성 click 억제
+                if (e.cancelable) e.preventDefault();
+                _lbCancelCloseTimer();
+                _lbCloseTimer = setTimeout(function () {
+                    _lbCloseTimer = null;
+                    _lbLastTap = null;
+                    if (_lbScale === 1) closeInboxLightbox();   // 확대 중이면 닫지 않음
+                }, 300);
+            }
+        }
+
+        // 마우스 클릭: 탭 닫기 (드래그/스와이프/확대 상태 제외)
+        lb.addEventListener('click', function () {
+            if (_lbSwiped) { _lbSwiped = false; return; }
+            if (_lbScale > 1) return;
+            closeInboxLightbox();
+        });
+
+        lb.addEventListener('touchstart', function (e) {
+            if (!isActive()) return;
+            _lbSwiped = false;
+            if (e.touches.length === 2) {
+                // 두 손가락 → 스와이프 취소하고 줌 모드
+                _lbCancelCloseTimer();
+                _lbStartTouch = null; _lbPan = null;
+                _lbPinch = { startDist: _lbDist(e.touches[0], e.touches[1]), startScale: _lbScale };
+            } else if (e.touches.length === 1) {
+                const t = e.touches[0];
+                if (_lbScale > 1) {
+                    _lbPan = { x: t.clientX, y: t.clientY, tx: _lbTx, ty: _lbTy };   // 확대 상태 = 패닝
+                    _lbStartTouch = null;
+                } else {
+                    _lbStartTouch = { x: t.clientX, y: t.clientY };                  // scale 1 = 스와이프/탭 후보
+                    _lbPan = null;
+                }
+            }
+        }, { passive: true });
+
+        lb.addEventListener('touchmove', function (e) {
+            if (!isActive()) return;
+            e.preventDefault();   // 페이지 전체 핀치확대/스크롤 차단 (라이트박스 열림 시에만)
+            if (e.touches.length === 2 && _lbPinch) {
+                const dist = _lbDist(e.touches[0], e.touches[1]);
+                const mid = _lbMid(e.touches[0], e.touches[1]);
+                _lbApplyZoom(_lbPinch.startScale * (dist / _lbPinch.startDist), mid.x, mid.y);
+            } else if (e.touches.length === 1 && _lbPan) {
+                const t = e.touches[0];
+                _lbTx = _lbPan.tx + (t.clientX - _lbPan.x);
+                _lbTy = _lbPan.ty + (t.clientY - _lbPan.y);
+                _lbClampTranslate();
+                _lbApplyTransform();
+            }
+        }, { passive: false });
+
+        lb.addEventListener('touchend', function (e) {
+            if (!isActive()) return;
+            const remaining = e.touches.length;
+
+            // 핀치 종료
+            if (_lbPinch && remaining < 2) {
+                _lbPinch = null;
+                if (_lbScale < 1.02) _lbResetZoom();   // 거의 1이면 1/0/0 스냅
+                if (remaining === 1 && _lbScale > 1) { // 남은 손가락으로 패닝 이어가기
+                    const t = e.touches[0];
+                    _lbPan = { x: t.clientX, y: t.clientY, tx: _lbTx, ty: _lbTy };
+                }
+                _lbSwiped = true;   // 핀치는 닫기/스와이프로 처리 안 함
+                return;
+            }
+            // 패닝 종료
+            if (_lbPan && remaining === 0) {
+                _lbPan = null;
+                _lbSwiped = true;
+                return;
+            }
+            // 스와이프/탭 (scale==1, 한 손가락)
+            if (_lbStartTouch && remaining === 0) {
+                const t = e.changedTouches[0];
+                const dx = t.clientX - _lbStartTouch.x, dy = t.clientY - _lbStartTouch.y;
+                _lbStartTouch = null;
+                if (_lbScale === 1 && Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy)) {
+                    _lbSwiped = true;
+                    inboxLbNav(dx < 0 ? 1 : -1);       // 넘기기
+                    if (e.cancelable) e.preventDefault();
+                    return;
+                }
+                if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                    _lbHandleTap(t.clientX, t.clientY, e);   // 더블탭/단일탭
+                    return;
+                }
+            }
+        }, { passive: false });
+
+        // 마우스 휠 줌 (커서 위치를 향해)
+        lb.addEventListener('wheel', function (e) {
+            if (!isActive()) return;
+            e.preventDefault();
+            const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+            _lbApplyZoom(_lbScale * factor, e.clientX, e.clientY);
+        }, { passive: false });
+
+        // 마우스 드래그 패닝 (scale > 1)
+        lb.addEventListener('mousedown', function (e) {
+            if (!isActive() || _lbScale <= 1) return;
+            e.preventDefault();
+            _lbMouse = { x: e.clientX, y: e.clientY, tx: _lbTx, ty: _lbTy, moved: false };
+        });
+        window.addEventListener('mousemove', function (e) {
+            if (!_lbMouse) return;
+            if (Math.abs(e.clientX - _lbMouse.x) > 3 || Math.abs(e.clientY - _lbMouse.y) > 3) _lbMouse.moved = true;
+            _lbTx = _lbMouse.tx + (e.clientX - _lbMouse.x);
+            _lbTy = _lbMouse.ty + (e.clientY - _lbMouse.y);
+            _lbClampTranslate();
+            _lbApplyTransform();
+        });
+        window.addEventListener('mouseup', function () {
+            if (!_lbMouse) return;
+            if (_lbMouse.moved) _lbSwiped = true;   // 드래그였으면 click 닫기 억제
+            _lbMouse = null;
+        });
+
+        // 키보드
+        document.addEventListener('keydown', function (e) {
+            if (!isActive()) return;
+            if (e.key === 'ArrowLeft') { e.preventDefault(); inboxLbNav(-1); }   // nav 내부서 줌 리셋
+            else if (e.key === 'ArrowRight') { e.preventDefault(); inboxLbNav(1); }
+            else if (e.key === 'Escape') { closeInboxLightbox(); }
+        });
+    })();
 
     async function toggleInboxSave(ev, id, currentlySaved) {
         if (ev) ev.stopPropagation();
