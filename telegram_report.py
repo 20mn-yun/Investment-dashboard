@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import threading
 import asyncio
 import uuid
@@ -45,17 +46,22 @@ def _mask_brokerages(text, watchlist):
 
 
 def _gemini_yes_no(prompt):
-    try:
-        res = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
-            f"?key={GEMINI_API_KEY}",
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=30,
-        )
-        text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return text.strip().upper()
-    except Exception:
-        return ""
+    for attempt in range(3):
+        try:
+            res = requests.post(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+                f"?key={GEMINI_API_KEY}",
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+                timeout=30,
+            )
+            if res.status_code == 200:
+                text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return text.strip().upper()
+            print(f"[Report AI필터] gemini 실패 status={res.status_code} 시도={attempt+1}/3", flush=True)
+        except Exception as e:
+            print(f"[Report AI필터] gemini 예외 {type(e).__name__} 시도={attempt+1}/3", flush=True)
+        time.sleep(2)
+    return ""
 
 
 def _ai_relevance(filename, caption, watchlist):
@@ -306,13 +312,12 @@ def start_realtime_watcher(api_id, api_hash, session_path):
                 print(f"[Report AI필터] {filename[:60]} -> {should_forward}", flush=True)
             if should_forward is None:
                 cleaned_filename = _mask_brokerages(filename.lower(), watchlist)
-                cleaned_text = _mask_brokerages(text.lower(), watchlist)
                 should_forward = False
                 for stock in watchlist:
-                    kw = stock.lower()
-                    if kw in cleaned_filename or kw in cleaned_text:
+                    if stock.lower() in cleaned_filename:
                         should_forward = True
                         break
+                print(f"[Report AI필터] 폴백(파일명 매칭) {filename[:60]} -> {should_forward}", flush=True)
             if should_forward:
                 for ch in personal_channels:
                     await _shared_client.forward_messages(ch, [message.id], event.chat_id)
