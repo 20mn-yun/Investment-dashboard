@@ -71,10 +71,25 @@ def _ai_relevance(filename, caption, watchlist):
         f"관심 종목 목록: {wl}\n\n"
         f"파일명: {filename}\n"
         f"본문: {caption[:500]}\n\n"
-        "이 리포트가 다음 중 하나에 해당하면 YES, 아니면 NO 라고만 답해라.\n"
-        "1. 관심 종목 중 하나를 주요 분석 대상으로 하는 기업 리포트\n"
-        "2. 관심 종목들이 속한 산업이나 밸류체인을 직접 다루는 산업 리포트 (예: 반도체, 반도체 장비, 전력기기)\n"
-        "다음은 NO 다: 시황·매크로·주간전망 리포트에서 관심 종목이 스치듯 언급만 되는 경우, 관심 종목과 무관한 기업·산업 리포트.\n"
+        "판정 규칙을 순서대로 적용해라.\n\n"
+        "규칙 1 (최우선, 무조건 NO): 다음 유형의 리포트는 관심 종목이나 그 산업이 제목·본문에 아무리 비중 있게 나와도 무조건 NO 다.\n"
+        "- 시황·마감시황·데일리·모닝브리프 등 정기 시장 요약\n"
+        "- 위클리·주간전망·월간전망·연간전망 등 정기 전망\n"
+        "- 투자전략·자산배분·포트폴리오 전략·퀀트 전략\n"
+        "- 파생상품·ETF·ETP·채권·환율·매크로 리포트\n\n"
+        "규칙 2 (YES): 규칙 1에 해당하지 않고, 다음 중 하나면 YES 다.\n"
+        "- 관심 종목 중 하나를 주요 분석 대상으로 하는 개별 기업 리포트\n"
+        "- 관심 종목들이 속한 산업(예: 반도체, 반도체 장비, 전력기기)을 전문적으로 다루는 산업 리포트\n\n"
+        "규칙 3: 그 외는 전부 NO 다. 관심 종목과 무관한 기업·산업 리포트, 이름만 비슷한 다른 회사(예: 삼성E&A는 삼성전자가 아니다)도 NO 다.\n\n"
+        "판정 예시:\n"
+        "- 국내 마감시황 → NO (규칙 1)\n"
+        "- 주간 아메리카 → NO (규칙 1)\n"
+        "- 마켓뷰: 관심은 결국, 실적 → NO (규칙 1)\n"
+        "- AI 주도장의 완충 포트폴리오: 밸류에이션 매력 중심의 단기 모멘텀 전략 → NO (규칙 1)\n"
+        "- 개별 주식 레버리지 리밸런싱 효과 → NO (규칙 1)\n"
+        "- 삼성E&A 기업분석 → NO (규칙 3)\n"
+        "- 반도체의 시간 → YES (규칙 2, 산업)\n"
+        "- 삼성전자 2Q26 프리뷰 → YES (규칙 2, 개별 기업)\n\n"
         "답은 YES 또는 NO 한 단어만 출력해라."
     )
     ans = _gemini_yes_no(prompt)
@@ -302,6 +317,8 @@ def start_realtime_watcher(api_id, api_hash, session_path):
                 if isinstance(attr, DocumentAttributeFilename):
                     filename = attr.file_name
                     break
+            if not filename:
+                return
             text = message.message or ""
             should_forward = None
             if cfg.get("ai_filter_enabled", True) and GEMINI_API_KEY:
