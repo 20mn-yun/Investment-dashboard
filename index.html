@@ -6,20 +6,35 @@
     <title>Investment Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
+        :root {
+            --bg: #ffffff;
+            --bg-card: #f8f9fa;
+            --bg-panel: #eef0f2;
+            --bg-hover: #eaf1fb;
+            --text: #1f2937;
+            --text-muted: #57606a;
+            --text-dim: #6b7280;
+            --border: #d0d7de;
+            --accent: #0969da;
+            --accent-bg: #ddf4ff;
+            --up: #cf222e;
+            --green: #1a7f37;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background-color: #0d1117;
-            color: #e6edf3;
+            background-color: var(--bg);
+            color: var(--text);
             font-family: 'Segoe UI', sans-serif;
             font-size: 14px;
         }
 
         /* 헤더 */
         .header {
-            background-color: #161b22;
+            background-color: var(--bg-card);
             padding: 16px 24px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -27,19 +42,19 @@
 
         .header h1 {
             font-size: 20px;
-            color: #58a6ff;
+            color: var(--accent);
         }
 
         .header .date {
-            color: #8b949e;
+            color: var(--text-muted);
             font-size: 13px;
         }
 
         /* 탭 */
         .tabs {
-            background-color: #161b22;
+            background-color: var(--bg-card);
             padding: 0 24px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
             display: flex;
             gap: 4px;
             overflow-x: auto;
@@ -52,7 +67,7 @@
         .tab {
             padding: 12px 20px;
             cursor: pointer;
-            color: #8b949e;
+            color: var(--text-muted);
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
             white-space: nowrap;
@@ -60,11 +75,11 @@
         }
 
         .tab.active {
-            color: #58a6ff;
-            border-bottom: 2px solid #58a6ff;
+            color: var(--accent);
+            border-bottom: 2px solid var(--accent);
         }
 
-        .tab:hover { color: #e6edf3; }
+        .tab:hover { color: var(--text); }
 
         /* 탭 콘텐츠 */
         .tab-content { display: none; padding: 24px; }
@@ -79,15 +94,15 @@
         }
 
         .metric-card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 16px;
             text-align: center;
         }
 
         .metric-card .label {
-            color: #8b949e;
+            color: var(--text-muted);
             font-size: 12px;
             margin-bottom: 8px;
         }
@@ -102,57 +117,57 @@
             margin-top: 4px;
         }
 
-        .positive { color: #f85149; }
-        .negative { color: #58a6ff; }
-        .neutral { color: #e6edf3; }
+        .positive { color: var(--up); }
+        .negative { color: var(--accent); }
+        .neutral { color: var(--text); }
 
         /* 섹션 제목 */
         .section-title {
             font-size: 15px;
             font-weight: bold;
-            color: #58a6ff;
+            color: var(--accent);
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
         }
 
         /* ===== 한국 마켓 탭 ===== */
         .korea-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-        .korea-asof { font-size: 13px; color: #8b949e; }
-        .korea-stale { font-size: 12px; color: #f0883e; background: rgba(240,136,62,0.12); border-radius: 10px; padding: 2px 10px; }
-        .korea-loading { color: #8b949e; padding: 40px 0; text-align: center; font-size: 14px; }
+        .korea-asof { font-size: 13px; color: var(--text-muted); }
+        .korea-stale { font-size: 12px; color: #f0883e; background: rgba(188,76,0,0.12); border-radius: 10px; padding: 2px 10px; }
+        .korea-loading { color: var(--text-muted); padding: 40px 0; text-align: center; font-size: 14px; }
         .korea-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-        .korea-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px; }
+        .korea-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
         .korea-card .kc-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 8px; }
-        .korea-card .kc-name { font-size: 14px; font-weight: 600; color: #e6edf3; }
+        .korea-card .kc-name { font-size: 14px; font-weight: 600; color: var(--text); }
         .korea-card .kc-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
-        .kc-badge.hot { color: #ff7b72; background: rgba(248,81,73,0.15); }
-        .kc-badge.neutral { color: #8b949e; background: rgba(139,148,158,0.15); }
-        .kc-badge.cool { color: #58a6ff; background: rgba(88,166,255,0.15); }
-        .korea-card .kc-price { font-size: 15px; color: #c9d1d9; margin-bottom: 2px; }
+        .kc-badge.hot { color: var(--up); background: rgba(207,34,46,0.15); }
+        .kc-badge.neutral { color: var(--text-muted); background: rgba(110,118,129,0.15); }
+        .kc-badge.cool { color: var(--accent); background: rgba(9,105,218,0.15); }
+        .korea-card .kc-price { font-size: 15px; color: var(--text); margin-bottom: 2px; }
         .korea-card .kc-chg { font-size: 12px; }
-        .korea-card .kc-chg.up { color: #ff7b72; }
-        .korea-card .kc-chg.down { color: #58a6ff; }
+        .korea-card .kc-chg.up { color: var(--up); }
+        .korea-card .kc-chg.down { color: var(--accent); }
         .korea-card .kc-disp50 { font-size: 30px; font-weight: 800; line-height: 1.15; margin: 8px 0 2px; }
-        .korea-card .kc-disp50-lbl { font-size: 11px; color: #8b949e; }
-        .korea-card .kc-sub { font-size: 12px; color: #8b949e; margin-top: 6px; }
-        .korea-card .kc-trend { font-size: 11px; color: #8b949e; margin-top: 6px; }
+        .korea-card .kc-disp50-lbl { font-size: 11px; color: var(--text-muted); }
+        .korea-card .kc-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+        .korea-card .kc-trend { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
         .korea-chart-ctrls { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
         .korea-target-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-        .korea-target-btns .kt-btn { padding: 5px 12px; border: 1px solid #30363d; border-radius: 14px; background: #161b22; color: #8b949e; cursor: pointer; font-size: 13px; }
-        .korea-target-btns .kt-btn.active { background: rgba(88,166,255,0.15); color: #58a6ff; border-color: #58a6ff; }
-        .korea-toggles { display: flex; gap: 14px; font-size: 12px; color: #8b949e; }
+        .korea-target-btns .kt-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); color: var(--text-muted); cursor: pointer; font-size: 13px; }
+        .korea-target-btns .kt-btn.active { background: rgba(9,105,218,0.15); color: var(--accent); border-color: var(--accent); }
+        .korea-toggles { display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); }
         .korea-toggles label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
-        .korea-chart-wrap { position: relative; height: 420px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px; }
-        .korea-sector-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #30363d; border-radius: 8px; }
+        .korea-chart-wrap { position: relative; height: 420px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+        .korea-sector-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 8px; }
         .korea-sector-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 460px; }
-        .korea-sector-table th { position: sticky; top: 0; background: #161b22; color: #8b949e; font-weight: 500; text-align: right; padding: 9px 12px; cursor: pointer; white-space: nowrap; border-bottom: 1px solid #30363d; z-index: 2; }
+        .korea-sector-table th { position: sticky; top: 0; background: var(--bg-card); color: var(--text-muted); font-weight: 500; text-align: right; padding: 9px 12px; cursor: pointer; white-space: nowrap; border-bottom: 1px solid var(--border); z-index: 2; }
         .korea-sector-table th:first-child { text-align: left; }
-        .korea-sector-table td { padding: 8px 12px; text-align: right; color: #c9d1d9; border-bottom: 1px solid #21262d; white-space: nowrap; }
-        .korea-sector-table td:first-child { text-align: left; position: sticky; left: 0; background: #0d1117; z-index: 1; font-weight: 500; box-shadow: 2px 0 4px rgba(0,0,0,0.35); }
+        .korea-sector-table td { padding: 8px 12px; text-align: right; color: var(--text); border-bottom: 1px solid var(--bg-panel); white-space: nowrap; }
+        .korea-sector-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--bg); z-index: 1; font-weight: 500; box-shadow: 2px 0 4px rgba(0,0,0,0.35); }
         .korea-sector-table th:first-child { position: sticky; left: 0; z-index: 3; }
-        .korea-sector-table tbody tr:hover td { background: rgba(88,166,255,0.05); }
-        .korea-sector-table tbody tr:hover td:first-child { background: #12171e; }
+        .korea-sector-table tbody tr:hover td { background: rgba(9,105,218,0.05); }
+        .korea-sector-table tbody tr:hover td:first-child { background: var(--bg-card); }
 
         /* 2단 레이아웃 */
         .two-column {
@@ -173,7 +188,7 @@
         .sector-name {
             width: 100px;
             font-size: 13px;
-            color: #8b949e;
+            color: var(--text-muted);
             text-align: right;
         }
 
@@ -192,12 +207,12 @@
         }
 
         .sector-bar.positive-bar {
-            background-color: #f85149;
+            background-color: var(--up);
             left: 50%;
         }
 
         .sector-bar.negative-bar {
-            background-color: #58a6ff;
+            background-color: var(--accent);
             right: 50%;
         }
 
@@ -206,7 +221,7 @@
             left: 50%;
             width: 1px;
             height: 20px;
-            background-color: #30363d;
+            background-color: var(--border);
         }
 
         .sector-value {
@@ -217,8 +232,8 @@
 
         /* 뉴스 */
         .news-section {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 24px;
@@ -233,12 +248,12 @@
         }
 
         .keyword-tag {
-            background-color: #21262d;
-            border: 1px solid #30363d;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
             border-radius: 20px;
             padding: 4px 12px;
             font-size: 12px;
-            color: #58a6ff;
+            color: var(--accent);
             display: flex;
             align-items: center;
             gap: 6px;
@@ -246,11 +261,11 @@
 
         .keyword-tag .remove {
             cursor: pointer;
-            color: #8b949e;
+            color: var(--text-muted);
             font-size: 14px;
         }
 
-        .keyword-tag .remove:hover { color: #f85149; }
+        .keyword-tag .remove:hover { color: var(--up); }
 
         .keyword-input-area {
             display: flex;
@@ -258,16 +273,16 @@
         }
 
         .keyword-input {
-            background-color: #21262d;
-            border: 1px solid #30363d;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
             border-radius: 6px;
             padding: 6px 12px;
-            color: #e6edf3;
+            color: var(--text);
             font-size: 13px;
             outline: none;
         }
 
-        .keyword-input:focus { border-color: #58a6ff; }
+        .keyword-input:focus { border-color: var(--accent); }
 
         .btn {
             background-color: #238636;
@@ -285,25 +300,25 @@
 
         .news-item {
             padding: 12px 0;
-            border-bottom: 1px solid #21262d;
+            border-bottom: 1px solid var(--bg-panel);
         }
 
         .news-item:last-child { border-bottom: none; }
 
         .news-item .news-title {
             font-size: 14px;
-            color: #e6edf3;
+            color: var(--text);
             margin-bottom: 4px;
         }
 
         .news-item .news-meta {
             font-size: 12px;
-            color: #8b949e;
+            color: var(--text-muted);
         }
 
         .news-keyword-badge {
-            background-color: #1f3a5f;
-            color: #58a6ff;
+            background-color: var(--accent-bg);
+            color: var(--accent);
             font-size: 11px;
             padding: 2px 8px;
             border-radius: 10px;
@@ -312,8 +327,8 @@
 
         /* 공포탐욕 게이지 */
         .fear-greed-container {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 16px;
         }
@@ -321,14 +336,14 @@
         .gauge-label {
             text-align: center;
             font-size: 13px;
-            color: #8b949e;
+            color: var(--text-muted);
             margin-bottom: 8px;
         }
 
         .gauge-bar {
             height: 12px;
             border-radius: 6px;
-            background: linear-gradient(to right, #f85149, #e3b341, #3fb950);
+            background: linear-gradient(to right, var(--up), #bf8700, var(--green));
             position: relative;
             margin-bottom: 8px;
         }
@@ -352,13 +367,13 @@
         .gauge-text {
             text-align: center;
             font-size: 13px;
-            color: #8b949e;
+            color: var(--text-muted);
         }
 
         /* 채권·환율·원자재 테이블 */
         .data-table {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 16px;
         }
@@ -367,13 +382,13 @@
             display: flex;
             justify-content: space-between;
             padding: 8px 0;
-            border-bottom: 1px solid #21262d;
+            border-bottom: 1px solid var(--bg-panel);
             font-size: 13px;
         }
 
         .data-row:last-child { border-bottom: none; }
 
-        .data-row .data-label { color: #8b949e; }
+        .data-row .data-label { color: var(--text-muted); }
         .data-row .data-value { font-weight: bold; }
 
         .sector-grid {
@@ -384,10 +399,10 @@
         .sector-panel-title {
             font-size: 15px;
             font-weight: bold;
-            color: #58a6ff;
+            color: var(--accent);
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
         }
         .sector-table {
             width: 100%;
@@ -397,15 +412,15 @@
         .sector-table th {
             text-align: left;
             padding: 8px 10px;
-            color: #8b949e;
-            border-bottom: 1px solid #30363d;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
             font-weight: normal;
             font-size: 12px;
         }
         .sector-table td {
             padding: 8px 10px;
-            border-bottom: 1px solid #21262d;
-            color: #e6edf3;
+            border-bottom: 1px solid var(--bg-panel);
+            color: var(--text);
         }
         .sector-table th, .sector-table td { word-break: keep-all; }
         .sector-table th:first-child, .sector-table td:first-child {
@@ -417,18 +432,18 @@
             cursor: pointer;
             transition: background-color 0.15s;
         }
-        .sector-table tr:hover { background-color: rgba(88, 166, 255, 0.06); }
-        .sector-table tr.chart-active { background-color: rgba(88, 166, 255, 0.10); }
-        .chart-row td { padding: 0 !important; border-bottom: 1px solid #21262d; }
+        .sector-table tr:hover { background-color: rgba(9,105,218, 0.06); }
+        .sector-table tr.chart-active { background-color: rgba(9,105,218, 0.10); }
+        .chart-row td { padding: 0 !important; border-bottom: 1px solid var(--bg-panel); }
         .chart-container { position: relative; height: 260px; padding: 8px 12px 4px; }
-        .rs-positive { color: #f85149; }
-        .rs-negative { color: #58a6ff; }
-        .sync-ok { color: #3fb950; font-size: 12px; }
-        .sync-warn { color: #d29922; font-size: 12px; }
-        .sync-none { color: #484f58; font-size: 12px; }
+        .rs-positive { color: var(--up); }
+        .rs-negative { color: var(--accent); }
+        .sync-ok { color: var(--green); font-size: 12px; }
+        .sync-warn { color: #9a6700; font-size: 12px; }
+        .sync-none { color: var(--text-dim); font-size: 12px; }
         .mapped-info {
             font-size: 11px;
-            color: #8b949e;
+            color: var(--text-muted);
             margin-left: 4px;
         }
         .period-selector {
@@ -440,30 +455,30 @@
         .period-selector .period-btn {
             padding: 5px 14px;
             border-radius: 6px;
-            border: 1px solid #30363d;
-            background: #161b22;
-            color: #8b949e;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-muted);
             cursor: pointer;
             font-size: 13px;
             white-space: nowrap;
             flex-shrink: 0;
             transition: all 0.15s;
         }
-        .period-selector .period-btn:hover { color: #e6edf3; border-color: #58a6ff; }
+        .period-selector .period-btn:hover { color: var(--text); border-color: var(--accent); }
         .period-selector .period-btn.active {
-            background: #58a6ff;
-            color: #0d1117;
-            border-color: #58a6ff;
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
             font-weight: bold;
         }
         .leaders-updated {
             font-size: 11px;
-            color: #484f58;
+            color: var(--text-dim);
             margin-left: auto;
         }
         .leaders-loading {
             text-align: center;
-            color: #8b949e;
+            color: var(--text-muted);
             padding: 40px 0;
             font-size: 14px;
         }
@@ -473,15 +488,15 @@
         .group-header {
             font-size: 15px;
             font-weight: bold;
-            color: #e6edf3;
+            color: var(--text);
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
         }
         .group-header .group-sub {
             font-size: 12px;
             font-weight: normal;
-            color: #8b949e;
+            color: var(--text-muted);
             margin-left: 8px;
         }
         .mapped-table table {
@@ -493,8 +508,8 @@
         .mapped-table th {
             text-align: left;
             padding: 8px 10px;
-            color: #8b949e;
-            border-bottom: 1px solid #30363d;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
             font-weight: normal;
             font-size: 12px;
         }
@@ -511,13 +526,13 @@
         }
         .mapped-table td {
             padding: 8px 10px;
-            border-bottom: 1px solid #21262d;
-            color: #e6edf3;
+            border-bottom: 1px solid var(--bg-panel);
+            color: var(--text);
         }
         .mapped-table tr:last-child td { border-bottom: none; }
         .mapped-table .arrow-col {
             text-align: center;
-            color: #484f58;
+            color: var(--text-dim);
             width: 24px;
             font-size: 12px;
         }
@@ -531,18 +546,18 @@
             gap: 10px;
             margin-bottom: 16px;
             padding: 8px 12px;
-            background: #161b22;
-            border: 1px solid #30363d;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
             font-size: 12px;
-            color: #8b949e;
+            color: var(--text-muted);
         }
         .weight-slider-wrap input[type=range] {
             flex: 1;
             -webkit-appearance: none;
             appearance: none;
             height: 6px;
-            background: linear-gradient(to right, #f85149, #484f58 50%, #58a6ff);
+            background: linear-gradient(to right, var(--up), var(--text-dim) 50%, var(--accent));
             border-radius: 3px;
             outline: none;
         }
@@ -551,69 +566,69 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #e6edf3;
-            border: 2px solid #30363d;
+            background: var(--text);
+            border: 2px solid var(--border);
             cursor: pointer;
         }
         .weight-slider-wrap .slider-label {
             white-space: nowrap;
             min-width: 50px;
         }
-        .weight-slider-wrap .slider-label-left { text-align: right; color: #f85149; }
-        .weight-slider-wrap .slider-label-right { text-align: left; color: #58a6ff; }
+        .weight-slider-wrap .slider-label-left { text-align: right; color: var(--up); }
+        .weight-slider-wrap .slider-label-right { text-align: left; color: var(--accent); }
         .weight-slider-status {
             text-align: center;
             font-size: 11px;
-            color: #8b949e;
+            color: var(--text-muted);
             margin-top: -10px;
             margin-bottom: 12px;
         }
         th.sortable { cursor: pointer; user-select: none; }
-        th.sortable:hover { color: #e6edf3; }
-        th.sort-active { color: #58a6ff; }
+        th.sortable:hover { color: var(--text); }
+        th.sort-active { color: var(--accent); }
         .stk-slider-grid {
             display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
             max-width: 600px; margin: 0 auto 12px;
         }
         .stk-slider-col { text-align: center; }
-        .stk-slider-col label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 2px; }
+        .stk-slider-col label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
         .stk-slider-col input[type=range] {
-            width: 100%; height: 4px; -webkit-appearance: none; background: #30363d;
+            width: 100%; height: 4px; -webkit-appearance: none; background: var(--border);
             border-radius: 2px; outline: none;
         }
         .stk-slider-col input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-            background: #58a6ff; cursor: pointer;
+            background: var(--accent); cursor: pointer;
         }
-        .stk-slider-col .stk-val { font-size: 12px; color: #e6edf3; margin-top: 2px; }
+        .stk-slider-col .stk-val { font-size: 12px; color: var(--text); margin-top: 2px; }
         .stk-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-        .stk-table th { padding: 6px 8px; border-bottom: 1px solid #30363d; color: #8b949e; text-align: right; font-weight: 500; font-size: 14px; white-space: pre-line; line-height: 1.3; vertical-align: bottom; }
+        .stk-table th { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text-muted); text-align: right; font-weight: 500; font-size: 14px; white-space: pre-line; line-height: 1.3; vertical-align: bottom; }
         .stk-table th:first-child, .stk-table th:nth-child(2) { text-align: left; }
-        .stk-table td { padding: 5px 8px; border-bottom: 1px solid #21262d; text-align: right; white-space: nowrap; }
-        .stk-table td:first-child { text-align: left; font-weight: 500; color: #e6edf3; }
-        .stk-table td:nth-child(2) { text-align: left; color: #8b949e; font-size: 14px; }
-        .stk-table tbody tr:hover { background-color: rgba(88,166,255,0.06); }
-        .stk-market { font-size: 10px; color: #484f58; margin-left: 4px; }
-        .stk-earnings { font-size: 15px; color: #8b949e; }
+        .stk-table td { padding: 5px 8px; border-bottom: 1px solid var(--bg-panel); text-align: right; white-space: nowrap; }
+        .stk-table td:first-child { text-align: left; font-weight: 500; color: var(--text); }
+        .stk-table td:nth-child(2) { text-align: left; color: var(--text-muted); font-size: 14px; }
+        .stk-table tbody tr:hover { background-color: rgba(9,105,218,0.06); }
+        .stk-market { font-size: 10px; color: var(--text-dim); margin-left: 4px; }
+        .stk-earnings { font-size: 15px; color: var(--text-muted); }
         .stk-score { font-weight: 600; }
         .stk-filters { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-        .stk-filters select { background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 4px 8px; font-size: 12px; }
-        .stk-filter-count { font-size: 11px; color: #8b949e; margin-left: auto; }
+        .stk-filters select { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 12px; }
+        .stk-filter-count { font-size: 11px; color: var(--text-muted); margin-left: auto; }
         .stk-table tbody tr { cursor: pointer; }
-        .drill-btn { background: none; border: 1px solid #30363d; color: #58a6ff; border-radius: 3px; padding: 1px 6px; font-size: 11px; cursor: pointer; white-space: nowrap; }
-        .drill-btn:hover { background: #21262d; border-color: #58a6ff; }
+        .drill-btn { background: none; border: 1px solid var(--border); color: var(--accent); border-radius: 3px; padding: 1px 6px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+        .drill-btn:hover { background: var(--bg-panel); border-color: var(--accent); }
         #tab-valuation .val-table td, #tab-valuation .val-table th { font-size: 12px; font-weight: normal; }
         #tab-valuation .val-table th { white-space: nowrap; vertical-align: middle; }
         #tab-valuation .val-table { table-layout: fixed; width: 100%; }
         #tab-valuation .val-table td, #tab-valuation .val-table th { padding-left: 4px; padding-right: 4px; overflow: hidden; text-overflow: ellipsis; }
-        #tab-valuation .val-table thead th { position: sticky; top: 0; z-index: 5; background: #161b22; }
+        #tab-valuation .val-table thead th { position: sticky; top: 0; z-index: 5; background: var(--bg-card); }
         #tab-valuation .val-table th:first-child, #tab-valuation .val-table td:first-child { width: 12%; }
         #tab-valuation .val-table th:nth-child(2), #tab-valuation .val-table td:nth-child(2) { width: 8%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* 그룹 카드 */
         .group-card {
-            background-color: #21262d;
-            border: 1px solid #30363d;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 8px;
@@ -629,18 +644,18 @@
         .group-name {
             font-size: 14px;
             font-weight: bold;
-            color: #58a6ff;
+            color: var(--accent);
         }
 
         .group-delete {
             cursor: pointer;
-            color: #8b949e;
+            color: var(--text-muted);
             font-size: 13px;
             padding: 2px 8px;
             border-radius: 4px;
         }
 
-        .group-delete:hover { color: #f85149; }
+        .group-delete:hover { color: var(--up); }
 
         .group-terms {
             display: flex;
@@ -655,17 +670,17 @@
         }
 
         .group-add-term input {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 4px;
             padding: 4px 8px;
-            color: #e6edf3;
+            color: var(--text);
             font-size: 12px;
             outline: none;
             width: 200px;
         }
 
-        .group-add-term input:focus { border-color: #58a6ff; }
+        .group-add-term input:focus { border-color: var(--accent); }
 
         .group-add-term button {
             background-color: #238636;
@@ -681,9 +696,9 @@
         .news-group-title {
             font-size: 15px;
             font-weight: bold;
-            color: #58a6ff;
+            color: var(--accent);
             padding: 12px 16px 8px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
         }
 
         /* 차트 모달 */
@@ -693,54 +708,54 @@
         }
         .chart-overlay.active { display:flex; }
         .chart-modal {
-            background:#161b22; border:1px solid #30363d; border-radius:12px;
+            background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
             padding:24px; width:90%; max-width:800px;
             max-height:90vh; overflow-y:auto;
         }
-        #brokerOpinionBody tr:hover { background:#1c2333; }
+        #brokerOpinionBody tr:hover { background:var(--bg-hover); }
         .chart-header {
             display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;
-            position:sticky; top:-24px; background:#161b22; z-index:10;
+            position:sticky; top:-24px; background:var(--bg-card); z-index:10;
             padding:24px 0 8px 0; margin-top:-24px;
         }
-        .chart-title { font-size:18px; font-weight:bold; color:#58a6ff; }
+        .chart-title { font-size:18px; font-weight:bold; color:var(--accent); }
         .chart-current-price {
             margin-left:auto; margin-right:14px; text-align:right; line-height:1.2;
         }
-        .ccp-label { display:block; font-size:11px; color:#8b949e; }
-        .ccp-value { display:block; font-size:17px; font-weight:700; color:#e6edf3; }
+        .ccp-label { display:block; font-size:11px; color:var(--text-muted); }
+        .ccp-value { display:block; font-size:17px; font-weight:700; color:var(--text); }
         .chart-close {
-            cursor:pointer; color:#8b949e; font-size:24px;
+            cursor:pointer; color:var(--text-muted); font-size:24px;
             min-width:44px; min-height:44px;
             display:flex; align-items:center; justify-content:center;
-            border-radius:8px; background:rgba(33,38,45,0.9);
+            border-radius:8px; background:rgba(238,240,242,0.9);
             flex-shrink:0;
         }
-        .chart-close:hover { color:#f85149; background:rgba(248,81,73,0.15); }
+        .chart-close:hover { color:var(--up); background:rgba(207,34,46,0.15); }
         .chart-periods { display:flex; gap:8px; margin-bottom:16px; }
 
         /* 기간/시장 선택 버튼 */
         .period-btn {
-            background:#21262d; border:1px solid #30363d; border-radius:6px;
-            padding:6px 14px; color:#8b949e; cursor:pointer; font-size:13px;
+            background:var(--bg-panel); border:1px solid var(--border); border-radius:6px;
+            padding:6px 14px; color:var(--text-muted); cursor:pointer; font-size:13px;
         }
-        .period-btn.active { background:#1f3a5f; color:#58a6ff; border-color:#58a6ff; }
-        .period-btn:hover { color:#e6edf3; }
+        .period-btn.active { background:var(--accent-bg); color:var(--accent); border-color:var(--accent); }
+        .period-btn:hover { color:var(--text); }
 
         .eps-period-btn {
-            background:transparent; border:1px solid #30363d; border-radius:4px;
-            padding:3px 10px; color:#8b949e; cursor:pointer; font-size:12px;
+            background:transparent; border:1px solid var(--border); border-radius:4px;
+            padding:3px 10px; color:var(--text-muted); cursor:pointer; font-size:12px;
         }
-        .eps-period-btn.active { background:#1f3a5f; color:#58a6ff; border-color:#58a6ff; }
-        .eps-period-btn:hover { color:#e6edf3; }
+        .eps-period-btn.active { background:var(--accent-bg); color:var(--accent); border-color:var(--accent); }
+        .eps-period-btn:hover { color:var(--text); }
 
         /* 클릭 가능 표시 */
         .clickable { cursor:pointer; transition:border-color 0.2s; }
-        .clickable:hover { border-color:#58a6ff !important; }
+        .clickable:hover { border-color:var(--accent) !important; }
 
         /* 로딩 */
         .loading {
-            color: #8b949e;
+            color: var(--text-muted);
             font-size: 13px;
             text-align: center;
             padding: 20px;
@@ -755,12 +770,12 @@
             margin-bottom: 20px;
         }
         .cal-nav button {
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 8px 14px; color: #e6edf3; cursor: pointer; font-size: 14px;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 8px 14px; color: var(--text); cursor: pointer; font-size: 14px;
         }
-        .cal-nav button:hover { border-color: #58a6ff; color: #58a6ff; }
+        .cal-nav button:hover { border-color: var(--accent); color: var(--accent); }
         .cal-month-label {
-            font-size: 18px; font-weight: bold; color: #e6edf3;
+            font-size: 18px; font-weight: bold; color: var(--text);
             min-width: 140px; text-align: center;
         }
         .cal-layout {
@@ -769,7 +784,7 @@
             gap: 20px;
         }
         .cal-grid-container {
-            background: #161b22; border: 1px solid #30363d;
+            background: var(--bg-card); border: 1px solid var(--border);
             border-radius: 8px; padding: 12px;
         }
         .cal-header-row, .cal-week-row {
@@ -778,212 +793,212 @@
             gap: 2px;
         }
         .cal-day-header {
-            text-align: center; font-size: 12px; color: #8b949e;
+            text-align: center; font-size: 12px; color: var(--text-muted);
             padding: 8px 0; font-weight: bold;
         }
-        .cal-day-header.cal-sun { color: #f85149; }
-        .cal-day-header.cal-sat { color: #58a6ff; }
+        .cal-day-header.cal-sun { color: var(--up); }
+        .cal-day-header.cal-sat { color: var(--accent); }
         .cal-cell {
-            min-height: 85px; border: 1px solid #21262d; border-radius: 4px;
+            min-height: 85px; border: 1px solid var(--bg-panel); border-radius: 4px;
             padding: 4px; cursor: pointer; transition: border-color 0.2s;
         }
-        .cal-cell:hover:not(.empty) { border-color: #58a6ff; }
+        .cal-cell:hover:not(.empty) { border-color: var(--accent); }
         .cal-cell.empty { border-color: transparent; cursor: default; }
-        .cal-cell.today { border-color: #58a6ff; background: rgba(88,166,255,0.06); }
-        .cal-cell.selected { border-color: #58a6ff; background: rgba(88,166,255,0.12); }
-        .cal-day-num { font-size: 13px; font-weight: bold; margin-bottom: 3px; color: #e6edf3; }
-        .cal-sun .cal-day-num { color: #f85149; }
-        .cal-sat .cal-day-num { color: #58a6ff; }
+        .cal-cell.today { border-color: var(--accent); background: rgba(9,105,218,0.06); }
+        .cal-cell.selected { border-color: var(--accent); background: rgba(9,105,218,0.12); }
+        .cal-day-num { font-size: 13px; font-weight: bold; margin-bottom: 3px; color: var(--text); }
+        .cal-sun .cal-day-num { color: var(--up); }
+        .cal-sat .cal-day-num { color: var(--accent); }
         .cal-event-dot {
             font-size: 10px; padding: 1px 4px; border-radius: 3px;
             margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis;
             white-space: nowrap; color: #fff; opacity: 0.9;
         }
-        .cal-event-more { font-size: 10px; color: #8b949e; text-align: center; }
+        .cal-event-more { font-size: 10px; color: var(--text-muted); text-align: center; }
         .cal-sidebar-section {
-            background: #161b22; border: 1px solid #30363d;
+            background: var(--bg-card); border: 1px solid var(--border);
             border-radius: 8px; padding: 14px; margin-bottom: 14px;
         }
         .cal-category-item {
             display: flex; align-items: center; gap: 8px;
-            padding: 5px 0; cursor: pointer; font-size: 13px; color: #e6edf3;
+            padding: 5px 0; cursor: pointer; font-size: 13px; color: var(--text);
         }
-        .cal-category-item input[type="checkbox"] { accent-color: #58a6ff; }
+        .cal-category-item input[type="checkbox"] { accent-color: var(--accent); }
         .cal-cat-dot {
             width: 10px; height: 10px; border-radius: 50%; display: inline-block;
         }
         .cal-wl-group { margin-bottom: 12px; }
-        .cal-wl-title { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+        .cal-wl-title { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
         .cal-wl-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
         .cal-wl-tag {
-            background: #21262d; border: 1px solid #30363d; border-radius: 12px;
-            padding: 2px 8px; font-size: 11px; color: #58a6ff;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+            padding: 2px 8px; font-size: 11px; color: var(--accent);
             display: flex; align-items: center; gap: 4px;
         }
-        .cal-wl-tag .remove { cursor: pointer; color: #8b949e; font-size: 13px; }
-        .cal-wl-tag .remove:hover { color: #f85149; }
+        .cal-wl-tag .remove { cursor: pointer; color: var(--text-muted); font-size: 13px; }
+        .cal-wl-tag .remove:hover { color: var(--up); }
         .cal-wl-add { display: flex; gap: 4px; position: relative; }
         .cal-wl-add input {
-            background: #0d1117; border: 1px solid #30363d; border-radius: 4px;
-            padding: 3px 8px; color: #e6edf3; font-size: 12px; outline: none; flex: 1;
+            background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+            padding: 3px 8px; color: var(--text); font-size: 12px; outline: none; flex: 1;
         }
-        .cal-wl-add input:focus { border-color: #58a6ff; }
+        .cal-wl-add input:focus { border-color: var(--accent); }
         .cal-wl-add button {
             background: #238636; color: white; border: none; border-radius: 4px;
             padding: 3px 10px; cursor: pointer; font-size: 11px;
         }
         .cal-day-detail {
-            background: #161b22; border: 1px solid #30363d;
+            background: var(--bg-card); border: 1px solid var(--border);
             border-radius: 8px; padding: 16px; margin-top: 16px;
         }
         .cal-detail-date {
-            font-size: 15px; font-weight: bold; color: #58a6ff;
-            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #30363d;
+            font-size: 15px; font-weight: bold; color: var(--accent);
+            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
         }
         .cal-detail-event {
             display: flex; align-items: flex-start; gap: 10px;
-            padding: 8px 0; border-bottom: 1px solid #21262d;
+            padding: 8px 0; border-bottom: 1px solid var(--bg-panel);
         }
         .cal-detail-event:last-child { border-bottom: none; }
         .cal-detail-cat-badge {
             font-size: 11px; padding: 2px 8px; border-radius: 10px;
             white-space: nowrap; color: #fff;
         }
-        .cal-detail-title { font-size: 14px; color: #e6edf3; }
-        .cal-detail-desc { font-size: 12px; color: #8b949e; margin-top: 2px; }
+        .cal-detail-title { font-size: 14px; color: var(--text); }
+        .cal-detail-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
         .cal-dropdown {
             position: absolute; top: 100%; left: 0; right: 0;
-            background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
             max-height: 220px; overflow-y: auto; z-index: 100;
             display: none; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
         .cal-dropdown-item {
             padding: 8px 10px; cursor: pointer; display: flex;
             align-items: center; gap: 8px; font-size: 12px;
-            border-bottom: 1px solid #21262d;
+            border-bottom: 1px solid var(--bg-panel);
         }
         .cal-dropdown-item:last-child { border-bottom: none; }
-        .cal-dropdown-item:hover { background: #21262d; }
-        .cal-dropdown-code { color: #58a6ff; font-weight: bold; min-width: 75px; }
-        .cal-dropdown-name { color: #e6edf3; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cal-dropdown-item:hover { background: var(--bg-panel); }
+        .cal-dropdown-code { color: var(--accent); font-weight: bold; min-width: 75px; }
+        .cal-dropdown-name { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cal-dropdown-market {
             font-size: 10px; padding: 1px 6px; border-radius: 8px;
-            background: #21262d; border: 1px solid #30363d; color: #8b949e;
+            background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-muted);
         }
 
         /* ===== DART 공시 탭 ===== */
         .dart-status-bar {
             display: flex; align-items: center; justify-content: space-between;
-            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
             padding: 14px 18px; margin-bottom: 20px;
         }
         .dart-status-left { display: flex; align-items: center; gap: 10px; }
         .dart-status-dot {
             width: 10px; height: 10px; border-radius: 50%;
         }
-        .dart-status-dot.running { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
-        .dart-status-dot.stopped { background: #f85149; }
-        .dart-status-text { font-size: 14px; color: #e6edf3; }
+        .dart-status-dot.running { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .dart-status-dot.stopped { background: var(--up); }
+        .dart-status-text { font-size: 14px; color: var(--text); }
         .dart-toggle-btn {
             background: #238636; color: white; border: none; border-radius: 6px;
             padding: 8px 18px; cursor: pointer; font-size: 13px;
         }
         .dart-toggle-btn:hover { background: #2ea043; }
         .dart-toggle-btn.stop { background: #da3633; }
-        .dart-toggle-btn.stop:hover { background: #f85149; }
+        .dart-toggle-btn.stop:hover { background: var(--up); }
         .dart-sections {
             display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;
         }
         .dart-section {
-            background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 16px;
         }
         .dart-section-title {
-            font-size: 14px; font-weight: bold; color: #58a6ff;
-            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #30363d;
+            font-size: 14px; font-weight: bold; color: var(--accent);
+            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
         }
         .dart-wl-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .dart-wl-tag {
-            background: #21262d; border: 1px solid #30363d; border-radius: 14px;
-            padding: 4px 10px; font-size: 12px; color: #58a6ff;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px;
+            padding: 4px 10px; font-size: 12px; color: var(--accent);
             display: flex; align-items: center; gap: 6px;
         }
-        .dart-wl-tag .remove { cursor: pointer; color: #8b949e; font-size: 14px; }
-        .dart-wl-tag .remove:hover { color: #f85149; }
+        .dart-wl-tag .remove { cursor: pointer; color: var(--text-muted); font-size: 14px; }
+        .dart-wl-tag .remove:hover { color: var(--up); }
         .dart-wl-add { display: flex; gap: 6px; position: relative; }
         .dart-wl-add input {
-            background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
-            padding: 6px 10px; color: #e6edf3; font-size: 12px; outline: none; flex: 1;
+            background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 10px; color: var(--text); font-size: 12px; outline: none; flex: 1;
         }
-        .dart-wl-add input:focus { border-color: #58a6ff; }
+        .dart-wl-add input:focus { border-color: var(--accent); }
         .dart-cond-row {
             display: flex; align-items: center; gap: 10px;
-            padding: 6px 0; font-size: 13px; color: #e6edf3;
+            padding: 6px 0; font-size: 13px; color: var(--text);
         }
-        .dart-cond-row input[type="checkbox"] { accent-color: #58a6ff; }
+        .dart-cond-row input[type="checkbox"] { accent-color: var(--accent); }
         .dart-cond-toggle {
             display: flex; gap: 4px; margin-top: 10px;
         }
         .dart-cond-toggle button {
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 5px 14px; color: #8b949e; cursor: pointer; font-size: 12px;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 5px 14px; color: var(--text-muted); cursor: pointer; font-size: 12px;
         }
-        .dart-cond-toggle button.active { background: #1f3a5f; color: #58a6ff; border-color: #58a6ff; }
+        .dart-cond-toggle button.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
         .dart-tg-row {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 8px 0; border-bottom: 1px solid #21262d;
+            padding: 8px 0; border-bottom: 1px solid var(--bg-panel);
         }
         .dart-tg-row:last-child { border-bottom: none; }
-        .dart-tg-label { font-size: 13px; color: #e6edf3; }
+        .dart-tg-label { font-size: 13px; color: var(--text); }
         .dart-tg-status { font-size: 12px; margin-left: 8px; }
-        .dart-tg-status.connected { color: #3fb950; }
-        .dart-tg-status.disconnected { color: #8b949e; }
+        .dart-tg-status.connected { color: var(--green); }
+        .dart-tg-status.disconnected { color: var(--text-muted); }
         .dart-tg-btn {
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 5px 12px; color: #e6edf3; cursor: pointer; font-size: 12px;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 5px 12px; color: var(--text); cursor: pointer; font-size: 12px;
         }
-        .dart-tg-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+        .dart-tg-btn:hover { border-color: var(--accent); color: var(--accent); }
         .dart-digest-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
         .dart-digest-toolbar .period-btn { font-size: 12px; padding: 4px 10px; }
         .dart-digest-row {
             display: grid; grid-template-columns: 100px 1fr 2fr; gap: 8px;
-            padding: 7px 0; border-bottom: 1px solid #21262d; font-size: 13px; align-items: baseline;
+            padding: 7px 0; border-bottom: 1px solid var(--bg-panel); font-size: 13px; align-items: baseline;
         }
         .dart-digest-row:last-child { border-bottom: none; }
-        .dart-digest-date { font-size: 11px; color: #484f58; white-space: nowrap; }
-        .dart-digest-corp { color: #e6edf3; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dart-digest-corp .sc { font-size: 10px; color: #484f58; margin-left: 3px; }
-        .dart-digest-link a { color: #58a6ff; text-decoration: none; }
+        .dart-digest-date { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+        .dart-digest-corp { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dart-digest-corp .sc { font-size: 10px; color: var(--text-dim); margin-left: 3px; }
+        .dart-digest-link a { color: var(--accent); text-decoration: none; }
         .dart-digest-link a:hover { text-decoration: underline; }
-        .dart-digest-summary { font-size: 12px; color: #e6edf3; margin-top: 2px; grid-column: 1 / -1; padding-left: 108px; }
-        .dart-digest-empty { font-size: 13px; color: #484f58; text-align: center; padding: 20px 0; }
-        .dart-digest-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; font-size: 12px; color: #8b949e; }
+        .dart-digest-summary { font-size: 12px; color: var(--text); margin-top: 2px; grid-column: 1 / -1; padding-left: 108px; }
+        .dart-digest-empty { font-size: 13px; color: var(--text-dim); text-align: center; padding: 20px 0; }
+        .dart-digest-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
         .dart-digest-pager button {
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 4px 12px; color: #8b949e; cursor: pointer; font-size: 12px;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 4px 12px; color: var(--text-muted); cursor: pointer; font-size: 12px;
         }
-        .dart-digest-pager button:hover { color: #e6edf3; border-color: #58a6ff; }
+        .dart-digest-pager button:hover { color: var(--text); border-color: var(--accent); }
         .dart-digest-pager button:disabled { opacity: 0.4; cursor: default; }
 
         #tab-inbox .inbox-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
         #tab-inbox .inbox-toolbar .period-btn { font-size: 14px; padding: 4px 12px; }
-        #tab-inbox .inbox-toolbar .period-btn b { color: #58a6ff; font-weight: 600; margin-left: 2px; }
+        #tab-inbox .inbox-toolbar .period-btn b { color: var(--accent); font-weight: 600; margin-left: 2px; }
         #tab-inbox .inbox-poll-btn { background: #1f6feb; border: none; border-radius: 6px; padding: 5px 14px; color: #fff; cursor: pointer; font-size: 14px; white-space: nowrap; }
         #tab-inbox .inbox-poll-btn:hover { background: #388bfd; }
         #tab-inbox .inbox-poll-btn:disabled { opacity: 0.5; cursor: default; }
-        #tab-inbox .inbox-day-group { font-size: 13px; color: #484f58; padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid #21262d; }
-        #tab-inbox .inbox-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+        #tab-inbox .inbox-day-group { font-size: 13px; color: var(--text-dim); padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid var(--bg-panel); }
+        #tab-inbox .inbox-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
         #tab-inbox .inbox-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-        #tab-inbox .inbox-star { margin-left: auto; cursor: pointer; font-size: 18px; line-height: 1; color: #6e7681; background: none; border: none; padding: 0 2px; -webkit-user-select: none; user-select: none; }
+        #tab-inbox .inbox-star { margin-left: auto; cursor: pointer; font-size: 18px; line-height: 1; color: var(--text-dim); background: none; border: none; padding: 0 2px; -webkit-user-select: none; user-select: none; }
         #tab-inbox .inbox-star.on { color: #f1c40f; }
-        #tab-inbox .inbox-ch { font-size: 15px; color: #e6edf3; font-weight: 600; }
-        #tab-inbox .inbox-time { font-size: 13px; color: #8b949e; }
-        #tab-inbox .inbox-alsoin { font-size: 12px; color: #58a6ff; background: rgba(88,166,255,0.12); border-radius: 10px; padding: 1px 8px; }
-        #tab-inbox .inbox-text { font-size: 15px; color: #c9d1d9; line-height: 1.5; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+        #tab-inbox .inbox-ch { font-size: 15px; color: var(--text); font-weight: 600; }
+        #tab-inbox .inbox-time { font-size: 13px; color: var(--text-muted); }
+        #tab-inbox .inbox-alsoin { font-size: 12px; color: var(--accent); background: rgba(9,105,218,0.12); border-radius: 10px; padding: 1px 8px; }
+        #tab-inbox .inbox-text { font-size: 15px; color: var(--text); line-height: 1.5; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
         #tab-inbox .inbox-text.collapsed { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         #tab-inbox .inbox-text.clickable { cursor: pointer; }
-        #tab-inbox .inbox-text a { color: #58a6ff; text-decoration: underline; overflow-wrap: anywhere; word-break: break-word; }
-        #tab-inbox .inbox-expire { font-size: 12px; color: #484f58; margin-top: 6px; }
-        #tab-inbox .inbox-empty { font-size: 15px; color: #484f58; text-align: center; padding: 24px 0; }
+        #tab-inbox .inbox-text a { color: var(--accent); text-decoration: underline; overflow-wrap: anywhere; word-break: break-word; }
+        #tab-inbox .inbox-expire { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+        #tab-inbox .inbox-empty { font-size: 15px; color: var(--text-dim); text-align: center; padding: 24px 0; }
         #tab-inbox .inbox-imgs { margin-top: 8px; }
         #tab-inbox .inbox-imgs.single img { max-height: 240px; max-width: 100%; border-radius: 6px; cursor: pointer; display: block; }
         #tab-inbox .inbox-imgs.multi { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1006,128 +1021,128 @@
         .inbox-lb-count { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
                           background: rgba(0,0,0,0.5); color: #fff; font-size: 14px; padding: 4px 12px;
                           border-radius: 12px; -webkit-user-select: none; user-select: none; }
-        #tab-inbox .inbox-topic-badge { font-size: 12px; color: #3fb950; background: rgba(63,185,80,0.12); border-radius: 10px; padding: 1px 8px; }
+        #tab-inbox .inbox-topic-badge { font-size: 12px; color: var(--green); background: rgba(26,127,55,0.12); border-radius: 10px; padding: 1px 8px; }
         #tab-inbox .inbox-topic-badge.editable { cursor: pointer; }
-        #tab-inbox .inbox-topic-badge.unclassified { color: #8b949e; background: rgba(139,148,158,0.14); }
-        #tab-inbox .inbox-topic-badge .manual-chk { margin-left: 3px; color: #3fb950; font-weight: 700; }
-        .inbox-correct-menu { position: absolute; z-index: 1000; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 4px; max-height: 280px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-        .inbox-correct-menu .opt { padding: 5px 14px; font-size: 14px; color: #c9d1d9; cursor: pointer; border-radius: 4px; white-space: nowrap; }
+        #tab-inbox .inbox-topic-badge.unclassified { color: var(--text-muted); background: rgba(110,118,129,0.14); }
+        #tab-inbox .inbox-topic-badge .manual-chk { margin-left: 3px; color: var(--green); font-weight: 700; }
+        .inbox-correct-menu { position: absolute; z-index: 1000; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 4px; max-height: 280px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .inbox-correct-menu .opt { padding: 5px 14px; font-size: 14px; color: var(--text); cursor: pointer; border-radius: 4px; white-space: nowrap; }
         .inbox-correct-menu .opt:hover { background: #1f6feb; color: #fff; }
         #tab-inbox .inbox-body { display: flex; gap: 16px; align-items: flex-start; }
         #tab-inbox .inbox-topics { flex: 0 0 150px; display: flex; flex-direction: column; gap: 3px; }
         #tab-inbox .inbox-main { flex: 1; min-width: 0; }
-        #tab-inbox .inbox-topic-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 15px; color: #8b949e; white-space: nowrap; }
-        #tab-inbox .inbox-topic-item:hover { background: #161b22; color: #e6edf3; }
+        #tab-inbox .inbox-topic-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 15px; color: var(--text-muted); white-space: nowrap; }
+        #tab-inbox .inbox-topic-item:hover { background: var(--bg-card); color: var(--text); }
         #tab-inbox .inbox-topic-item.active { background: #1f6feb; color: #fff; }
-        #tab-inbox .inbox-topic-item .cnt { font-size: 13px; color: #6e7681; }
+        #tab-inbox .inbox-topic-item .cnt { font-size: 13px; color: var(--text-dim); }
         #tab-inbox .inbox-topic-item.active .cnt { color: #cfe3ff; }
-        #tab-inbox .inbox-topic-item .tx { color: #f85149; font-size: 14px; padding: 0 2px; cursor: pointer; }
+        #tab-inbox .inbox-topic-item .tx { color: var(--up); font-size: 14px; padding: 0 2px; cursor: pointer; }
         #tab-inbox .inbox-topic-item .lbl { display: inline-flex; align-items: center; gap: 6px; }
-        #tab-inbox .inbox-topic-item .drag-handle { color: #6e7681; cursor: grab; font-size: 15px; touch-action: none; user-select: none; }
+        #tab-inbox .inbox-topic-item .drag-handle { color: var(--text-dim); cursor: grab; font-size: 15px; touch-action: none; user-select: none; }
         #tab-inbox .inbox-topic-item.dragging { opacity: 0.4; touch-action: none; }
         body.inbox-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
         #tab-inbox .inbox-topic-item[data-topic] { border-top: 1px solid transparent; }
         #tab-inbox .inbox-channels { margin-bottom: 14px; }
-        #tab-inbox .inbox-subtabs { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid #30363d; }
-        #tab-inbox .inbox-subtab { padding: 8px 16px; cursor: pointer; color: #8b949e; font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-        #tab-inbox .inbox-subtab.active { color: #c9d1d9; border-bottom-color: #58a6ff; }
+        #tab-inbox .inbox-subtabs { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+        #tab-inbox .inbox-subtab { padding: 8px 16px; cursor: pointer; color: var(--text-muted); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        #tab-inbox .inbox-subtab.active { color: var(--text); border-bottom-color: var(--accent); }
         #tab-inbox .inbox-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-        #tab-inbox .inbox-chip { display: inline-flex; align-items: center; gap: 6px; background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 3px 10px; font-size: 14px; color: #c9d1d9; }
-        #tab-inbox .inbox-chip .x { color: #8b949e; cursor: pointer; font-weight: 700; }
-        #tab-inbox .inbox-chip .x:hover { color: #f85149; }
+        #tab-inbox .inbox-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 3px 10px; font-size: 14px; color: var(--text); }
+        #tab-inbox .inbox-chip .x { color: var(--text-muted); cursor: pointer; font-weight: 700; }
+        #tab-inbox .inbox-chip .x:hover { color: var(--up); }
         #tab-inbox .inbox-ch-add { display: flex; gap: 6px; }
-        #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 10px; font-size: 14px; }
+        #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 14px; }
         #tab-inbox .inbox-ch-add button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer; white-space: nowrap; }
         #tab-inbox .inbox-ch-add button:disabled { opacity: 0.5; cursor: default; }
-        #tab-inbox .inbox-ch-err, #tab-inbox .inbox-ta-err { color: #f85149; font-size: 14px; margin-top: 5px; min-height: 14px; }
+        #tab-inbox .inbox-ch-err, #tab-inbox .inbox-ta-err { color: var(--up); font-size: 14px; margin-top: 5px; min-height: 14px; }
         #tab-inbox .inbox-topics-wrap { flex: 0 0 170px; }
         #tab-inbox .inbox-topic-admin-toggle { margin-top: 8px; }
-        #tab-inbox .inbox-topic-admin-toggle button, #tab-inbox .inbox-reclassify-btn { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 5px 10px; font-size: 14px; cursor: pointer; width: 100%; }
+        #tab-inbox .inbox-topic-admin-toggle button, #tab-inbox .inbox-reclassify-btn { background: var(--bg-panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 5px 10px; font-size: 14px; cursor: pointer; width: 100%; }
         #tab-inbox .inbox-topic-admin-toggle button.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
         #tab-inbox .inbox-topic-admin { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
         #tab-inbox .inbox-ta-row { display: flex; flex-direction: column; gap: 4px; }
-        #tab-inbox .inbox-ta-row input { background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 8px; font-size: 14px; }
+        #tab-inbox .inbox-ta-row input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 14px; }
         #tab-inbox .inbox-ta-row button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 8px; font-size: 14px; cursor: pointer; }
-        #tab-inbox .inbox-reclassify-status { font-size: 13px; color: #8b949e; }
+        #tab-inbox .inbox-reclassify-status { font-size: 13px; color: var(--text-muted); }
         @media (max-width: 768px) {
             #tab-inbox .inbox-body { flex-direction: column; }
             #tab-inbox .inbox-topics-wrap { flex: none; width: 100%; }
             #tab-inbox .inbox-topics { flex: none; width: 100%; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
-            #tab-inbox .inbox-topic-item { flex: 0 0 auto; border: 1px solid #30363d; }
+            #tab-inbox .inbox-topic-item { flex: 0 0 auto; border: 1px solid var(--border); }
         }
         .dart-tg-toggle-row {
             display: flex; align-items: center; gap: 8px;
-            margin-bottom: 12px; font-size: 13px; color: #e6edf3;
+            margin-bottom: 12px; font-size: 13px; color: var(--text);
         }
-        .dart-tg-toggle-row input[type="checkbox"] { accent-color: #58a6ff; }
+        .dart-tg-toggle-row input[type="checkbox"] { accent-color: var(--accent); }
         .dart-log-section {
-            background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 16px;
         }
         .dart-log-header {
             display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #30363d;
+            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
         }
-        .dart-log-title { font-size: 14px; font-weight: bold; color: #58a6ff; }
+        .dart-log-title { font-size: 14px; font-weight: bold; color: var(--accent); }
         .dart-log-refresh {
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 4px 10px; color: #8b949e; cursor: pointer; font-size: 12px;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 4px 10px; color: var(--text-muted); cursor: pointer; font-size: 12px;
         }
-        .dart-log-refresh:hover { border-color: #58a6ff; color: #58a6ff; }
+        .dart-log-refresh:hover { border-color: var(--accent); color: var(--accent); }
         .dart-log-list { max-height: 400px; overflow-y: auto; }
         .dart-log-item {
-            padding: 8px 0; border-bottom: 1px solid #21262d; font-size: 13px;
+            padding: 8px 0; border-bottom: 1px solid var(--bg-panel); font-size: 13px;
         }
         .dart-log-item:last-child { border-bottom: none; }
-        .dart-log-time { color: #8b949e; font-size: 11px; margin-right: 8px; }
+        .dart-log-time { color: var(--text-muted); font-size: 11px; margin-right: 8px; }
         .dart-log-type {
             font-size: 11px; padding: 2px 8px; border-radius: 10px;
             margin-right: 8px; color: #fff;
         }
         .dart-log-type.종목 { background: #1f6feb; }
-        .dart-log-type.잠정 { background: #8957e5; }
+        .dart-log-type.잠정 { background: #8250df; }
         .dart-log-type.주요 { background: #da3633; }
         .dart-log-type.일일 { background: #238636; }
-        .dart-log-type.엑셀 { background: #8b949e; }
-        .dart-log-empty { color: #8b949e; text-align: center; padding: 20px; font-size: 13px; }
+        .dart-log-type.엑셀 { background: var(--text-muted); }
+        .dart-log-empty { color: var(--text-muted); text-align: center; padding: 20px; font-size: 13px; }
 
         /* 증권사 Report 탭 */
         .rpt-channels { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .rpt-ch-tag {
-            background: #21262d; border: 1px solid #30363d; border-radius: 20px;
-            padding: 4px 12px; font-size: 12px; color: #58a6ff;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 20px;
+            padding: 4px 12px; font-size: 12px; color: var(--accent);
             display: flex; align-items: center; gap: 6px;
         }
-        .rpt-ch-tag .remove { cursor: pointer; color: #8b949e; font-size: 14px; }
-        .rpt-ch-tag .remove:hover { color: #f85149; }
+        .rpt-ch-tag .remove { cursor: pointer; color: var(--text-muted); font-size: 14px; }
+        .rpt-ch-tag .remove:hover { color: var(--up); }
         .rpt-add-row { display: flex; gap: 6px; margin-bottom: 24px; }
         .rpt-add-row input {
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 6px 12px; color: #e6edf3; font-size: 13px; outline: none; flex: 1;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 12px; color: var(--text); font-size: 13px; outline: none; flex: 1;
         }
-        .rpt-add-row input:focus { border-color: #58a6ff; }
+        .rpt-add-row input:focus { border-color: var(--accent); }
         .rpt-search-grid {
             display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
             margin-bottom: 12px;
         }
         .rpt-field { display: flex; flex-direction: column; gap: 4px; }
-        .rpt-field label { font-size: 12px; color: #8b949e; }
+        .rpt-field label { font-size: 12px; color: var(--text-muted); }
         .rpt-field input, .rpt-field select {
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 8px 12px; color: #e6edf3; font-size: 13px; outline: none;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 8px 12px; color: var(--text); font-size: 13px; outline: none;
         }
-        .rpt-field input:focus, .rpt-field select:focus { border-color: #58a6ff; }
+        .rpt-field input:focus, .rpt-field select:focus { border-color: var(--accent); }
         #dart-rpt-search {
             width: 100%; box-sizing: border-box;
-            background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-            padding: 8px 12px; color: #e6edf3; font-size: 13px; outline: none;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 8px 12px; color: var(--text); font-size: 13px; outline: none;
         }
-        #dart-rpt-search:focus { border-color: #58a6ff; }
+        #dart-rpt-search:focus { border-color: var(--accent); }
         .rpt-progress {
-            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
             padding: 16px; margin-bottom: 16px;
         }
-        .rpt-progress-text { font-size: 13px; color: #e6edf3; margin-bottom: 6px; }
-        .rpt-progress-path { font-size: 12px; color: #8b949e; word-break: break-all; }
+        .rpt-progress-text { font-size: 13px; color: var(--text); margin-bottom: 6px; }
+        .rpt-progress-path { font-size: 12px; color: var(--text-muted); word-break: break-all; }
         .rpt-dots { display: inline-block; }
         .rpt-dots::after {
             content: ''; animation: rptDots 1.5s steps(4, end) infinite;
@@ -1139,11 +1154,11 @@
             width: 100%; border-collapse: collapse; font-size: 13px;
         }
         .rpt-result-table th {
-            text-align: left; padding: 8px 12px; color: #8b949e;
-            border-bottom: 1px solid #30363d; font-weight: normal; font-size: 12px;
+            text-align: left; padding: 8px 12px; color: var(--text-muted);
+            border-bottom: 1px solid var(--border); font-weight: normal; font-size: 12px;
         }
         .rpt-result-table td {
-            padding: 8px 12px; border-bottom: 1px solid #21262d; color: #e6edf3;
+            padding: 8px 12px; border-bottom: 1px solid var(--bg-panel); color: var(--text);
         }
         .rpt-result-table tr:last-child td { border-bottom: none; }
 
@@ -1243,10 +1258,10 @@
             .stk-table th:first-child,
             .stk-table td:first-child {
                 position: sticky; left: 0; z-index: 2;
-                background: #0d1117; box-shadow: 2px 0 4px rgba(0,0,0,0.4);
+                background: var(--bg); box-shadow: 2px 0 4px rgba(0,0,0,0.4);
             }
-            .stk-table thead th:first-child { z-index: 3; background: #0d1117; }
-            .stk-table tbody tr:hover td:first-child { background: rgba(88,166,255,0.06); }
+            .stk-table thead th:first-child { z-index: 3; background: var(--bg); }
+            .stk-table tbody tr:hover td:first-child { background: rgba(9,105,218,0.06); }
 
             .stk-slider-grid { grid-template-columns: 1fr; max-width: 100%; gap: 8px; }
             .stk-slider-col input[type=range] { height: 8px; }
@@ -1281,6 +1296,31 @@
             .stk-table { min-width: 900px; font-size: 12px; }
             .stk-table th { font-size: 11px; }
         }
+
+        /* 수출 탭 */
+        #tab-export .export-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        #tab-export .export-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        #tab-export .export-table th { color: var(--text-muted); font-weight: 600; text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); cursor: pointer; white-space: nowrap; user-select: none; }
+        #tab-export .export-table th:first-child { text-align: left; }
+        #tab-export .export-table td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--bg-panel); white-space: nowrap; }
+        #tab-export .export-table td:first-child { text-align: left; color: var(--text); font-weight: 600; }
+        #tab-export .export-table tbody tr { cursor: pointer; }
+        #tab-export .export-table tbody tr:hover { background: rgba(9,105,218,0.06); }
+        #tab-export .export-table tbody tr.collecting { cursor: default; color: var(--text-dim); }
+        #tab-export .export-table tbody tr.selected { background: rgba(9,105,218,0.12); }
+        #tab-export .export-badge { display: inline-block; font-size: 12px; border-radius: 10px; padding: 1px 9px; font-weight: 600; }
+        #tab-export .export-badge.b-초고성장 { color: var(--bg); background: #2ea043; }
+        #tab-export .export-badge.b-고성장 { color: var(--green); background: rgba(26,127,55,0.15); }
+        #tab-export .export-badge.b-안정 { color: var(--text-muted); background: rgba(110,118,129,0.15); }
+        #tab-export .export-badge.b-부진 { color: var(--up); background: rgba(207,34,46,0.15); }
+        #tab-export .export-badge.b-턴어라운드 { color: var(--accent); background: rgba(9,105,218,0.15); }
+        #tab-export .export-badge.b-둔화 { color: #9a6700; background: rgba(154,103,0,0.15); }
+        #tab-export .export-badge.b-수집중 { color: var(--text-dim); background: rgba(107,114,128,0.15); }
+        #tab-export .export-detail { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px; }
+        #tab-export .export-chart-wrap { position: relative; height: 300px; margin-bottom: 20px; }
+        #tab-export .export-footer { margin-top: 20px; font-size: 12px; color: var(--text-dim); }
+        #tab-export .export-pos { color: var(--up); }
+        #tab-export .export-neg { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -1295,6 +1335,7 @@
 <div class="tabs">
     <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
     <div class="tab" onclick="switchTab('korea')">🇰🇷 한국 마켓</div>
+    <div class="tab" onclick="switchTab('export')">🚢 수출</div>
     <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
     <div class="tab" onclick="switchTab('stocks')">🔍 주도주</div>
     <div class="tab" onclick="switchTab('valuation')">💰 PER/PBR</div>
@@ -1352,7 +1393,7 @@
                 <div class="gauge-bar">
                     <div class="gauge-pointer" id="gauge-pointer" style="left: 25%"></div>
                 </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; color:#8b949e; margin-bottom:8px;">
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#57606a; margin-bottom:8px;">
                     <span>극단적 공포</span>
                     <span>공포</span>
                     <span>중립</span>
@@ -1405,7 +1446,7 @@
     <!-- 시장별 상승률 TOP 10 -->
     <div style="margin-bottom:24px;">
         <div class="section-title">🚀 시장별 상승률 TOP 10</div>
-        <div id="gainers-timestamp" style="font-size:12px; color:#8b949e; margin-bottom:8px;"></div>
+        <div id="gainers-timestamp" style="font-size:12px; color:#57606a; margin-bottom:8px;"></div>
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
             <button class="period-btn active" data-market="us" onclick="switchGainerMarket('us')">미장</button>
             <button class="period-btn" data-market="kr" onclick="switchGainerMarket('kr')">국장</button>
@@ -1425,15 +1466,15 @@
     <div style="display:flex; align-items:center; justify-content:space-between;">
         <div class="section-title" style="margin-bottom:0; border-bottom:none;">📰 글로벌 주요 뉴스 (AI 선별)</div>
         <div style="display:flex; align-items:center; gap:12px;">
-            <span id="news-updated" style="font-size:12px; color:#8b949e;"></span>
+            <span id="news-updated" style="font-size:12px; color:#57606a;"></span>
             <button class="btn" onclick="fetchNews()" id="news-refresh-btn">새로고침</button>
         </div>
     </div>
-    <div style="border-bottom:1px solid #30363d; margin-bottom:12px;"></div>
+    <div style="border-bottom:1px solid #d0d7de; margin-bottom:12px;"></div>
 
     <!-- 그룹 관리 -->
     <div class="news-section" style="margin-bottom:16px;">
-        <div style="margin-bottom:12px; font-size:13px; color:#8b949e;">키워드 그룹 관리</div>
+        <div style="margin-bottom:12px; font-size:13px; color:#57606a;">키워드 그룹 관리</div>
         <div id="groups-container"></div>
         <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;">
             <input class="keyword-input" id="group-name-input" type="text" placeholder="그룹 이름 (예: 이란-이스라엘 전쟁)" style="flex:1; min-width:140px;">
@@ -1470,25 +1511,25 @@
             <span class="chart-close" onclick="closeChart()">x</span>
         </div>
         <div id="chart-period-selector"></div>
-        <div id="chartRangeNotice" style="display:none; font-size:12px; color:#8b949e; margin-top:6px;"></div>
-        <div id="periodReturnDisplay" style="text-align:center; padding:8px 0 12px 0; border-bottom:1px solid #30363d; margin-bottom:12px;">
-            <div id="periodReturnValue" style="font-size:28px; font-weight:700; line-height:1.1; color:#c9d1d9;">—</div>
-            <div id="periodReturnLabel" style="font-size:12px; color:#8b949e; margin-top:4px;">기간 수익률</div>
+        <div id="chartRangeNotice" style="display:none; font-size:12px; color:#57606a; margin-top:6px;"></div>
+        <div id="periodReturnDisplay" style="text-align:center; padding:8px 0 12px 0; border-bottom:1px solid #d0d7de; margin-bottom:12px;">
+            <div id="periodReturnValue" style="font-size:28px; font-weight:700; line-height:1.1; color:#1f2937;">—</div>
+            <div id="periodReturnLabel" style="font-size:12px; color:#57606a; margin-top:4px;">기간 수익률</div>
         </div>
         <div style="height:400px;">
             <canvas id="price-chart"></canvas>
         </div>
-        <div id="perBandSection" style="display:none; margin-top:16px; border-top:1px solid #30363d; padding-top:16px;">
-            <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">📈 PER 밴드 (5년)</h3>
+        <div id="perBandSection" style="display:none; margin-top:16px; border-top:1px solid #d0d7de; padding-top:16px;">
+            <h3 style="font-size:16px; margin:0 0 12px 0; color:#111827;">📈 PER 밴드 (5년)</h3>
             <div style="position:relative; height:260px;"><canvas id="perBandChart"></canvas></div>
         </div>
-        <div id="pbrBandSection" style="display:none; margin-top:16px; border-top:1px solid #30363d; padding-top:16px;">
-            <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">📉 PBR 밴드 (5년)</h3>
+        <div id="pbrBandSection" style="display:none; margin-top:16px; border-top:1px solid #d0d7de; padding-top:16px;">
+            <h3 style="font-size:16px; margin:0 0 12px 0; color:#111827;">📉 PBR 밴드 (5년)</h3>
             <div style="position:relative; height:260px;"><canvas id="pbrBandChart"></canvas></div>
         </div>
-        <div id="epsChartSection" style="display:none; margin-top:16px; border-top:1px solid #30363d; padding-top:16px;">
+        <div id="epsChartSection" style="display:none; margin-top:16px; border-top:1px solid #d0d7de; padding-top:16px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-                <h3 style="font-size:16px; margin:0; color:#f0f6fc;">📊 분기 EPS 추이</h3>
+                <h3 style="font-size:16px; margin:0; color:#111827;">📊 분기 EPS 추이</h3>
                 <div id="epsPeriodButtons" style="display:flex; gap:4px;">
                     <button class="eps-period-btn" data-eq="4">4분기</button>
                     <button class="eps-period-btn active" data-eq="8">8분기</button>
@@ -1498,50 +1539,50 @@
             <div style="position:relative; height:250px;">
                 <canvas id="epsChart"></canvas>
             </div>
-            <div id="epsChartUnit" style="text-align:right; font-size:11px; color:#484f58; margin-top:4px;"></div>
+            <div id="epsChartUnit" style="text-align:right; font-size:11px; color:#6b7280; margin-top:4px;"></div>
         </div>
-        <div id="stockDetailSection" style="display:none; margin-top:20px; border-top:1px solid #30363d; padding-top:16px;">
+        <div id="stockDetailSection" style="display:none; margin-top:20px; border-top:1px solid #d0d7de; padding-top:16px;">
             <div id="companyOverview">
-                <h3 style="font-size:16px; margin:0 0 8px 0; color:#f0f6fc;">기업 개요</h3>
-                <p id="companyOverviewText" style="color:#c9d1d9; line-height:1.5; margin:0;">로딩 중...</p>
-                <p id="companySectorIndustry" style="font-size:13px; color:#8b949e; margin:6px 0 0 0;"></p>
+                <h3 style="font-size:16px; margin:0 0 8px 0; color:#111827;">기업 개요</h3>
+                <p id="companyOverviewText" style="color:#1f2937; line-height:1.5; margin:0;">로딩 중...</p>
+                <p id="companySectorIndustry" style="font-size:13px; color:#57606a; margin:6px 0 0 0;"></p>
             </div>
             <div id="newsReason" style="margin-top:16px;">
-                <h3 style="font-size:16px; margin:0 0 8px 0; color:#f0f6fc;">📰 오늘의 움직임</h3>
-                <div id="newsReasonText" style="color:#c9d1d9; line-height:1.6;">로딩 중...</div>
+                <h3 style="font-size:16px; margin:0 0 8px 0; color:#111827;">📰 오늘의 움직임</h3>
+                <div id="newsReasonText" style="color:#1f2937; line-height:1.6;">로딩 중...</div>
                 <div id="newsSourcesList" style="margin-top:10px; font-size:13px;"></div>
             </div>
             <div id="investOpinionSection" style="display:none; margin-top:16px;">
-                <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">🎯 투자의견</h3>
+                <h3 style="font-size:16px; margin:0 0 12px 0; color:#111827;">🎯 투자의견</h3>
                 <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:140px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px; text-align:center;">
-                        <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">평균 목표가</div>
-                        <div id="opinionTargetAvg" style="font-size:22px; font-weight:700; color:#f0f6fc;">—</div>
+                    <div style="flex:1; min-width:140px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px; padding:12px; text-align:center;">
+                        <div style="font-size:11px; color:#57606a; margin-bottom:4px;">평균 목표가</div>
+                        <div id="opinionTargetAvg" style="font-size:22px; font-weight:700; color:#111827;">—</div>
                         <div id="opinionUpside" style="font-size:13px; margin-top:4px;">—</div>
                     </div>
-                    <div style="flex:1; min-width:140px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px; text-align:center;">
-                        <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">목표가 범위</div>
-                        <div id="opinionTargetRange" style="font-size:16px; font-weight:600; color:#c9d1d9;">—</div>
+                    <div style="flex:1; min-width:140px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px; padding:12px; text-align:center;">
+                        <div style="font-size:11px; color:#57606a; margin-bottom:4px;">목표가 범위</div>
+                        <div id="opinionTargetRange" style="font-size:16px; font-weight:600; color:#1f2937;">—</div>
                     </div>
-                    <div style="flex:1; min-width:140px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px; text-align:center;">
-                        <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">증권사 커버리지</div>
-                        <div id="opinionCoverage" style="font-size:22px; font-weight:700; color:#f0f6fc;">—</div>
+                    <div style="flex:1; min-width:140px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px; padding:12px; text-align:center;">
+                        <div style="font-size:11px; color:#57606a; margin-bottom:4px;">증권사 커버리지</div>
+                        <div id="opinionCoverage" style="font-size:22px; font-weight:700; color:#111827;">—</div>
                     </div>
                 </div>
-                <div style="margin-top:12px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px;">
-                    <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">컨센서스</div>
+                <div style="margin-top:12px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px; padding:12px;">
+                    <div style="font-size:11px; color:#57606a; margin-bottom:8px;">컨센서스</div>
                     <div id="opinionConsensusBar" style="display:flex; height:20px; border-radius:4px; overflow:hidden; margin-bottom:6px;"></div>
-                    <div id="opinionConsensusText" style="font-size:13px; color:#c9d1d9; text-align:center;">—</div>
+                    <div id="opinionConsensusText" style="font-size:13px; color:#1f2937; text-align:center;">—</div>
                 </div>
-                <div id="brokerOpinionTable" style="display:none; margin-top:12px; background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden;">
+                <div id="brokerOpinionTable" style="display:none; margin-top:12px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px; overflow:hidden;">
                     <div style="max-height:300px; overflow-y:auto;">
                         <table style="width:100%; border-collapse:collapse; font-size:13px;">
                             <thead>
-                                <tr style="position:sticky; top:0; background:#161b22; z-index:1;">
-                                    <th style="text-align:left; padding:10px 12px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">증권사</th>
-                                    <th style="text-align:center; padding:10px 8px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">의견</th>
-                                    <th style="text-align:right; padding:10px 12px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">목표가</th>
-                                    <th style="text-align:right; padding:10px 12px; color:#8b949e; font-weight:500; border-bottom:1px solid #30363d;">일자</th>
+                                <tr style="position:sticky; top:0; background:#f8f9fa; z-index:1;">
+                                    <th style="text-align:left; padding:10px 12px; color:#57606a; font-weight:500; border-bottom:1px solid #d0d7de;">증권사</th>
+                                    <th style="text-align:center; padding:10px 8px; color:#57606a; font-weight:500; border-bottom:1px solid #d0d7de;">의견</th>
+                                    <th style="text-align:right; padding:10px 12px; color:#57606a; font-weight:500; border-bottom:1px solid #d0d7de;">목표가</th>
+                                    <th style="text-align:right; padding:10px 12px; color:#57606a; font-weight:500; border-bottom:1px solid #d0d7de;">일자</th>
                                 </tr>
                             </thead>
                             <tbody id="brokerOpinionBody"></tbody>
@@ -1549,22 +1590,22 @@
                     </div>
                 </div>
                 <div id="opinionResearchLink" style="display:none; text-align:right; margin-top:8px;">
-                    <a id="opinionResearchAnchor" href="" target="_blank" rel="noopener" style="font-size:13px; color:#58a6ff; text-decoration:none;">📄 이 종목 전체 리서치 보기 →</a>
+                    <a id="opinionResearchAnchor" href="" target="_blank" rel="noopener" style="font-size:13px; color:#0969da; text-decoration:none;">📄 이 종목 전체 리서치 보기 →</a>
                 </div>
             </div>
             <div id="moatSection" style="display:none; margin-top:16px;">
-                <h3 style="font-size:16px; margin:0 0 12px 0; color:#f0f6fc;">🛡️ 병목 & 해자 <span style="font-size:11px; color:#8b949e; font-weight:400;">(AI 분석)</span></h3>
-                <div id="moatLoading" style="display:none; text-align:center; padding:16px; color:#8b949e; font-size:13px;">AI 분석 중... (5~10초 소요)</div>
+                <h3 style="font-size:16px; margin:0 0 12px 0; color:#111827;">🛡️ 병목 & 해자 <span style="font-size:11px; color:#57606a; font-weight:400;">(AI 분석)</span></h3>
+                <div id="moatLoading" style="display:none; text-align:center; padding:16px; color:#57606a; font-size:13px;">AI 분석 중... (5~10초 소요)</div>
                 <div id="moatContent" style="display:none;">
-                    <div style="border-left:3px solid #3fb950; background:rgba(63,185,80,0.06); border-radius:0 6px 6px 0; padding:10px 14px; margin-bottom:8px;">
-                        <div style="font-size:11px; color:#3fb950; font-weight:600; margin-bottom:4px;">해자 (경쟁우위)</div>
-                        <div id="moatText" style="font-size:13px; color:#c9d1d9; line-height:1.5;"></div>
+                    <div style="border-left:3px solid #1a7f37; background:rgba(26,127,55,0.06); border-radius:0 6px 6px 0; padding:10px 14px; margin-bottom:8px;">
+                        <div style="font-size:11px; color:#1a7f37; font-weight:600; margin-bottom:4px;">해자 (경쟁우위)</div>
+                        <div id="moatText" style="font-size:13px; color:#1f2937; line-height:1.5;"></div>
                     </div>
-                    <div style="border-left:3px solid #f85149; background:rgba(248,81,73,0.06); border-radius:0 6px 6px 0; padding:10px 14px;">
-                        <div style="font-size:11px; color:#f85149; font-weight:600; margin-bottom:4px;">병목 (리스크)</div>
-                        <div id="bottleneckText" style="font-size:13px; color:#c9d1d9; line-height:1.5;"></div>
+                    <div style="border-left:3px solid #cf222e; background:rgba(207,34,46,0.06); border-radius:0 6px 6px 0; padding:10px 14px;">
+                        <div style="font-size:11px; color:#cf222e; font-weight:600; margin-bottom:4px;">병목 (리스크)</div>
+                        <div id="bottleneckText" style="font-size:13px; color:#1f2937; line-height:1.5;"></div>
                     </div>
-                    <div id="moatMeta" style="text-align:right; margin-top:6px; font-size:11px; color:#484f58;"></div>
+                    <div id="moatMeta" style="text-align:right; margin-top:6px; font-size:11px; color:#6b7280;"></div>
                 </div>
             </div>
         </div>
@@ -1609,6 +1650,43 @@
     </div>
 </div>
 
+<!-- 수출 탭 -->
+<div class="tab-content" id="tab-export">
+    <div class="section-title" style="margin-top:0;">🚢 한국 수출 · 20대 품목 (MTI)</div>
+    <div class="loading" id="export-loading">수출 데이터를 불러오는 중...</div>
+    <div id="export-content" style="display:none;">
+        <div class="export-table-wrap">
+            <table class="export-table" id="export-table">
+                <thead>
+                    <tr>
+                        <th onclick="exportSortBy('group')">품목</th>
+                        <th onclick="exportSortBy('latest_export')">당월 수출액</th>
+                        <th onclick="exportSortBy('yoy')">YoY</th>
+                        <th onclick="exportSortBy('delta_yoy')">ΔYoY</th>
+                        <th onclick="exportSortBy('badge')">상태</th>
+                    </tr>
+                </thead>
+                <tbody id="export-table-body"></tbody>
+            </table>
+        </div>
+        <div class="export-detail" id="export-detail" style="display:none;">
+            <div class="section-title" id="export-detail-title"></div>
+            <div class="export-chart-wrap"><canvas id="export-chart-value"></canvas></div>
+            <div class="export-chart-wrap"><canvas id="export-chart-yoy"></canvas></div>
+            <div class="section-title" style="font-size:15px;">하위 MTI 품목 (최신월)</div>
+            <div class="export-table-wrap">
+                <table class="export-table" id="export-sub-table">
+                    <thead>
+                        <tr><th style="cursor:default;">MTI</th><th style="cursor:default;">품목명</th><th style="cursor:default;">수출액</th><th style="cursor:default;">YoY</th></tr>
+                    </thead>
+                    <tbody id="export-sub-body"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="export-footer" id="export-footer"></div>
+    </div>
+</div>
+
 <!-- 주도섹터 탭 -->
 <div class="tab-content" id="tab-leaders">
     <div class="leaders-loading" id="leaders-loading">데이터를 불러오는 중...</div>
@@ -1621,18 +1699,18 @@
             <span class="period-btn" onclick="changePeriod('1y')">1Y</span>
             <span class="period-btn" id="sec-custom-btn" onclick="toggleSecCustomPanel()">사용자 지정</span>
             <span class="leaders-updated" id="leaders-updated"></span>
-            <div id="sec-custom-panel" style="display:none; margin-top:8px; padding:10px; background:#161b22; border:1px solid #30363d; border-radius:8px;">
+            <div id="sec-custom-panel" style="display:none; margin-top:8px; padding:10px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px;">
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <label style="color:#8b949e; font-size:13px;">시작
-                        <input type="date" id="sec-custom-start" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    <label style="color:#57606a; font-size:13px;">시작
+                        <input type="date" id="sec-custom-start" style="margin-left:4px; background:#ffffff; color:#1f2937; border:1px solid #d0d7de; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
                     </label>
-                    <label style="color:#8b949e; font-size:13px;">종료
-                        <input type="date" id="sec-custom-end" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    <label style="color:#57606a; font-size:13px;">종료
+                        <input type="date" id="sec-custom-end" style="margin-left:4px; background:#ffffff; color:#1f2937; border:1px solid #d0d7de; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
                     </label>
                     <button onclick="applySecCustomPeriod()" style="background:#238636; color:#fff; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-size:13px;">적용</button>
-                    <span id="sec-custom-label" style="color:#58a6ff; font-size:13px;"></span>
+                    <span id="sec-custom-label" style="color:#0969da; font-size:13px;"></span>
                 </div>
-                <div style="margin-top:6px; color:#6e7681; font-size:12px;">⚠ 임의 기간에서 미국은 상대강도(RS)만 지원 — 거래대금 컬럼은 「—」로 표시됩니다.</div>
+                <div style="margin-top:6px; color:#6b7280; font-size:12px;">⚠ 임의 기간에서 미국은 상대강도(RS)만 지원 — 거래대금 컬럼은 「—」로 표시됩니다.</div>
             </div>
         </div>
         <div class="weight-slider-wrap">
@@ -1674,17 +1752,17 @@
             <span class="period-btn" onclick="changeStkPeriod('1y')">1Y</span>
             <span class="period-btn" id="stk-custom-btn" onclick="toggleStkCustomPanel()">사용자 지정</span>
             <span class="leaders-updated" id="stocks-updated"></span>
-            <div id="stk-custom-panel" style="display:none; margin-top:8px; padding:10px; background:#161b22; border:1px solid #30363d; border-radius:8px;">
+            <div id="stk-custom-panel" style="display:none; margin-top:8px; padding:10px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px;">
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <label style="color:#8b949e; font-size:13px;">시작
-                        <input type="date" id="stk-custom-start" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    <label style="color:#57606a; font-size:13px;">시작
+                        <input type="date" id="stk-custom-start" style="margin-left:4px; background:#ffffff; color:#1f2937; border:1px solid #d0d7de; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
                     </label>
-                    <label style="color:#8b949e; font-size:13px;">종료
-                        <input type="date" id="stk-custom-end" style="margin-left:4px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
+                    <label style="color:#57606a; font-size:13px;">종료
+                        <input type="date" id="stk-custom-end" style="margin-left:4px; background:#ffffff; color:#1f2937; border:1px solid #d0d7de; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;">
                     </label>
                     <button onclick="applyStkCustomPeriod()" style="background:#238636; color:#fff; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-size:13px;">적용</button>
-                    <button onclick="closeStkCustomPanel()" style="background:transparent; color:#8b949e; border:1px solid #30363d; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">닫기</button>
-                    <span id="stk-custom-label" style="color:#58a6ff; font-size:13px;"></span>
+                    <button onclick="closeStkCustomPanel()" style="background:transparent; color:#57606a; border:1px solid #d0d7de; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">닫기</button>
+                    <span id="stk-custom-label" style="color:#0969da; font-size:13px;"></span>
                 </div>
             </div>
         </div>
@@ -1724,11 +1802,11 @@
     <div id="val-content" style="display:none;">
         <div class="stk-filters">
             <div id="val-sector-dd" style="position:relative; display:inline-block;">
-                <button type="button" id="val-sector-btn" onclick="toggleValSectorMenu(event)" style="background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:13px;">섹터: 전체 ▾</button>
-                <div id="val-sector-menu" style="display:none; position:absolute; z-index:50; top:100%; left:0; margin-top:4px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:8px; min-width:220px; max-height:320px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
-                    <div style="display:flex; gap:12px; padding:4px 6px 8px; border-bottom:1px solid #30363d; margin-bottom:6px;">
-                        <span style="cursor:pointer; color:#58a6ff; font-size:12px;" onclick="valSectorSelectAll(true)">전체 선택</span>
-                        <span style="cursor:pointer; color:#58a6ff; font-size:12px;" onclick="valSectorSelectAll(false)">전체 해제</span>
+                <button type="button" id="val-sector-btn" onclick="toggleValSectorMenu(event)" style="background:#f8f9fa; color:#1f2937; border:1px solid #d0d7de; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:13px;">섹터: 전체 ▾</button>
+                <div id="val-sector-menu" style="display:none; position:absolute; z-index:50; top:100%; left:0; margin-top:4px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:8px; padding:8px; min-width:220px; max-height:320px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
+                    <div style="display:flex; gap:12px; padding:4px 6px 8px; border-bottom:1px solid #d0d7de; margin-bottom:6px;">
+                        <span style="cursor:pointer; color:#0969da; font-size:12px;" onclick="valSectorSelectAll(true)">전체 선택</span>
+                        <span style="cursor:pointer; color:#0969da; font-size:12px;" onclick="valSectorSelectAll(false)">전체 해제</span>
                     </div>
                     <div id="val-sector-options"></div>
                 </div>
@@ -1826,7 +1904,7 @@
         <!-- 주요 공시 안내 -->
         <div class="dart-section">
             <div class="dart-section-title">📋 주요 공시 모니터링</div>
-            <div style="font-size:13px;color:#8b949e;line-height:1.6">
+            <div style="font-size:13px;color:#57606a;line-height:1.6">
                 <p>매일 자동으로 다음 공시를 감시합니다:</p>
                 <p style="margin-top:8px;">
                     · 30% 이상 매출/이익 변동<br>
@@ -1865,7 +1943,7 @@
       <div style="position:relative;margin-bottom:8px;">
         <input type="text" id="dart-rpt-search" data-cal-search="dart_report_download" placeholder="회사명 또는 종목코드 검색" autocomplete="off">
       </div>
-      <div id="dart-rpt-selected" style="font-size:13px;color:#8b949e;margin-bottom:8px;">선택된 회사 없음</div>
+      <div id="dart-rpt-selected" style="font-size:13px;color:#57606a;margin-bottom:8px;">선택된 회사 없음</div>
       <div class="rpt-search-grid">
         <div class="rpt-field"><label>시작일</label><input type="date" id="dart-rpt-from"></div>
         <div class="rpt-field"><label>종료일</label><input type="date" id="dart-rpt-to"></div>
@@ -1965,7 +2043,7 @@
     <!-- 인덱스 현황 -->
     <div class="section-title">📦 메시지 인덱스 현황</div>
     <div id="rpt-index-status" class="data-table" style="margin-bottom:24px;">
-        <div style="color:#8b949e;font-size:13px;padding:8px 0;">로딩 중...</div>
+        <div style="color:#57606a;font-size:13px;padding:8px 0;">로딩 중...</div>
     </div>
 
     <!-- 워치리스트 -->
@@ -2004,7 +2082,7 @@
             <input type="date" id="rpt-date-to">
         </div>
     </div>
-    <div id="rpt-index-hint" style="display:none;color:#e3b341;font-size:12px;margin-top:4px;">⚠️ 선택된 채널이 아직 인덱싱 중입니다...</div>
+    <div id="rpt-index-hint" style="display:none;color:#bf8700;font-size:12px;margin-top:4px;">⚠️ 선택된 채널이 아직 인덱싱 중입니다...</div>
     <button class="btn" onclick="reportSearchJob()" style="margin-top:8px;margin-bottom:16px;">🔍 검색 (인덱스 사용)</button>
 
     <!-- 진행상황 -->
@@ -2030,6 +2108,9 @@
 
 <script>
     const API_BASE = '';
+
+    Chart.defaults.color = '#57606a';
+    Chart.defaults.borderColor = '#e5e7eb';
 
     // 날짜 표시
     function updateDate() {
@@ -2082,6 +2163,10 @@
             koreaLoaded = true;
             loadKorea();
         }
+        if (tabName === 'export' && !exportLoaded) {
+            exportLoaded = true;
+            loadExportSummary();
+        }
         if (tabName === 'stocks' && !stocksLoaded) {
             stocksLoaded = true;
             loadStockLeaders();
@@ -2107,7 +2192,7 @@
             valItems = data.items || [];
             const sectors = [...new Set(valItems.map(i => i.sector).filter(Boolean))].sort();
             document.getElementById('val-sector-options').innerHTML = sectors.map(s =>
-                `<label style="display:block; padding:4px 6px; cursor:pointer; font-size:13px; color:#c9d1d9; white-space:nowrap;"><input type="checkbox" value="${s}" checked onchange="onValSectorChange()" style="margin-right:6px; vertical-align:middle;">${s}</label>`
+                `<label style="display:block; padding:4px 6px; cursor:pointer; font-size:13px; color:#1f2937; white-space:nowrap;"><input type="checkbox" value="${s}" checked onchange="onValSectorChange()" style="margin-right:6px; vertical-align:middle;">${s}</label>`
             ).join('');
             updateValSectorBtnLabel();
             document.addEventListener('click', function(e) {
@@ -2210,7 +2295,7 @@
         for (const r of slice) {
             const lowPer = r.per_p10 != null && r.fper != null && r.fper <= r.per_p10;
             const lowPbr = r.pbr_p10 != null && r.fpbr != null && r.fpbr <= r.pbr_p10;
-            const highlight = (lowPer || lowPbr) ? ' style="background:rgba(63,185,80,0.12)"' : '';
+            const highlight = (lowPer || lowPbr) ? ' style="background:rgba(26,127,55,0.12)"' : '';
             const code = (r.code || '').replace('.KS','').replace('.KQ','');
             html += `<tr${highlight} onclick="openValuationModal('${code}')">`;
             html += `<td style="text-align:left">${r.name || ''}</td>`;
@@ -2226,7 +2311,7 @@
         let pHtml = '';
         if (totalPages > 1) {
             pHtml += valPage > 1 ? `<span class="period-btn" onclick="valGoPage(${valPage-1})">이전</span>` : '';
-            pHtml += `<span style="color:#8b949e;font-size:13px">${valPage} / ${totalPages}</span>`;
+            pHtml += `<span style="color:#57606a;font-size:13px">${valPage} / ${totalPages}</span>`;
             pHtml += valPage < totalPages ? `<span class="period-btn" onclick="valGoPage(${valPage+1})">다음</span>` : '';
         }
         document.getElementById('val-pagination').innerHTML = pHtml;
@@ -2276,7 +2361,7 @@
             if (!msg) {
                 msg = document.createElement('div');
                 msg.className = 'band-empty-msg';
-                msg.style.cssText = 'display:flex; align-items:center; justify-content:center; height:100%; color:#6e7681; font-size:13px; text-align:center; padding:0 12px;';
+                msg.style.cssText = 'display:flex; align-items:center; justify-content:center; height:100%; color:#6b7280; font-size:13px; text-align:center; padding:0 12px;';
                 wrap.appendChild(msg);
             }
             msg.textContent = `이 종목은 해당 기간에 ${label} 밴드 데이터가 없습니다 (적자·상장 기간 부족 등).`;
@@ -2292,16 +2377,16 @@
         const vals = series.map(s => s[key]);
 
         const datasets = [
-            { label: label, data: [...vals, null], borderColor: '#58a6ff', pointRadius: 0, borderWidth: 1.5, tension: 0.1, order: 3 },
-            { label: 'P90', data: Array(n).fill(band.p90), borderColor: 'rgba(139,148,158,0.35)', pointRadius: 0, borderWidth: 1, order: 4 },
-            { label: 'P10~P90', data: Array(n).fill(band.p10), borderColor: 'rgba(139,148,158,0.35)', pointRadius: 0, borderWidth: 1, fill: '-1', backgroundColor: 'rgba(88,166,255,0.08)', order: 4 },
-            { label: 'P50(중앙값)', data: Array(n).fill(band.p50), borderColor: '#8b949e', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, order: 4 },
+            { label: label, data: [...vals, null], borderColor: '#0969da', pointRadius: 0, borderWidth: 1.5, tension: 0.1, order: 3 },
+            { label: 'P90', data: Array(n).fill(band.p90), borderColor: 'rgba(110,118,129,0.35)', pointRadius: 0, borderWidth: 1, order: 4 },
+            { label: 'P10~P90', data: Array(n).fill(band.p10), borderColor: 'rgba(110,118,129,0.35)', pointRadius: 0, borderWidth: 1, fill: '-1', backgroundColor: 'rgba(9,105,218,0.08)', order: 4 },
+            { label: 'P50(중앙값)', data: Array(n).fill(band.p50), borderColor: '#57606a', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, order: 4 },
         ];
         if (current != null) {
-            datasets.push({ label: '현재', data: [...Array(vals.length).fill(null), current], showLine: false, pointRadius: 6, pointBackgroundColor: '#f0f6fc', order: 1 });
+            datasets.push({ label: '현재', data: [...Array(vals.length).fill(null), current], showLine: false, pointRadius: 6, pointBackgroundColor: '#111827', order: 1 });
         }
         if (forward != null) {
-            datasets.push({ label: '선행(forward)', data: [...Array(vals.length).fill(null), forward], showLine: false, pointRadius: 6, pointBackgroundColor: '#3fb950', order: 1 });
+            datasets.push({ label: '선행(forward)', data: [...Array(vals.length).fill(null), forward], showLine: false, pointRadius: 6, pointBackgroundColor: '#1a7f37', order: 1 });
         }
 
         new Chart(document.getElementById(canvasId), {
@@ -2309,10 +2394,10 @@
             data: { labels, datasets },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: true, position: 'top', labels: { color: '#8b949e', font: { size: 11 } } } },
+                plugins: { legend: { display: true, position: 'top', labels: { color: '#57606a', font: { size: 11 } } } },
                 scales: {
-                    x: { ticks: { color: '#e6edf3', maxTicksLimit: 12, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
-                    y: { beginAtZero: false, ticks: { color: '#e6edf3', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                    x: { ticks: { color: '#1f2937', maxTicksLimit: 12, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                    y: { beginAtZero: false, ticks: { color: '#1f2937', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
                 },
             },
         });
@@ -2434,7 +2519,7 @@
             }
             html += `<div class="korea-card">
                 <div class="kc-top"><span class="kc-name">${obj.name}</span>${badge}</div>
-                <div class="kc-price">${koreaFmtPrice(lt.close)} <span style="font-size:11px;color:#8b949e;">${chgHtml}</span></div>
+                <div class="kc-price">${koreaFmtPrice(lt.close)} <span style="font-size:11px;color:#57606a;">${chgHtml}</span></div>
                 <div class="kc-disp50-lbl">50일 이격도</div>
                 <div class="kc-disp50">${lt.disp50 != null ? lt.disp50.toFixed(2) : '-'}</div>
                 <div class="kc-sub">20일 ${lt.disp20 != null ? lt.disp20.toFixed(2) : '-'} · 120일 ${lt.disp120 != null ? lt.disp120.toFixed(2) : '-'}</div>
@@ -2498,16 +2583,16 @@
 
         // pointStyle:'line' → 범례 마커가 각 데이터셋의 선 색·굵기·점선을 그대로 반영
         const datasets = [
-            { label: '종가', data: closes, yAxisID: 'yPrice', borderColor: '#8b949e', backgroundColor: 'rgba(139,148,158,0.06)', pointStyle: 'line', pointRadius: 0, borderWidth: 1, tension: 0.1, fill: true, order: 5 },
-            { label: '50일 이평', data: ma50, yAxisID: 'yPrice', borderColor: '#d29922', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, borderDash: [4, 3], tension: 0.1, order: 4 },
-            { label: '50일 이격도', data: disp50, yAxisID: 'yDisp', borderColor: '#58a6ff', pointStyle: 'line', pointRadius: 0, borderWidth: 3, tension: 0.1, order: 1 },
+            { label: '종가', data: closes, yAxisID: 'yPrice', borderColor: '#57606a', backgroundColor: 'rgba(110,118,129,0.06)', pointStyle: 'line', pointRadius: 0, borderWidth: 1, tension: 0.1, fill: true, order: 5 },
+            { label: '50일 이평', data: ma50, yAxisID: 'yPrice', borderColor: '#9a6700', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, borderDash: [4, 3], tension: 0.1, order: 4 },
+            { label: '50일 이격도', data: disp50, yAxisID: 'yDisp', borderColor: '#0969da', pointStyle: 'line', pointRadius: 0, borderWidth: 3, tension: 0.1, order: 1 },
         ];
-        if (showD20) datasets.push({ label: '20일 이격도', data: disp20, yAxisID: 'yDisp', borderColor: '#3fb950', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, tension: 0.1, order: 2 });
-        if (showD120) datasets.push({ label: '120일 이격도', data: disp120, yAxisID: 'yDisp', borderColor: '#bc8cff', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, tension: 0.1, order: 2 });
-        if (t.isIndex) datasets.push({ label: '50일 이격도 고점', data: peakPoints, yAxisID: 'yDisp', showLine: false, pointRadius: 5, pointStyle: 'triangle', pointBackgroundColor: '#f85149', pointBorderColor: '#f85149', order: 0 });
+        if (showD20) datasets.push({ label: '20일 이격도', data: disp20, yAxisID: 'yDisp', borderColor: '#1a7f37', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, tension: 0.1, order: 2 });
+        if (showD120) datasets.push({ label: '120일 이격도', data: disp120, yAxisID: 'yDisp', borderColor: '#8250df', pointStyle: 'line', pointRadius: 0, borderWidth: 1.2, tension: 0.1, order: 2 });
+        if (t.isIndex) datasets.push({ label: '50일 이격도 고점', data: peakPoints, yAxisID: 'yDisp', showLine: false, pointRadius: 5, pointStyle: 'triangle', pointBackgroundColor: '#cf222e', pointBorderColor: '#cf222e', order: 0 });
 
         // 우축 기준선(130/105/100) — annotation 플러그인 없이 얇은 데이터셋으로 표현
-        [[130, 'rgba(248,81,73,0.5)'], [105, 'rgba(210,153,34,0.5)'], [100, 'rgba(139,148,158,0.5)']].forEach(([lv, col]) => {
+        [[130, 'rgba(207,34,46,0.5)'], [105, 'rgba(154,103,0,0.5)'], [100, 'rgba(110,118,129,0.5)']].forEach(([lv, col]) => {
             datasets.push({ label: '기준' + lv, data: labels.map(() => lv), yAxisID: 'yDisp', borderColor: col, borderDash: [6, 4], borderWidth: 1, pointRadius: 0, order: 6, _ref: true });
         });
 
@@ -2521,14 +2606,14 @@
                 plugins: {
                     legend: {
                         display: true, position: 'top',
-                        labels: { color: '#8b949e', font: { size: 11 }, usePointStyle: true, filter: (it) => !it.text.startsWith('기준') },
+                        labels: { color: '#57606a', font: { size: 11 }, usePointStyle: true, filter: (it) => !it.text.startsWith('기준') },
                     },
                     tooltip: { callbacks: { label: (c) => c.dataset._ref ? null : `${c.dataset.label}: ${c.parsed.y != null ? c.parsed.y.toLocaleString() : '-'}` } },
                 },
                 scales: {
-                    x: { ticks: { color: '#8b949e', maxTicksLimit: 10, font: { size: 9 } }, grid: { color: 'rgba(48,54,61,0.4)' } },
-                    yPrice: { position: 'left', ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: 'rgba(48,54,61,0.35)' }, title: { display: true, text: '지수/종가', color: '#8b949e', font: { size: 10 } } },
-                    yDisp: { position: 'right', ticks: { color: '#58a6ff', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: '이격도', color: '#58a6ff', font: { size: 10 } } },
+                    x: { ticks: { color: '#57606a', maxTicksLimit: 10, font: { size: 9 } }, grid: { color: 'rgba(48,54,61,0.4)' } },
+                    yPrice: { position: 'left', ticks: { color: '#57606a', font: { size: 9 } }, grid: { color: 'rgba(48,54,61,0.35)' }, title: { display: true, text: '지수/종가', color: '#57606a', font: { size: 10 } } },
+                    yDisp: { position: 'right', ticks: { color: '#0969da', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: '이격도', color: '#0969da', font: { size: 10 } } },
                 },
             },
         });
@@ -2539,11 +2624,11 @@
         if (d50 == null) return '';
         if (d50 <= 105) {
             const t = Math.max(0, Math.min(1, (105 - d50) / 25));
-            return `background: rgba(88,166,255,${(0.08 + t * 0.32).toFixed(3)});`;
+            return `background: rgba(9,105,218,${(0.08 + t * 0.32).toFixed(3)});`;
         }
         if (d50 >= 130) {
             const t = Math.max(0, Math.min(1, (d50 - 130) / 25));
-            return `background: rgba(248,81,73,${(0.08 + t * 0.32).toFixed(3)});`;
+            return `background: rgba(207,34,46,${(0.08 + t * 0.32).toFixed(3)});`;
         }
         return '';
     }
@@ -2647,19 +2732,19 @@
             data: {
                 labels: dateSlice,
                 datasets: [
-                    { label: krLabel, data: krSlice, borderColor: '#f85149', borderWidth: 2, tension: 0.1, pointRadius: 0 },
-                    { label: usLabel, data: usSlice, borderColor: '#8b949e', borderWidth: 2, tension: 0.1, pointRadius: 0, borderDash: [5, 3] }
+                    { label: krLabel, data: krSlice, borderColor: '#cf222e', borderWidth: 2, tension: 0.1, pointRadius: 0 },
+                    { label: usLabel, data: usSlice, borderColor: '#57606a', borderWidth: 2, tension: 0.1, pointRadius: 0, borderDash: [5, 3] }
                 ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { color: '#c9d1d9', font: { size: 11 } } },
+                    legend: { labels: { color: '#1f2937', font: { size: 11 } } },
                     tooltip: { mode: 'index', intersect: false }
                 },
                 scales: {
-                    x: { ticks: { color: '#484f58', maxTicksLimit: 6, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
-                    y: { ticks: { color: '#484f58', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } }
+                    x: { ticks: { color: '#6b7280', maxTicksLimit: 6, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                    y: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } }
                 }
             }
         });
@@ -3280,7 +3365,7 @@
                     const newsHtml = (data.news_summary || []).map(line => '<div>' + line + '</div>').join('');
                     document.getElementById('newsReasonText').innerHTML = newsHtml || '정보 없음';
                     const sourcesHtml = (data.news_sources || []).map(s =>
-                        '<a href="' + s.url + '" target="_blank" rel="noopener" style="color:#58a6ff; text-decoration:none; margin-right:12px;">[' + s.source + '] ' + s.title + '</a>'
+                        '<a href="' + s.url + '" target="_blank" rel="noopener" style="color:#0969da; text-decoration:none; margin-right:12px;">[' + s.source + '] ' + s.title + '</a>'
                     ).join('<br>');
                     document.getElementById('newsSourcesList').innerHTML = sourcesHtml;
                 })
@@ -3305,7 +3390,7 @@
         document.getElementById('chart-current-price').style.display = 'none';
         document.getElementById('ccp-value').textContent = '—';
         document.getElementById('periodReturnValue').textContent = '—';
-        document.getElementById('periodReturnValue').style.color = '#c9d1d9';
+        document.getElementById('periodReturnValue').style.color = '#1f2937';
         document.getElementById('periodReturnLabel').textContent = '기간 수익률';
         document.getElementById('stockDetailSection').style.display = 'none';
         document.getElementById('companyOverviewText').textContent = '로딩 중...';
@@ -3357,16 +3442,16 @@
                 var upsideEl = document.getElementById('opinionUpside');
                 var sign = upside >= 0 ? '+' : '';
                 upsideEl.textContent = '상승여력 ' + sign + upside.toFixed(1) + '%';
-                upsideEl.style.color = upside >= 0 ? '#f85149' : '#58a6ff';
+                upsideEl.style.color = upside >= 0 ? '#cf222e' : '#0969da';
 
                 var con = data.consensus;
                 var total = con.buy + con.hold + con.sell;
                 var bar = document.getElementById('opinionConsensusBar');
                 bar.innerHTML = '';
                 if (total > 0) {
-                    if (con.buy > 0) bar.innerHTML += '<div style="width:' + (con.buy/total*100) + '%; background:#f85149;"></div>';
-                    if (con.hold > 0) bar.innerHTML += '<div style="width:' + (con.hold/total*100) + '%; background:#d29922;"></div>';
-                    if (con.sell > 0) bar.innerHTML += '<div style="width:' + (con.sell/total*100) + '%; background:#58a6ff;"></div>';
+                    if (con.buy > 0) bar.innerHTML += '<div style="width:' + (con.buy/total*100) + '%; background:#cf222e;"></div>';
+                    if (con.hold > 0) bar.innerHTML += '<div style="width:' + (con.hold/total*100) + '%; background:#9a6700;"></div>';
+                    if (con.sell > 0) bar.innerHTML += '<div style="width:' + (con.sell/total*100) + '%; background:#0969da;"></div>';
                 }
                 document.getElementById('opinionConsensusText').textContent =
                     '매수 ' + con.buy + ' · 중립 ' + con.hold + ' · 매도 ' + con.sell;
@@ -3385,15 +3470,15 @@
                         'sell': '매도', '매도': '매도', 'underperform': '매도',
                         'strong sell': '매도', 'reduce': '매도'
                     };
-                    var opColor = {'매수': '#f85149', '중립': '#d29922', '매도': '#58a6ff'};
+                    var opColor = {'매수': '#cf222e', '중립': '#9a6700', '매도': '#0969da'};
                     tbody.innerHTML = opinions.map(function(o) {
                         var label = opMap[o.opinion.toLowerCase()] || o.opinion;
-                        var color = opColor[label] || '#c9d1d9';
-                        return '<tr style="border-bottom:1px solid #21262d;">'
-                            + '<td style="padding:8px 12px; color:#c9d1d9;">' + o.broker + '</td>'
+                        var color = opColor[label] || '#1f2937';
+                        return '<tr style="border-bottom:1px solid #e5e7eb;">'
+                            + '<td style="padding:8px 12px; color:#1f2937;">' + o.broker + '</td>'
                             + '<td style="padding:8px; text-align:center; color:' + color + '; font-weight:600;">' + label + '</td>'
-                            + '<td style="padding:8px 12px; text-align:right; color:#c9d1d9;">' + formatKrw(o.target_price) + '원</td>'
-                            + '<td style="padding:8px 12px; text-align:right; color:#8b949e;">' + o.date + '</td>'
+                            + '<td style="padding:8px 12px; text-align:right; color:#1f2937;">' + formatKrw(o.target_price) + '원</td>'
+                            + '<td style="padding:8px 12px; text-align:right; color:#57606a;">' + o.date + '</td>'
                             + '</tr>';
                     }).join('');
                 }
@@ -3459,7 +3544,7 @@
                 if (val == null) return;
                 var label = val.toLocaleString('ko-KR', { maximumFractionDigits: 1 });
                 var y = val >= 0 ? bar.y - 6 : bar.y + 14;
-                ctx.fillStyle = '#c9d1d9';
+                ctx.fillStyle = '#1f2937';
                 ctx.fillText(label, bar.x, y);
             });
             ctx.restore();
@@ -3474,7 +3559,7 @@
         const maxAbs = Math.max(...values.map(v => Math.abs(v || 0)), 1);
         const unit = epsUnit(maxAbs);
         const scaled = values.map(v => v != null ? v / unit.div : null);
-        const colors = values.map(v => v >= 0 ? '#f85149' : '#58a6ff');
+        const colors = values.map(v => v >= 0 ? '#cf222e' : '#0969da');
 
         document.getElementById('epsChartUnit').textContent = '단위: ' + unit.label;
 
@@ -3496,10 +3581,10 @@
                         label: '연결선',
                         data: scaled,
                         type: 'line',
-                        borderColor: '#6e7681',
+                        borderColor: '#6b7280',
                         borderWidth: 1.5,
                         pointRadius: 3,
-                        pointBackgroundColor: '#8b949e',
+                        pointBackgroundColor: '#57606a',
                         fill: false,
                         tension: 0,
                         order: 1,
@@ -3524,11 +3609,11 @@
                     }
                 },
                 scales: {
-                    x: { ticks: { color: '#8b949e', font: { size: 12 } }, grid: { display: false } },
+                    x: { ticks: { color: '#57606a', font: { size: 12 } }, grid: { display: false } },
                     y: {
-                        ticks: { color: '#8b949e', font: { size: 11 } },
-                        grid: { color: '#21262d' },
-                        title: { display: true, text: unit.label, color: '#8b949e', font: { size: 11 } }
+                        ticks: { color: '#57606a', font: { size: 11 } },
+                        grid: { color: '#e5e7eb' },
+                        title: { display: true, text: unit.label, color: '#57606a', font: { size: 11 } }
                     }
                 }
             }
@@ -3594,17 +3679,17 @@
             else if (key === 'ytd') start = new Date(today.getFullYear(), 0, 1);
             return { start: fmtLocal(start), end: fmtLocal(end) };
         }
-        const inputStyle = 'background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;';
+        const inputStyle = 'background:#ffffff; color:#1f2937; border:1px solid #d0d7de; border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer;';
         let html = '<div class="chart-periods" style="flex-wrap:wrap;">';
         for (const p of presets) {
             html += `<button class="period-btn" data-pkey="${p.key}">${p.label}</button>`;
         }
         html += '<button class="period-btn" data-pkey="custom">직접지정</button>';
         html += '</div>';
-        html += '<div class="ps-custom-panel" style="display:none; margin-top:8px; padding:8px; background:#161b22; border:1px solid #30363d; border-radius:6px;">';
+        html += '<div class="ps-custom-panel" style="display:none; margin-top:8px; padding:8px; background:#f8f9fa; border:1px solid #d0d7de; border-radius:6px;">';
         html += '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">';
         html += `<input type="date" class="ps-start" style="${inputStyle}">`;
-        html += '<span style="color:#8b949e;">~</span>';
+        html += '<span style="color:#57606a;">~</span>';
         html += `<input type="date" class="ps-end" style="${inputStyle}">`;
         html += '</div></div>';
         containerEl.innerHTML = html;
@@ -3619,12 +3704,12 @@
         }
         function tryCustom() {
             const s = startEl.value, e = endEl.value;
-            startEl.style.borderColor = '#30363d';
-            endEl.style.borderColor = '#30363d';
+            startEl.style.borderColor = '#d0d7de';
+            endEl.style.borderColor = '#d0d7de';
             if (!s || !e) return;
             if (s >= e) {
-                startEl.style.borderColor = '#f85149';
-                endEl.style.borderColor = '#f85149';
+                startEl.style.borderColor = '#cf222e';
+                endEl.style.borderColor = '#cf222e';
                 return;
             }
             onRangeChange(s, e);
@@ -3679,8 +3764,8 @@
                     labels: data.dates,
                     datasets: [{
                         data: data.prices,
-                        borderColor: '#58a6ff',
-                        backgroundColor: 'rgba(88,166,255,0.08)',
+                        borderColor: '#0969da',
+                        backgroundColor: 'rgba(9,105,218,0.08)',
                         fill: true, pointRadius: 0, borderWidth: 2,
                     }]
                 },
@@ -3688,8 +3773,8 @@
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: '#8b949e', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: '#21262d' } },
-                        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+                        x: { ticks: { color: '#57606a', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: '#e5e7eb' } },
+                        y: { ticks: { color: '#57606a' }, grid: { color: '#e5e7eb' } },
                     }
                 }
             });
@@ -3722,7 +3807,7 @@
         const labelEl = document.getElementById('periodReturnLabel');
         if (!prices || prices.length < 2) {
             valueEl.textContent = '—';
-            valueEl.style.color = '#c9d1d9';
+            valueEl.style.color = '#1f2937';
             labelEl.textContent = '데이터 없음';
             return;
         }
@@ -3730,9 +3815,9 @@
         const end = prices[prices.length - 1];
         const returnPct = ((end - start) / start) * 100;
         valueEl.textContent = fmtPct(returnPct, 2);
-        if (returnPct > 0) valueEl.style.color = '#f85149';
-        else if (returnPct < 0) valueEl.style.color = '#58a6ff';
-        else valueEl.style.color = '#c9d1d9';
+        if (returnPct > 0) valueEl.style.color = '#cf222e';
+        else if (returnPct < 0) valueEl.style.color = '#0969da';
+        else valueEl.style.color = '#1f2937';
         labelEl.textContent = '기간 수익률';
     }
 
@@ -3823,11 +3908,11 @@
                     String(d.getHours()).padStart(2,'0') + ':' +
                     String(d.getMinutes()).padStart(2,'0');
                 const ageH = (Date.now() - d.getTime()) / 3600000;
-                const style = ageH > 6 ? 'color:#e3b341;' : 'color:#8b949e;';
+                const style = ageH > 6 ? 'color:#bf8700;' : 'color:#57606a;';
                 tsEl.innerHTML = `<span style="${style}">마지막 갱신: ${fmt}</span>`;
             }
             container.innerHTML = `
-                <div class="data-row" style="font-weight:bold; color:#58a6ff; border-bottom:1px solid #30363d;">
+                <div class="data-row" style="font-weight:bold; color:#0969da; border-bottom:1px solid #d0d7de;">
                     <span style="flex:0.4">#</span>
                     <span style="flex:2">종목명</span>
                     <span style="flex:1.2">섹터</span>
@@ -3836,10 +3921,10 @@
                 </div>
                 ${items.map((d, i) => `
                     <div class="data-row clickable" onclick="openChart('${d.ticker}','${d.name}',${d.change_pct})">
-                        <span style="flex:0.4; color:#8b949e;">${i+1}</span>
+                        <span style="flex:0.4; color:#57606a;">${i+1}</span>
                         <span style="flex:2">${d.name}</span>
-                        <span style="flex:1.2; color:#8b949e;">${d.sector}</span>
-                        <span style="flex:1.2; color:#8b949e;">${d.industry}</span>
+                        <span style="flex:1.2; color:#57606a;">${d.sector}</span>
+                        <span style="flex:1.2; color:#57606a;">${d.industry}</span>
                         <span style="flex:1; text-align:right" class="${d.change_pct >= 0 ? 'positive' : 'negative'}">
                             ${d.change_pct >= 0 ? '+' : ''}${d.change_pct.toFixed(2)}%
                         </span>
@@ -3921,15 +4006,15 @@
                 const articlesHtml = g.articles.map((a, i) => {
                     const date = a.publishedAt ? new Date(a.publishedAt).toLocaleString('ko-KR') : '';
                     const summaryHtml = (a.summary && a.summary.length)
-                        ? `<div style="margin-top:6px; padding:8px 12px; background:#161b22; border-radius:6px; border-left:3px solid #58a6ff;">
-                            ${a.summary.map(s => `<div style="font-size:12px; color:#c9d1d9; line-height:1.6;">${s}</div>`).join('')}
+                        ? `<div style="margin-top:6px; padding:8px 12px; background:#f8f9fa; border-radius:6px; border-left:3px solid #0969da;">
+                            ${a.summary.map(s => `<div style="font-size:12px; color:#1f2937; line-height:1.6;">${s}</div>`).join('')}
                            </div>`
                         : '';
                     return `
                         <div class="news-item">
                             <div class="news-title">
-                                <span style="color:#8b949e; margin-right:8px; font-weight:bold;">${i+1}.</span>
-                                <a href="${a.url}" target="_blank" style="color:#e6edf3; text-decoration:none;">
+                                <span style="color:#57606a; margin-right:8px; font-weight:bold;">${i+1}.</span>
+                                <a href="${a.url}" target="_blank" style="color:#1f2937; text-decoration:none;">
                                     ${a.title}
                                 </a>
                             </div>
@@ -4241,13 +4326,13 @@
     let krNameCache = {};
 
     const CAL_CATS = {
-        us_earnings:  { name: '미국 실적발표',  color: '#58a6ff', checked: true },
-        kr_earnings:  { name: '국내 실적/IR',   color: '#d2a8ff', checked: true },
+        us_earnings:  { name: '미국 실적발표',  color: '#0969da', checked: true },
+        kr_earnings:  { name: '국내 실적/IR',   color: '#6639ba', checked: true },
         us_economic:  { name: '미국 경제지표',  color: '#f0883e', checked: true },
-        kr_economic:  { name: '한국 경제지표',  color: '#e3b341', checked: true },
-        central_bank: { name: '중앙은행',       color: '#f85149', checked: true },
-        dividend:     { name: '배당 이벤트',    color: '#3fb950', checked: true },
-        derivatives:  { name: '파생상품',       color: '#8b949e', checked: true },
+        kr_economic:  { name: '한국 경제지표',  color: '#bf8700', checked: true },
+        central_bank: { name: '중앙은행',       color: '#cf222e', checked: true },
+        dividend:     { name: '배당 이벤트',    color: '#1a7f37', checked: true },
+        derivatives:  { name: '파생상품',       color: '#57606a', checked: true },
     };
 
     function initCalendar() {
@@ -4411,7 +4496,7 @@
                         <div class="cal-day-num">${day}</div>
                         <div class="cal-events">
                             ${evts.slice(0, 3).map(e =>
-                                `<div class="cal-event-dot" style="background:${CAL_CATS[e.category]?.color||'#8b949e'}"
+                                `<div class="cal-event-dot" style="background:${CAL_CATS[e.category]?.color||'#57606a'}"
                                       title="${e.title}">${e.title}</div>`
                             ).join('')}
                             ${evts.length > 3 ? `<div class="cal-event-more">+${evts.length-3}건</div>` : ''}
@@ -4439,7 +4524,7 @@
             ${evts.map(e => {
                 const cat = CAL_CATS[e.category] || {};
                 return `<div class="cal-detail-event">
-                    <span class="cal-detail-cat-badge" style="background:${cat.color||'#8b949e'}">${cat.name||e.category}</span>
+                    <span class="cal-detail-cat-badge" style="background:${cat.color||'#57606a'}">${cat.name||e.category}</span>
                     <div>
                         <div class="cal-detail-title">${e.title}</div>
                         <div class="cal-detail-desc">${e.detail||''}</div>
@@ -4510,7 +4595,7 @@
             document.getElementById(inputId).parentElement.appendChild(dd);
         }
         if (!calSearchResults.length) {
-            dd.innerHTML = '<div style="padding:8px;color:#8b949e;font-size:12px;text-align:center">검색 결과 없음</div>';
+            dd.innerHTML = '<div style="padding:8px;color:#57606a;font-size:12px;text-align:center">검색 결과 없음</div>';
             dd.style.display = 'block';
             return;
         }
@@ -4713,7 +4798,7 @@
         for (const it of slice) {
             const d = it.date || it.rcept_dt || '';
             if (d !== lastDate) {
-                html += `<div style="font-size:11px;color:#484f58;padding:6px 0 2px;margin-top:4px;border-top:1px solid #21262d;">${d}</div>`;
+                html += `<div style="font-size:11px;color:#6b7280;padding:6px 0 2px;margin-top:4px;border-top:1px solid #e5e7eb;">${d}</div>`;
                 lastDate = d;
             }
             const link = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${it.rcept_no}`;
@@ -4721,7 +4806,7 @@
             html += `<div class="dart-digest-row">
                 <div class="dart-digest-corp">${it.corp_name || ''}<span class="sc">${it.stock_code || ''}</span></div>
                 <div class="dart-digest-link"><a href="${link}" target="_blank">${it.title || ''}</a></div>
-                <div style="font-size:12px;color:#e6edf3;">${it.summary || ''}</div>
+                <div style="font-size:12px;color:#1f2937;">${it.summary || ''}</div>
             </div>`;
         }
         container.innerHTML = html;
@@ -4957,7 +5042,7 @@
             html += `<span class="inbox-chip">${inboxEsc(c.title || c.channel)}
                 <span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
         }
-        cont.innerHTML = html || '<span style="font-size:12px;color:#6e7681;">등록된 채널이 없습니다</span>';
+        cont.innerHTML = html || '<span style="font-size:12px;color:#6b7280;">등록된 채널이 없습니다</span>';
     }
 
     async function addInboxChannel() {
@@ -5521,7 +5606,7 @@
                 <span>${names[i]} (${code})</span>
                 <span class="remove" onclick="removeDartWl('${code}')">&times;</span>
             </div>`
-        ).join('') || '<span style="color:#8b949e;font-size:12px">종목을 추가해주세요</span>';
+        ).join('') || '<span style="color:#57606a;font-size:12px">종목을 추가해주세요</span>';
 
         // 잠정실적 조건 렌더링
         const conds = dartConfig.earnings_conditions || {};
@@ -5833,7 +5918,7 @@
         } catch(e) { _rptIndexStatus = []; }
         const container = document.getElementById('rpt-index-status');
         if (!Array.isArray(_rptIndexStatus) || _rptIndexStatus.length === 0) {
-            container.innerHTML = '<div style="color:#8b949e;font-size:13px;padding:8px 0;">등록된 채널이 없습니다</div>';
+            container.innerHTML = '<div style="color:#57606a;font-size:13px;padding:8px 0;">등록된 채널이 없습니다</div>';
             return;
         }
         container.innerHTML = _rptIndexStatus.map(s => {
@@ -5942,6 +6027,187 @@
             const channels = await res.json();
             renderForwardingChannels(channels);
         } catch(e) {}
+    }
+
+    // ===== 수출 탭 =====
+    let exportLoaded = false;
+    let exportGroups = [];
+    let exportSort = { key: 'yoy', dir: -1 };
+    let exportSelected = null;
+
+    function exportFmtUsd(v) {
+        if (v == null) return '—';
+        return (v / 1e8).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '억 달러';
+    }
+
+    function exportFmtOku(n) {
+        if (n == null) return '—';
+        return n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    }
+
+    function exportFmtPct(v, suffix) {
+        if (v == null) return '—';
+        const cls = v >= 0 ? 'export-pos' : 'export-neg';
+        return `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}${suffix}</span>`;
+    }
+
+    async function loadExportSummary() {
+        try {
+            const res = await fetch(API_BASE + '/api/korea-export/summary');
+            const data = await res.json();
+            exportGroups = data.groups || [];
+            document.getElementById('export-loading').style.display = 'none';
+            document.getElementById('export-content').style.display = 'block';
+            const meta = data.meta || {};
+            const latest = (exportGroups.find(g => g.latest_month) || {}).latest_month || (meta.range || {}).to || '';
+            const baseStr = latest ? `${latest.slice(0,4)}.${latest.slice(4)}` : '수집 전';
+            document.getElementById('export-footer').innerHTML =
+                `데이터 기준월: ${baseStr} · 출처: 관세청 수출입무역통계, MTI 분류: 산업통상부/한국무역협회`;
+            renderExportTable();
+        } catch (e) {
+            document.getElementById('export-loading').textContent = '수출 데이터를 불러오지 못했습니다.';
+        }
+    }
+
+    function exportSortBy(key) {
+        if (exportSort.key === key) exportSort.dir *= -1;
+        else exportSort = { key, dir: key === 'group' || key === 'badge' ? 1 : -1 };
+        renderExportTable();
+    }
+
+    function renderExportTable() {
+        const { key, dir } = exportSort;
+        const rows = [...exportGroups].sort((a, b) => {
+            const ra = a.status !== 'ready', rb = b.status !== 'ready';
+            if (ra !== rb) return ra - rb;
+            let va = a[key], vb = b[key];
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            if (typeof va === 'string') return va.localeCompare(vb, 'ko') * dir;
+            return (va - vb) * dir;
+        });
+        const html = rows.map(g => {
+            if (g.status !== 'ready') {
+                return `<tr class="collecting"><td>${g.group}</td><td>—</td><td>—</td><td>—</td>` +
+                       `<td><span class="export-badge b-수집중">수집중</span></td></tr>`;
+            }
+            const sel = exportSelected === g.group ? ' selected' : '';
+            const badgeLabel = g.badge_streak > 1 ? `${g.badge} · ${g.badge_streak}개월` : g.badge;
+            return `<tr class="ready${sel}" onclick="loadExportDetail('${g.group}')">` +
+                `<td>${g.group}</td>` +
+                `<td>${exportFmtUsd(g.latest_export)}</td>` +
+                `<td>${exportFmtPct(g.yoy, '%')}</td>` +
+                `<td>${exportFmtPct(g.delta_yoy, 'p')}</td>` +
+                `<td><span class="export-badge b-${g.badge}">${badgeLabel}</span></td></tr>`;
+        }).join('');
+        document.getElementById('export-table-body').innerHTML = html;
+    }
+
+    async function loadExportDetail(group) {
+        exportSelected = group;
+        renderExportTable();
+        try {
+            const res = await fetch(API_BASE + '/api/korea-export/detail?group=' + encodeURIComponent(group));
+            const data = await res.json();
+            if (!data.monthly || !data.monthly.length) return;
+            document.getElementById('export-detail').style.display = 'block';
+            document.getElementById('export-detail-title').textContent = `📦 ${group} 상세`;
+            renderExportCharts(data.monthly);
+            const subHtml = (data.sub_items || []).map(s =>
+                `<tr style="cursor:default;"><td>${s.mti}</td><td style="text-align:left;">${s.name}</td>` +
+                `<td>${exportFmtUsd(s.latest_export)}</td><td>${exportFmtPct(s.yoy, '%')}</td></tr>`
+            ).join('');
+            document.getElementById('export-sub-body').innerHTML = subHtml;
+            document.getElementById('export-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (e) {}
+    }
+
+    function renderExportCharts(monthly) {
+        const labels = monthly.map(r => `${r.month.slice(0,4)}.${r.month.slice(4)}`);
+        const vals = monthly.map(r => r.value / 1e8);
+        const ma12 = monthly.map(r => r.ma12 != null ? r.ma12 / 1e8 : null);
+        const yoy = monthly.map(r => r.yoy);
+        const dyoy = monthly.map(r => r.delta_yoy);
+
+        ['export-chart-value', 'export-chart-yoy'].forEach(id => {
+            const c = Chart.getChart(id);
+            if (c) c.destroy();
+        });
+
+        const commonOpts = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#57606a', font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { color: '#57606a', maxTicksLimit: 12, maxRotation: 0 }, grid: { color: '#e5e7eb' } },
+                y: { ticks: { color: '#57606a' }, grid: { color: '#e5e7eb' } },
+            },
+        };
+
+        new Chart(document.getElementById('export-chart-value'), {
+            data: {
+                labels,
+                datasets: [
+                    { type: 'bar', label: '월 수출액(억 달러)', data: vals, backgroundColor: 'rgba(9,105,218,0.5)' },
+                    { type: 'line', label: '12M MA(억 달러)', data: ma12, borderColor: '#f0883e', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+                ],
+            },
+            options: {
+                ...commonOpts,
+                plugins: {
+                    ...commonOpts.plugins,
+                    tooltip: { callbacks: { label: c => `${c.dataset.label}: ${exportFmtOku(c.parsed.y)}억 달러` } },
+                },
+                scales: {
+                    ...commonOpts.scales,
+                    y: { ticks: { color: '#57606a', callback: v => exportFmtOku(v) }, grid: { color: '#e5e7eb' } },
+                },
+            },
+        });
+
+        const yoyRefLines = {
+            id: 'yoyRefLines',
+            afterDraw(chart) {
+                const yAxis = chart.scales.y;
+                const area = chart.chartArea;
+                const ctx = chart.ctx;
+                [[30, '+30'], [10, '+10'], [-10, '-10']].forEach(([v, label]) => {
+                    if (v < yAxis.min || v > yAxis.max) return;
+                    const y = yAxis.getPixelForValue(v);
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(110,118,129,0.35)';
+                    ctx.setLineDash([4, 4]);
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(area.left, y);
+                    ctx.lineTo(area.right, y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = 'rgba(110,118,129,0.8)';
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText(label, area.left + 4, y - 3);
+                    ctx.restore();
+                });
+            }
+        };
+
+        new Chart(document.getElementById('export-chart-yoy'), {
+            data: {
+                labels,
+                datasets: [
+                    { type: 'line', label: 'YoY(%)', data: yoy, borderColor: '#1a7f37', borderWidth: 2, pointRadius: 0, tension: 0.2, yAxisID: 'y' },
+                    { type: 'bar', label: 'ΔYoY(%p)', data: dyoy, backgroundColor: dyoy.map(v => (v != null && v >= 0) ? 'rgba(207,34,46,0.5)' : 'rgba(9,105,218,0.5)'), yAxisID: 'y1' },
+                ],
+            },
+            options: {
+                ...commonOpts,
+                scales: {
+                    ...commonOpts.scales,
+                    y: { position: 'left', ticks: { color: '#1a7f37' }, grid: { color: '#e5e7eb' } },
+                    y1: { position: 'right', ticks: { color: '#57606a' }, grid: { drawOnChartArea: false } },
+                },
+            },
+            plugins: [yoyRefLines],
+        });
     }
 </script>
 
