@@ -3078,5 +3078,117 @@ def update_report_settings():
     return jsonify(channels)
 
 
+# --- 한국 수출(관세청 MTI) API ---
+KOREA_EXPORT_CACHE = os.path.join("cache", "korea_export.json")
+KOREA_EXPORT_GROUPS = [
+    "반도체", "자동차", "석유제품", "석유화학", "일반기계", "철강제품", "선박류",
+    "무선통신기기", "자동차부품", "디스플레이", "컴퓨터", "바이오헬스", "이차전지",
+    "가전", "섬유류", "화장품", "농수산식품", "비철금속", "전기기기", "생활용품",
+]
+
+
+def _load_korea_export():
+    if not os.path.exists(KOREA_EXPORT_CACHE):
+        return None
+    try:
+        with open(KOREA_EXPORT_CACHE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _korea_export_group_monthly(data, group):
+    agg = {}
+    for s in data.get("series", {}).values():
+        if s.get("group") != group:
+            continue
+        for m, v in s.get("monthly", {}).items():
+            agg[m] = agg.get(m, 0) + v
+    return agg
+
+
+@app.route("/api/korea-export/summary", methods=["GET"])
+def korea_export_summary():
+    import korea_export as ke
+    data = _load_korea_export()
+    if not data or not data.get("series"):
+        return jsonify({"meta": {}, "groups": [], "message": "수출 데이터 백필이 아직 완료되지 않았습니다."})
+
+    groups_out = []
+    for g in KOREA_EXPORT_GROUPS:
+        monthly = _korea_export_group_monthly(data, g)
+        if not monthly:
+            groups_out.append({"group": g, "status": "collecting"})
+            continue
+        ind = ke.compute_indicators(monthly)
+        months = sorted(monthly)
+        latest = months[-1]
+        yoy_series = {m: ind[m]["yoy"] for m in months}
+        mini = [{"month": m, "value": monthly[m]} for m in months[-12:]]
+        groups_out.append({
+            "group": g,
+            "status": "ready",
+            "latest_month": latest,
+            "latest_export": monthly[latest],
+            "yoy": ind[latest]["yoy"],
+            "delta_yoy": ind[latest]["delta_yoy"],
+            "badge": ke.classify(yoy_series),
+            "badge_streak": ke.badge_streak(yoy_series),
+            "mini_series": mini,
+        })
+
+    return jsonify({"meta": data.get("meta", {}), "groups": groups_out})
+
+
+@app.route("/api/korea-export/detail", methods=["GET"])
+def korea_export_detail():
+    import korea_export as ke
+    group = request.args.get("group", "").strip()
+    if not group:
+        return jsonify({"error": "group 파라미터가 필요합니다."}), 400
+    data = _load_korea_export()
+    if not data or not data.get("series"):
+        return jsonify({"meta": {}, "group": group, "monthly": [], "sub_items": [],
+                        "message": "수출 데이터 백필이 아직 완료되지 않았습니다."})
+
+    monthly = _korea_export_group_monthly(data, group)
+    if not monthly:
+        return jsonify({"meta": data.get("meta", {}), "group": group, "monthly": [], "sub_items": [],
+                        "message": f"{group} 데이터가 아직 수집되지 않았습니다."})
+
+    ind = ke.compute_indicators(monthly)
+    months = sorted(monthly)
+    monthly_out = [{
+        "month": m,
+        "value": monthly[m],
+        "yoy": ind[m]["yoy"],
+        "delta_yoy": ind[m]["delta_yoy"],
+        "ma12": ind[m]["ma12"],
+        "ttm": ind[m]["ttm"],
+    } for m in months]
+
+    sub_items = []
+    for mti, s in sorted(data.get("series", {}).items()):
+        if s.get("group") != group:
+            continue
+        sm = s.get("monthly", {})
+        if not sm:
+            continue
+        s_months = sorted(sm)
+        s_latest = s_months[-1]
+        s_ind = ke.compute_indicators(sm)
+        sub_items.append({
+            "mti": mti,
+            "name": s.get("name", mti),
+            "latest_month": s_latest,
+            "latest_export": sm[s_latest],
+            "yoy": s_ind[s_latest]["yoy"],
+        })
+    sub_items.sort(key=lambda x: -(x["latest_export"] or 0))
+
+    return jsonify({"meta": data.get("meta", {}), "group": group,
+                    "monthly": monthly_out, "sub_items": sub_items})
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8000, debug=False)

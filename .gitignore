@@ -35,3 +35,7 @@ dart_daily_history.json.bak
 # 한국 마켓(이격도) 개인설정·데이터
 disparity_config.json
 cache/disparity.json
+
+# 수출 탭 (관세청 MTI) 원천·작업 파일
+scratchpad/
+2026 MTI-HSK 코드표_vFF_260507.xlsx
