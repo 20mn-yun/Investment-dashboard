@@ -361,7 +361,50 @@ def compute_indicators(monthly):
         else:
             ma12, ttm = None, None
         out[m] = {"yoy": yoy[m], "delta_yoy": d, "ma12": ma12, "ttm": ttm}
+
+    for i, m in enumerate(months):
+        w3 = months[max(0, i - 2):i + 1]
+        ys = [out[w]["yoy"] for w in w3]
+        ds = [out[w]["delta_yoy"] for w in w3]
+        out[m]["m3_avg_yoy"] = sum(ys) / 3 if len(ys) == 3 and all(v is not None for v in ys) else None
+        out[m]["m3_avg_delta"] = sum(ds) / 3 if len(ds) == 3 and all(v is not None for v in ds) else None
+        ma12 = out[m]["ma12"]
+        out[m]["ma_gap"] = (monthly[m] / ma12 - 1) * 100 if ma12 else None
+        prev_yr = f"{int(m[:4])-1}{m[4:]}"
+        cur_ttm = out[m]["ttm"]
+        prev_ttm = out.get(prev_yr, {}).get("ttm")
+        out[m]["ttm_yoy"] = (cur_ttm / prev_ttm - 1) * 100 if cur_ttm and prev_ttm else None
     return out
+
+
+def build_comment(indicators):
+    """최신월 지표 기반 한 줄 해설 생성 (규칙 기반)."""
+    months = sorted(m for m, v in indicators.items() if v.get("yoy") is not None)
+    if not months:
+        return "지표를 계산할 데이터가 부족합니다."
+    latest = months[-1]
+    cur = indicators[latest]
+    yoy = cur["yoy"]
+    delta = cur["delta_yoy"]
+    m3 = cur["m3_avg_yoy"]
+
+    prev3 = months[-4:-1]
+    turnaround = (yoy > 0 and len(prev3) == 3
+                  and all(indicators[m]["yoy"] < 0 for m in prev3))
+
+    if turnaround:
+        return f"수개월간의 감소세를 벗어나 전년 대비 +{yoy:.1f}%로 플러스 전환에 성공했습니다."
+    if yoy >= 30 and m3 is not None and m3 >= 30:
+        return f"전년 대비 +{yoy:.1f}%, 최근 3개월 평균 +{m3:.1f}%로 높은 성장률이 여러 달 이어지고 있습니다."
+    if yoy > 0 and delta is not None and delta < 0:
+        return f"전년 대비 +{yoy:.1f}%로 성장세는 유지되고 있으나 증가율의 가속은 전월보다 {delta:.1f}%p 꺾였습니다."
+    if yoy < -10:
+        return f"전년 대비 {yoy:.1f}%로 두 자릿수 감소가 이어지는 부진 구간입니다."
+    if yoy >= 10:
+        return f"전년 대비 +{yoy:.1f}%의 견조한 증가 흐름을 보이고 있습니다."
+    if yoy >= 0:
+        return f"전년 대비 +{yoy:.1f}%로 완만한 증가 흐름입니다."
+    return f"전년 대비 {yoy:.1f}%로 소폭 감소했으나 부진 기준(-10%)보다는 양호합니다."
 
 
 def classify(yoy_series):

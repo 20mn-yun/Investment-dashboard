@@ -3112,32 +3112,70 @@ def korea_export_summary():
     import korea_export as ke
     data = _load_korea_export()
     if not data or not data.get("series"):
-        return jsonify({"meta": {}, "groups": [], "message": "수출 데이터 백필이 아직 완료되지 않았습니다."})
+        return jsonify({"meta": {}, "items": [], "groups": [], "message": "수출 데이터 백필이 아직 완료되지 않았습니다."})
 
-    groups_out = []
+    items_out = []
     for g in KOREA_EXPORT_GROUPS:
         monthly = _korea_export_group_monthly(data, g)
         if not monthly:
-            groups_out.append({"group": g, "status": "collecting"})
+            items_out.append({"group": g, "status": "collecting"})
             continue
         ind = ke.compute_indicators(monthly)
         months = sorted(monthly)
         latest = months[-1]
+        li = ind[latest]
         yoy_series = {m: ind[m]["yoy"] for m in months}
         mini = [{"month": m, "value": monthly[m]} for m in months[-12:]]
-        groups_out.append({
+        items_out.append({
             "group": g,
             "status": "ready",
             "latest_month": latest,
             "latest_export": monthly[latest],
-            "yoy": ind[latest]["yoy"],
-            "delta_yoy": ind[latest]["delta_yoy"],
+            "yoy": li["yoy"],
+            "delta_yoy": li["delta_yoy"],
+            "m3_avg_yoy": li["m3_avg_yoy"],
+            "m3_avg_delta": li["m3_avg_delta"],
+            "ma12": li["ma12"],
+            "ma_gap": li["ma_gap"],
+            "ttm": li["ttm"],
+            "ttm_yoy": li["ttm_yoy"],
             "badge": ke.classify(yoy_series),
             "badge_streak": ke.badge_streak(yoy_series),
+            "comment": ke.build_comment(ind),
             "mini_series": mini,
         })
 
-    return jsonify({"meta": data.get("meta", {}), "groups": groups_out})
+    ready = [it for it in items_out if it["status"] == "ready"]
+    strong = sorted(
+        [it for it in ready if it["yoy"] is not None and it["yoy"] >= 10],
+        key=lambda x: -x["yoy"],
+    )
+    weak = sorted(
+        [it for it in ready if it["yoy"] is not None and it["yoy"] < 0],
+        key=lambda x: x["yoy"],
+    )
+    accel = sorted(
+        [it for it in ready if it["delta_yoy"] is not None and it["delta_yoy"] > 0],
+        key=lambda x: -x["delta_yoy"],
+    )[:6]
+    slowdown = sorted(
+        [it for it in ready
+         if it["yoy"] is not None and it["yoy"] > 0
+         and it["delta_yoy"] is not None and it["delta_yoy"] < 0],
+        key=lambda x: x["delta_yoy"],
+    )
+    groups_out = [
+        {"id": "strong", "title": "초고성장/강세", "metric": "yoy",
+         "items": [{"group": it["group"], "value": it["yoy"]} for it in strong]},
+        {"id": "weak", "title": "부진/재하락", "metric": "yoy",
+         "items": [{"group": it["group"], "value": it["yoy"]} for it in weak]},
+        {"id": "accel", "title": "가속 확대", "metric": "delta",
+         "items": [{"group": it["group"], "value": it["delta_yoy"]} for it in accel]},
+        {"id": "slowdown", "title": "고성장 둔화/기울기 하락", "metric": "delta",
+         "items": [{"group": it["group"], "value": it["delta_yoy"]} for it in slowdown]},
+    ]
+
+    return jsonify({"meta": data.get("meta", {}), "items": items_out, "groups": groups_out})
 
 
 @app.route("/api/korea-export/detail", methods=["GET"])
@@ -3164,7 +3202,9 @@ def korea_export_detail():
         "yoy": ind[m]["yoy"],
         "delta_yoy": ind[m]["delta_yoy"],
         "ma12": ind[m]["ma12"],
+        "ma_gap": ind[m]["ma_gap"],
         "ttm": ind[m]["ttm"],
+        "ttm_yoy": ind[m]["ttm_yoy"],
     } for m in months]
 
     sub_items = []
@@ -3188,6 +3228,55 @@ def korea_export_detail():
 
     return jsonify({"meta": data.get("meta", {}), "group": group,
                     "monthly": monthly_out, "sub_items": sub_items})
+
+
+@app.route("/api/korea-export/sub-detail", methods=["GET"])
+def korea_export_sub_detail():
+    import korea_export as ke
+    mti = request.args.get("mti", "").strip()
+    if not mti:
+        return jsonify({"error": "mti 파라미터가 필요합니다."}), 400
+    data = _load_korea_export()
+    s = data.get("series", {}).get(mti) if data else None
+    if not s or not s.get("monthly"):
+        return jsonify({"meta": (data or {}).get("meta", {}), "mti": mti, "monthly": [],
+                        "message": f"MTI {mti} 데이터가 아직 수집되지 않았습니다."})
+
+    monthly = s["monthly"]
+    ind = ke.compute_indicators(monthly)
+    months = sorted(monthly)
+    latest = months[-1]
+    li = ind[latest]
+    yoy_series = {m: ind[m]["yoy"] for m in months}
+    monthly_out = [{
+        "month": m,
+        "value": monthly[m],
+        "yoy": ind[m]["yoy"],
+        "delta_yoy": ind[m]["delta_yoy"],
+        "ma12": ind[m]["ma12"],
+        "ma_gap": ind[m]["ma_gap"],
+        "ttm": ind[m]["ttm"],
+        "ttm_yoy": ind[m]["ttm_yoy"],
+    } for m in months]
+
+    return jsonify({
+        "meta": data.get("meta", {}),
+        "mti": mti,
+        "name": s.get("name", mti),
+        "group": s.get("group"),
+        "latest_month": latest,
+        "latest_export": monthly[latest],
+        "yoy": li["yoy"],
+        "delta_yoy": li["delta_yoy"],
+        "ma12": li["ma12"],
+        "ma_gap": li["ma_gap"],
+        "ttm": li["ttm"],
+        "ttm_yoy": li["ttm_yoy"],
+        "badge": ke.classify(yoy_series),
+        "badge_streak": ke.badge_streak(yoy_series),
+        "comment": ke.build_comment(ind),
+        "monthly": monthly_out,
+    })
 
 
 if __name__ == "__main__":

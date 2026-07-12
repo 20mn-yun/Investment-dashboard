@@ -1316,11 +1316,59 @@
         #tab-export .export-badge.b-턴어라운드 { color: var(--accent); background: rgba(9,105,218,0.15); }
         #tab-export .export-badge.b-둔화 { color: #9a6700; background: rgba(154,103,0,0.15); }
         #tab-export .export-badge.b-수집중 { color: var(--text-dim); background: rgba(107,114,128,0.15); }
-        #tab-export .export-detail { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px; }
         #tab-export .export-chart-wrap { position: relative; height: 300px; margin-bottom: 20px; }
         #tab-export .export-footer { margin-top: 20px; font-size: 12px; color: var(--text-dim); }
         #tab-export .export-pos { color: var(--up); }
         #tab-export .export-neg { color: var(--accent); }
+        #tab-export .export-group-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-bottom: 22px; }
+        #tab-export .export-group-box { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        #tab-export .export-group-box-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+        #tab-export .export-group-note-text { font-size: 12px; color: var(--text-muted); line-height: 1.55; }
+        #tab-export .export-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        #tab-export .export-chip { display: inline-flex; gap: 6px; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 3px 11px; font-size: 13px; cursor: pointer; color: var(--text); }
+        #tab-export .export-chip b { font-weight: 700; }
+        #tab-export .export-chip:hover { border-color: var(--accent); }
+        #tab-export .export-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+        #tab-export .export-card-cols { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 16px; align-items: start; }
+        #tab-export .export-card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+        #tab-export .export-card-name { font-size: 16px; font-weight: 700; color: var(--text); }
+        #tab-export .export-mode-btns { display: flex; gap: 4px; margin-bottom: 10px; }
+        #tab-export .export-mode-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 2px 10px; font-size: 12px; color: var(--text-muted); cursor: pointer; }
+        #tab-export .export-mode-btn.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+        #tab-export .export-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+        #tab-export .export-metric .lbl { font-size: 11px; color: var(--text-muted); }
+        #tab-export .export-metric .val { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 1px; }
+        #tab-export .export-comment { margin-top: 10px; font-size: 12.5px; color: var(--text-muted); border-left: 3px solid var(--accent); padding-left: 8px; line-height: 1.5; }
+        #tab-export .export-callout { margin-top: 10px; font-size: 12.5px; border-radius: 7px; padding: 8px 10px; line-height: 1.5; }
+        #tab-export .export-callout.c-up { background: rgba(26,127,55,0.08); color: #1a7f37; }
+        #tab-export .export-callout.c-warn { background: rgba(154,103,0,0.08); color: #9a6700; }
+        #tab-export .export-callout.c-down { background: rgba(207,34,46,0.08); color: #cf222e; }
+        #tab-export .export-callout.c-neutral { background: var(--bg-panel); color: var(--text-muted); }
+        #tab-export .export-chart-box { position: relative; height: 240px; min-width: 0; }
+        #tab-export .export-raw-wrap { margin-top: 14px; }
+        #tab-export .export-raw-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 7px; }
+        #tab-export .export-raw { border-collapse: separate; border-spacing: 0; font-size: 12px; white-space: nowrap; }
+        #tab-export .export-raw th, #tab-export .export-raw td { padding: 5px 9px; text-align: right; border-bottom: 1px solid var(--bg-panel); }
+        #tab-export .export-raw thead th { color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+        #tab-export .export-raw .rowhdr { position: sticky; left: 0; z-index: 1; background: var(--bg-card); text-align: left; font-weight: 600; color: var(--text); box-shadow: 2px 0 3px rgba(0,0,0,0.05); }
+        #tab-export .export-raw tbody tr:last-child td { border-bottom: none; }
+        #tab-export .export-collecting { color: var(--text-dim); font-size: 13px; }
+        #tab-export .export-sub-title { margin: 14px 0 6px; font-size: 13px; font-weight: 700; color: var(--text); }
+        #tab-export .export-sub-title.sub-toggle { cursor: pointer; user-select: none; }
+        #tab-export .export-sub-caret { display: inline-block; width: 14px; color: var(--text-muted); }
+        #tab-export .export-subrow.sub-expanded td { background: var(--accent-bg); }
+        #tab-export .export-subpanel > td { padding: 4px 0 10px; background: transparent; border-bottom: 1px solid var(--bg-panel); }
+        #tab-export .export-subpanel-clamp { width: 0; min-width: 100%; }
+        #tab-export .export-subpanel-box { background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; max-width: 100%; }
+        #tab-export .export-subpanel-head { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+        #tab-export .export-subpanel-head .muted { font-weight: 400; color: var(--text-muted); font-size: 12px; margin-left: 6px; }
+        #tab-export .export-subpanel-cols { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 12px; align-items: start; }
+        #tab-export .export-chart-box.sub { height: 200px; }
+        @media (max-width: 900px) {
+            #tab-export .export-card-cols { grid-template-columns: 1fr; }
+            #tab-export .export-chart-box { height: 220px; }
+            #tab-export .export-subpanel-cols { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -1655,34 +1703,8 @@
     <div class="section-title" style="margin-top:0;">🚢 한국 수출 · 20대 품목 (MTI)</div>
     <div class="loading" id="export-loading">수출 데이터를 불러오는 중...</div>
     <div id="export-content" style="display:none;">
-        <div class="export-table-wrap">
-            <table class="export-table" id="export-table">
-                <thead>
-                    <tr>
-                        <th onclick="exportSortBy('group')">품목</th>
-                        <th onclick="exportSortBy('latest_export')">당월 수출액</th>
-                        <th onclick="exportSortBy('yoy')">YoY</th>
-                        <th onclick="exportSortBy('delta_yoy')">ΔYoY</th>
-                        <th onclick="exportSortBy('badge')">상태</th>
-                    </tr>
-                </thead>
-                <tbody id="export-table-body"></tbody>
-            </table>
-        </div>
-        <div class="export-detail" id="export-detail" style="display:none;">
-            <div class="section-title" id="export-detail-title"></div>
-            <div class="export-chart-wrap"><canvas id="export-chart-value"></canvas></div>
-            <div class="export-chart-wrap"><canvas id="export-chart-yoy"></canvas></div>
-            <div class="section-title" style="font-size:15px;">하위 MTI 품목 (최신월)</div>
-            <div class="export-table-wrap">
-                <table class="export-table" id="export-sub-table">
-                    <thead>
-                        <tr><th style="cursor:default;">MTI</th><th style="cursor:default;">품목명</th><th style="cursor:default;">수출액</th><th style="cursor:default;">YoY</th></tr>
-                    </thead>
-                    <tbody id="export-sub-body"></tbody>
-                </table>
-            </div>
-        </div>
+        <div id="export-groups"></div>
+        <div id="export-cards"></div>
         <div class="export-footer" id="export-footer"></div>
     </div>
 </div>
@@ -6031,182 +6053,464 @@
 
     // ===== 수출 탭 =====
     let exportLoaded = false;
-    let exportGroups = [];
-    let exportSort = { key: 'yoy', dir: -1 };
-    let exportSelected = null;
+    let exportItems = [];
+    const exportDetailCache = {};
+    const exportModes = {};
+    const exportBuilt = new Set();
+    let exportObserver = null;
 
     function exportFmtUsd(v) {
-        if (v == null) return '—';
-        return (v / 1e8).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '억 달러';
+        if (v == null) return '\u2014';
+        return (v / 1e8).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '\uc5b5 \ub2ec\ub7ec';
     }
 
     function exportFmtOku(n) {
-        if (n == null) return '—';
+        if (n == null) return '\u2014';
         return n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     }
 
     function exportFmtPct(v, suffix) {
-        if (v == null) return '—';
+        if (v == null) return '\u2014';
         const cls = v >= 0 ? 'export-pos' : 'export-neg';
         return `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}${suffix}</span>`;
     }
+
+    const exportValueLabels = {
+        id: 'exportValueLabels',
+        afterDraw(chart) {
+            const ds0 = chart.data.datasets[0];
+            if (!ds0) return;
+            const meta = chart.getDatasetMeta(0);
+            const data = ds0.data;
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.font = 'bold 10px sans-serif';
+            let lastI = -1, minI = -1;
+            data.forEach((v, i) => {
+                if (v == null) return;
+                lastI = i;
+                if (minI < 0 || v < data[minI]) minI = i;
+            });
+            const drawAt = (i, color, txt, dy) => {
+                const el = meta.data[i];
+                if (!el) return;
+                const w = ctx.measureText(txt).width;
+                const x = Math.min(Math.max(el.x - w / 2, chart.chartArea.left), chart.chartArea.right - w);
+                ctx.fillStyle = color;
+                ctx.fillText(txt, x, el.y + dy);
+            };
+            if (lastI >= 0) drawAt(lastI, '#1f2937', exportFmtOku(data[lastI]), -6);
+            if (minI >= 0 && minI !== lastI) drawAt(minI, '#6b7280', exportFmtOku(data[minI]), 14);
+            const ds1 = chart.data.datasets[1];
+            if (ds1) {
+                const meta1 = chart.getDatasetMeta(1);
+                let l1 = -1;
+                ds1.data.forEach((v, i) => { if (v != null) l1 = i; });
+                if (l1 >= 0 && meta1.data[l1]) {
+                    ctx.fillStyle = '#bc4c00';
+                    const txt = 'MA ' + exportFmtOku(ds1.data[l1]);
+                    const w = ctx.measureText(txt).width;
+                    ctx.fillText(txt, Math.max(chart.chartArea.left, Math.min(meta1.data[l1].x - w / 2, chart.chartArea.right - w)), meta1.data[l1].y - 8);
+                }
+            }
+            ctx.restore();
+        }
+    };
 
     async function loadExportSummary() {
         try {
             const res = await fetch(API_BASE + '/api/korea-export/summary');
             const data = await res.json();
-            exportGroups = data.groups || [];
+            exportItems = data.items || [];
             document.getElementById('export-loading').style.display = 'none';
             document.getElementById('export-content').style.display = 'block';
-            const meta = data.meta || {};
-            const latest = (exportGroups.find(g => g.latest_month) || {}).latest_month || (meta.range || {}).to || '';
-            const baseStr = latest ? `${latest.slice(0,4)}.${latest.slice(4)}` : '수집 전';
+            const latest = (exportItems.find(g => g.latest_month) || {}).latest_month || '';
+            const baseStr = latest ? `${latest.slice(0,4)}.${latest.slice(4)}` : '\uc218\uc9d1 \uc804';
             document.getElementById('export-footer').innerHTML =
-                `데이터 기준월: ${baseStr} · 출처: 관세청 수출입무역통계, MTI 분류: 산업통상부/한국무역협회`;
-            renderExportTable();
+                `\ub370\uc774\ud130 \uae30\uc900\uc6d4: ${baseStr} \u00b7 \ucd9c\ucc98: \uad00\uc138\uccad \uc218\ucd9c\uc785\ubb34\uc5ed\ud1b5\uacc4, MTI \ubd84\ub958: \uc0b0\uc5c5\ud1b5\uc0c1\ubd80/\ud55c\uad6d\ubb34\uc5ed\ud611\ud68c`;
+            renderExportGroups(data.groups || []);
+            renderExportCards();
         } catch (e) {
-            document.getElementById('export-loading').textContent = '수출 데이터를 불러오지 못했습니다.';
+            document.getElementById('export-loading').textContent = '\uc218\ucd9c \ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.';
         }
     }
 
-    function exportSortBy(key) {
-        if (exportSort.key === key) exportSort.dir *= -1;
-        else exportSort = { key, dir: key === 'group' || key === 'badge' ? 1 : -1 };
-        renderExportTable();
+    function renderExportGroups(groups) {
+        const byId = {};
+        (groups || []).forEach(g => { byId[g.id] = g; });
+        const chipBox = (g, title) => {
+            if (!g || !g.items.length) return '';
+            const chips = g.items.map(i => {
+                const suffix = g.metric === 'delta' ? '%p' : '%';
+                const val = (i.value >= 0 ? '+' : '') + i.value.toFixed(1) + suffix;
+                const cls = i.value >= 0 ? 'export-pos' : 'export-neg';
+                return `<span class="export-chip" onclick="scrollToExportCard('${i.group}')"><b>${i.group}</b><span class="${cls}">${val}</span></span>`;
+            }).join('');
+            return `<div class="export-group-box"><div class="export-group-box-title">${title}</div><div class="export-chips">${chips}</div></div>`;
+        };
+        const noteBox = (title, text) =>
+            `<div class="export-group-box"><div class="export-group-box-title">${title}</div><div class="export-group-note-text">${text}</div></div>`;
+        const html =
+            chipBox(byId.strong, '초고성장/강세') +
+            chipBox(byId.weak, '부진/재하락') +
+            noteBox('분류 기준',
+                '최신월 YoY가 +10% 이상이면 초고성장/강세, 0% 미만이면 부진/재하락으로 분류합니다. ΔYoY(전월 대비 YoY 변화)가 양수인 품목 중 상위 6개는 가속 확대, YoY가 양수인데 ΔYoY가 음수이면 성장 둔화(기울기 하락)로 봅니다.') +
+            chipBox(byId.accel, '가속 확대') +
+            chipBox(byId.slowdown, '고성장 둔화/기울기 하락') +
+            noteBox('ΔYoY 읽는 법',
+                'ΔYoY는 이번 달 YoY에서 전월 YoY를 뺀 값입니다. YoY가 높더라도 ΔYoY가 음수로 돌아서면 성장의 가속이 꺾이기 시작했다는 신호로 봅니다.');
+        document.getElementById('export-groups').innerHTML = `<div class="export-group-grid">${html}</div>`;
     }
 
-    function renderExportTable() {
-        const { key, dir } = exportSort;
-        const rows = [...exportGroups].sort((a, b) => {
-            const ra = a.status !== 'ready', rb = b.status !== 'ready';
-            if (ra !== rb) return ra - rb;
-            let va = a[key], vb = b[key];
-            if (va == null) return 1;
-            if (vb == null) return -1;
-            if (typeof va === 'string') return va.localeCompare(vb, 'ko') * dir;
-            return (va - vb) * dir;
-        });
-        const html = rows.map(g => {
-            if (g.status !== 'ready') {
-                return `<tr class="collecting"><td>${g.group}</td><td>—</td><td>—</td><td>—</td>` +
-                       `<td><span class="export-badge b-수집중">수집중</span></td></tr>`;
-            }
-            const sel = exportSelected === g.group ? ' selected' : '';
-            const badgeLabel = g.badge_streak > 1 ? `${g.badge} · ${g.badge_streak}개월` : g.badge;
-            return `<tr class="ready${sel}" onclick="loadExportDetail('${g.group}')">` +
-                `<td>${g.group}</td>` +
-                `<td>${exportFmtUsd(g.latest_export)}</td>` +
-                `<td>${exportFmtPct(g.yoy, '%')}</td>` +
-                `<td>${exportFmtPct(g.delta_yoy, 'p')}</td>` +
-                `<td><span class="export-badge b-${g.badge}">${badgeLabel}</span></td></tr>`;
-        }).join('');
-        document.getElementById('export-table-body').innerHTML = html;
+    function scrollToExportCard(group) {
+        const el = document.getElementById('export-card-' + group);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    async function loadExportDetail(group) {
-        exportSelected = group;
-        renderExportTable();
-        try {
-            const res = await fetch(API_BASE + '/api/korea-export/detail?group=' + encodeURIComponent(group));
-            const data = await res.json();
-            if (!data.monthly || !data.monthly.length) return;
-            document.getElementById('export-detail').style.display = 'block';
-            document.getElementById('export-detail-title').textContent = `📦 ${group} 상세`;
-            renderExportCharts(data.monthly);
-            const subHtml = (data.sub_items || []).map(s =>
-                `<tr style="cursor:default;"><td>${s.mti}</td><td style="text-align:left;">${s.name}</td>` +
-                `<td>${exportFmtUsd(s.latest_export)}</td><td>${exportFmtPct(s.yoy, '%')}</td></tr>`
-            ).join('');
-            document.getElementById('export-sub-body').innerHTML = subHtml;
-            document.getElementById('export-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } catch (e) {}
+    function exportCanvasIds(group) {
+        return ['exp-c1-' + group, 'exp-c2-' + group];
     }
 
-    function renderExportCharts(monthly) {
-        const labels = monthly.map(r => `${r.month.slice(0,4)}.${r.month.slice(4)}`);
-        const vals = monthly.map(r => r.value / 1e8);
-        const ma12 = monthly.map(r => r.ma12 != null ? r.ma12 / 1e8 : null);
-        const yoy = monthly.map(r => r.yoy);
-        const dyoy = monthly.map(r => r.delta_yoy);
-
-        ['export-chart-value', 'export-chart-yoy'].forEach(id => {
+    function destroyExportCharts(group) {
+        exportCanvasIds(group).forEach(id => {
             const c = Chart.getChart(id);
             if (c) c.destroy();
         });
+    }
 
-        const commonOpts = {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: '#57606a', font: { size: 11 } } } },
-            scales: {
-                x: { ticks: { color: '#57606a', maxTicksLimit: 12, maxRotation: 0 }, grid: { color: '#e5e7eb' } },
-                y: { ticks: { color: '#57606a' }, grid: { color: '#e5e7eb' } },
-            },
-        };
+    function exportCallout(it) {
+        if (it.delta_yoy == null) return ['neutral', '\ub370\uc774\ud130 \ub300\uae30 \u2014 \u0394YoY\ub97c \uacc4\uc0b0\ud560 \uc774\uc804 \ub2ec \uc790\ub8cc\uac00 \ubd80\uc871\ud569\ub2c8\ub2e4.'];
+        const d = it.delta_yoy;
+        const y = it.yoy == null ? 0 : it.yoy;
+        if (d > 0 && y >= 0) return ['up', `\uac00\uc18d \ud655\ub300 \u2014 YoY \uc99d\uac00\ud3ed\uc774 \uc804\uc6d4\ubcf4\ub2e4 ${d.toFixed(1)}%p \ucee4\uc84c\uc2b5\ub2c8\ub2e4.`];
+        if (d > 0) return ['up', `\ub099\ud3ed \ucd95\uc18c \u2014 \uc5ed\uc131\uc7a5 \uc911\uc774\uc9c0\ub9cc YoY\uac00 \uc804\uc6d4\ubcf4\ub2e4 ${d.toFixed(1)}%p \uac1c\uc120\ub410\uc2b5\ub2c8\ub2e4.`];
+        if (y > 0) return ['warn', `\uac00\uc18d \ub454\ud654 \u2014 \uc131\uc7a5\ub960\uc740 \uc591\uc218\uc9c0\ub9cc \uc99d\uac00 \uc18d\ub3c4\uac00 \uc804\uc6d4\ubcf4\ub2e4 ${Math.abs(d).toFixed(1)}%p \uc904\uc5c8\uc2b5\ub2c8\ub2e4.`];
+        return ['down', `\uac10\uc18c \uc2ec\ud654 \u2014 YoY\uac00 \uc804\uc6d4\ubcf4\ub2e4 ${Math.abs(d).toFixed(1)}%p \ub354 \ub0ae\uc544\uc84c\uc2b5\ub2c8\ub2e4.`];
+    }
 
-        new Chart(document.getElementById('export-chart-value'), {
-            data: {
-                labels,
-                datasets: [
-                    { type: 'bar', label: '월 수출액(억 달러)', data: vals, backgroundColor: 'rgba(9,105,218,0.5)' },
-                    { type: 'line', label: '12M MA(억 달러)', data: ma12, borderColor: '#f0883e', borderWidth: 2, pointRadius: 0, tension: 0.2 },
-                ],
-            },
-            options: {
-                ...commonOpts,
-                plugins: {
-                    ...commonOpts.plugins,
-                    tooltip: { callbacks: { label: c => `${c.dataset.label}: ${exportFmtOku(c.parsed.y)}억 달러` } },
-                },
-                scales: {
-                    ...commonOpts.scales,
-                    y: { ticks: { color: '#57606a', callback: v => exportFmtOku(v) }, grid: { color: '#e5e7eb' } },
-                },
-            },
-        });
+    function exportMetricsHtml(it, mode) {
+        const mLabel = `${it.latest_month.slice(0,4)}.${it.latest_month.slice(4)}`;
+        let metrics;
+        if (mode === 'ttm') {
+            metrics = [
+                ['\ucd5c\uc2e0\uc6d4', mLabel],
+                ['TTM \uc218\ucd9c\uc561', exportFmtUsd(it.ttm)],
+                ['TTM YoY', exportFmtPct(it.ttm_yoy, '%')],
+                ['\ub2f9\uc6d4 YoY', exportFmtPct(it.yoy, '%')],
+            ];
+        } else {
+            metrics = [
+                ['\ucd5c\uc2e0\uc6d4', mLabel],
+                ['\uc218\ucd9c\uc561', exportFmtUsd(it.latest_export)],
+                ['YoY', exportFmtPct(it.yoy, '%')],
+                ['\u0394YoY', exportFmtPct(it.delta_yoy, 'p')],
+                ['3\uac1c\uc6d4 \ud3c9\uade0 YoY', exportFmtPct(it.m3_avg_yoy, '%')],
+                ['3\uac1c\uc6d4 \ud3c9\uade0 \u0394YoY', exportFmtPct(it.m3_avg_delta, 'p')],
+                ['12M MA', exportFmtUsd(it.ma12)],
+                ['MA \ub300\ube44', exportFmtPct(it.ma_gap, '%')],
+            ];
+        }
+        return metrics.map(([l, v]) =>
+            `<div class="export-metric"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join('');
+    }
 
-        const yoyRefLines = {
-            id: 'yoyRefLines',
-            afterDraw(chart) {
-                const yAxis = chart.scales.y;
-                const area = chart.chartArea;
-                const ctx = chart.ctx;
-                [[30, '+30'], [10, '+10'], [-10, '-10']].forEach(([v, label]) => {
-                    if (v < yAxis.min || v > yAxis.max) return;
-                    const y = yAxis.getPixelForValue(v);
-                    ctx.save();
-                    ctx.strokeStyle = 'rgba(110,118,129,0.35)';
-                    ctx.setLineDash([4, 4]);
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(area.left, y);
-                    ctx.lineTo(area.right, y);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.fillStyle = 'rgba(110,118,129,0.8)';
-                    ctx.font = '10px sans-serif';
-                    ctx.fillText(label, area.left + 4, y - 3);
-                    ctx.restore();
-                });
+    function exportModeBtnsHtml(g, mode) {
+        return `<button class="export-mode-btn${mode === 'monthly' ? ' active' : ''}" onclick="setExportMode('${g}','monthly')">\uc6d4\ubcc4</button>` +
+               `<button class="export-mode-btn${mode === 'ttm' ? ' active' : ''}" onclick="setExportMode('${g}','ttm')">12M TTM</button>`;
+    }
+
+    function exportCardHtml(it) {
+        const g = it.group;
+        const mode = exportModes[g] || 'monthly';
+        const badgeLabel = it.badge_streak > 1 ? `${it.badge} \u00b7 ${it.badge_streak}\uac1c\uc6d4` : it.badge;
+        const [c1, c2] = exportCanvasIds(g);
+        const [calloutCls, calloutTxt] = exportCallout(it);
+        return `<div class="export-card" id="export-card-${g}" data-group="${g}" data-ready="1">` +
+            `<div class="export-card-cols">` +
+            `<div class="export-card-left">` +
+            `<div class="export-card-title"><span class="export-card-name">${g}</span><span class="export-badge b-${it.badge}">${badgeLabel}</span></div>` +
+            `<div class="export-mode-btns" id="export-modes-${g}">${exportModeBtnsHtml(g, mode)}</div>` +
+            `<div class="export-metrics" id="export-metrics-${g}">${exportMetricsHtml(it, mode)}</div>` +
+            `<div class="export-comment">${it.comment || ''}</div>` +
+            `<div class="export-callout c-${calloutCls}">${calloutTxt}</div>` +
+            `</div>` +
+            `<div class="export-chart-box"><canvas id="${c1}"></canvas></div>` +
+            `<div class="export-chart-box"><canvas id="${c2}"></canvas></div>` +
+            `</div>` +
+            `<div class="export-raw-wrap" id="export-raw-${g}"><span class="export-collecting">\uc6d4\ubcc4 \uc6d0\uc790\ub8cc \ubd88\ub7ec\uc624\ub294 \uc911...</span></div>` +
+            `<div id="export-sub-${g}"></div>` +
+            `</div>`;
+    }
+
+    function renderExportCards() {
+        exportItems.forEach(i => destroyExportCharts(i.group));
+        exportBuilt.clear();
+        const ready = exportItems.filter(i => i.status === 'ready')
+            .sort((a, b) => b.latest_export - a.latest_export);
+        const collecting = exportItems.filter(i => i.status !== 'ready');
+        const html = ready.map(exportCardHtml).join('') + collecting.map(i =>
+            `<div class="export-card" id="export-card-${i.group}">` +
+            `<div class="export-card-title"><span class="export-card-name">${i.group}</span>` +
+            `<span class="export-badge b-\uc218\uc9d1\uc911">\uc218\uc9d1\uc911</span>` +
+            `<span class="export-collecting">\ubc31\ud544 \uc9c4\ud589 \uc911 \u2014 \uc218\uc9d1 \uc644\ub8cc \ud6c4 \ud45c\uc2dc\ub429\ub2c8\ub2e4</span></div></div>`
+        ).join('');
+        document.getElementById('export-cards').innerHTML = html;
+
+        if (exportObserver) exportObserver.disconnect();
+        exportObserver = new IntersectionObserver(entries => {
+            entries.forEach(en => {
+                if (!en.isIntersecting) return;
+                exportObserver.unobserve(en.target);
+                ensureExportDetail(en.target.dataset.group);
+            });
+        }, { rootMargin: '120px' });
+        document.querySelectorAll('#export-cards .export-card[data-ready="1"]').forEach(el => exportObserver.observe(el));
+    }
+
+    async function ensureExportDetail(group) {
+        let det = exportDetailCache[group];
+        if (!det) {
+            try {
+                const res = await fetch(API_BASE + '/api/korea-export/detail?group=' + encodeURIComponent(group));
+                det = await res.json();
+                exportDetailCache[group] = det;
+            } catch (e) { return; }
+        }
+        if (!det.monthly || !det.monthly.length) return;
+        renderExportCardCharts(group, det.monthly);
+        renderExportRawTable(group, det.monthly);
+        renderExportSubTable(group, det.sub_items);
+        exportBuilt.add(group);
+    }
+
+    function setExportMode(group, mode) {
+        if ((exportModes[group] || 'monthly') === mode) return;
+        exportModes[group] = mode;
+        const it = exportItems.find(i => i.group === group);
+        if (it) {
+            const me = document.getElementById('export-metrics-' + group);
+            if (me) me.innerHTML = exportMetricsHtml(it, mode);
+            const be = document.getElementById('export-modes-' + group);
+            if (be) be.innerHTML = exportModeBtnsHtml(group, mode);
+        }
+        if (exportBuilt.has(group)) {
+            const det = exportDetailCache[group];
+            if (det && det.monthly) {
+                renderExportCardCharts(group, det.monthly);
+                renderExportRawTable(group, det.monthly);
             }
-        };
+        }
+    }
 
-        new Chart(document.getElementById('export-chart-yoy'), {
-            data: {
-                labels,
-                datasets: [
-                    { type: 'line', label: 'YoY(%)', data: yoy, borderColor: '#1a7f37', borderWidth: 2, pointRadius: 0, tension: 0.2, yAxisID: 'y' },
-                    { type: 'bar', label: 'ΔYoY(%p)', data: dyoy, backgroundColor: dyoy.map(v => (v != null && v >= 0) ? 'rgba(207,34,46,0.5)' : 'rgba(9,105,218,0.5)'), yAxisID: 'y1' },
-                ],
-            },
-            options: {
-                ...commonOpts,
-                scales: {
-                    ...commonOpts.scales,
-                    y: { position: 'left', ticks: { color: '#1a7f37' }, grid: { color: '#e5e7eb' } },
-                    y1: { position: 'right', ticks: { color: '#57606a' }, grid: { drawOnChartArea: false } },
-                },
-            },
-            plugins: [yoyRefLines],
+    function renderExportCardCharts(group, monthly) {
+        destroyExportCharts(group);
+        const [c1, c2] = exportCanvasIds(group);
+        const el1 = document.getElementById(c1), el2 = document.getElementById(c2);
+        if (!el1 || !el2) return;
+        const mode = exportModes[group] || 'monthly';
+        const labels = monthly.map(r => `${r.month.slice(0,4)}.${r.month.slice(4)}`);
+        const tooltipOku = { callbacks: { label: c => `${c.dataset.label}: ${exportFmtOku(c.parsed.y)}\uc5b5 \ub2ec\ub7ec` } };
+        const baseOpts = { responsive: true, maintainAspectRatio: false };
+        if (mode === 'ttm') {
+            new Chart(el1, {
+                data: { labels, datasets: [
+                    { type: 'line', label: 'TTM \uc218\ucd9c\uc561(\uc5b5 \ub2ec\ub7ec)', data: monthly.map(r => r.ttm != null ? r.ttm / 1e8 : null),
+                      borderColor: '#0969da', backgroundColor: 'rgba(9,105,218,0.08)', fill: true, borderWidth: 2, pointRadius: 0 },
+                ] },
+                options: { ...baseOpts, plugins: { tooltip: tooltipOku }, scales: { y: { ticks: { callback: v => exportFmtOku(v) } } } },
+                plugins: [exportValueLabels],
+            });
+            new Chart(el2, {
+                data: { labels, datasets: [
+                    { type: 'line', label: 'TTM YoY(%)', data: monthly.map(r => r.ttm_yoy), borderColor: '#1a7f37', borderWidth: 2, pointRadius: 0 },
+                ] },
+                options: baseOpts,
+            });
+        } else {
+            new Chart(el1, {
+                data: { labels, datasets: [
+                    { type: 'bar', label: '\uc6d4 \uc218\ucd9c\uc561(\uc5b5 \ub2ec\ub7ec)', data: monthly.map(r => r.value / 1e8), backgroundColor: 'rgba(9,105,218,0.5)' },
+                    { type: 'line', label: '12M MA(\uc5b5 \ub2ec\ub7ec)', data: monthly.map(r => r.ma12 != null ? r.ma12 / 1e8 : null),
+                      borderColor: '#f0883e', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+                ] },
+                options: { ...baseOpts, plugins: { tooltip: tooltipOku }, scales: { y: { ticks: { callback: v => exportFmtOku(v) } } } },
+                plugins: [exportValueLabels],
+            });
+            new Chart(el2, {
+                data: { labels, datasets: [
+                    { type: 'bar', label: 'YoY(%)', data: monthly.map(r => r.yoy),
+                      backgroundColor: monthly.map(r => (r.yoy != null && r.yoy >= 0) ? 'rgba(207,34,46,0.55)' : 'rgba(9,105,218,0.55)') },
+                ] },
+                options: baseOpts,
+            });
+        }
+    }
+
+    function renderExportRawTable(group, monthly) {
+        const wrap = document.getElementById('export-raw-' + group);
+        if (!wrap) return;
+        const mode = exportModes[group] || 'monthly';
+        const pctCell = v => {
+            if (v == null) return '<td>\u2014</td>';
+            const cls = v >= 0 ? 'export-pos' : 'export-neg';
+            return `<td class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</td>`;
+        };
+        const okuCell = v => v == null ? '<td>\u2014</td>' : `<td>${exportFmtOku(v / 1e8)}</td>`;
+        let rows;
+        if (mode === 'ttm') {
+            rows = [
+                ['TTM \uc218\ucd9c\uc561(\uc5b5 \ub2ec\ub7ec)', r => okuCell(r.ttm)],
+                ['TTM YoY(%)', r => pctCell(r.ttm_yoy)],
+            ];
+        } else {
+            rows = [
+                ['\uc218\ucd9c\uc561(\uc5b5 \ub2ec\ub7ec)', r => okuCell(r.value)],
+                ['YoY(%)', r => pctCell(r.yoy)],
+                ['\u0394YoY(%p)', r => pctCell(r.delta_yoy)],
+                ['12M MA(\uc5b5 \ub2ec\ub7ec)', r => okuCell(r.ma12)],
+                ['MA \ub300\ube44(%)', r => pctCell(r.ma_gap)],
+            ];
+        }
+        const head = `<tr><th class="rowhdr">\uc6d4\ubcc4 \uc6d0\uc790\ub8cc</th>${monthly.map(r => `<th>${r.month.slice(2,4)}.${r.month.slice(4)}</th>`).join('')}</tr>`;
+        const body = rows.map(([name, cell]) =>
+            `<tr><td class="rowhdr">${name}</td>${monthly.map(cell).join('')}</tr>`).join('');
+        wrap.innerHTML = `<div class="export-raw-scroll"><table class="export-raw"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function renderExportSubTable(group, subItems) {
+        const wrap = document.getElementById('export-sub-' + group);
+        if (!wrap) return;
+        if (!subItems || subItems.length <= 1) { wrap.innerHTML = ''; return; }
+        const rows = subItems.map(s =>
+            `<tr class="export-subrow" id="export-subrow-${s.mti}" onclick="toggleExportSubRow('${group}','${s.mti}')">` +
+            `<td style="text-align:left;">${s.name}</td>` +
+            `<td>${exportFmtUsd(s.latest_export)}</td><td>${exportFmtPct(s.yoy, '%')}</td></tr>`).join('');
+        wrap.innerHTML = `<div class="export-sub-title sub-toggle" onclick="toggleExportSub('${group}')">` +
+            `<span class="export-sub-caret" id="export-sub-caret-${group}">\u25b8</span> 세부 품목 (${subItems.length})</div>` +
+            `<div id="export-sub-body-${group}" style="display:none;">` +
+            `<div class="export-table-wrap"><table class="export-table">` +
+            `<thead><tr><th style="cursor:default;">세부품목명</th><th style="cursor:default;">최신월 수출액</th><th style="cursor:default;">YoY</th></tr></thead>` +
+            `<tbody id="export-sub-tbody-${group}">${rows}</tbody></table></div></div>`;
+    }
+
+    function toggleExportSub(group) {
+        const body = document.getElementById('export-sub-body-' + group);
+        const caret = document.getElementById('export-sub-caret-' + group);
+        if (!body) return;
+        const open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        if (caret) caret.textContent = open ? '\u25b8' : '\u25be';
+    }
+
+    const exportSubOpen = {};
+    const exportSubDetailCache = {};
+
+    function exportSubCanvasIds(mti) {
+        return ['exp-sub-c1-' + mti, 'exp-sub-c2-' + mti];
+    }
+
+    function destroyExportSubCharts(mti) {
+        exportSubCanvasIds(mti).forEach(id => {
+            const c = Chart.getChart(id);
+            if (c) c.destroy();
+        });
+    }
+
+    function closeExportSubRow(group) {
+        const mti = exportSubOpen[group];
+        if (!mti) return;
+        destroyExportSubCharts(mti);
+        const panel = document.getElementById('export-subpanel-row-' + mti);
+        if (panel) panel.remove();
+        const row = document.getElementById('export-subrow-' + mti);
+        if (row) row.classList.remove('sub-expanded');
+        delete exportSubOpen[group];
+    }
+
+    async function toggleExportSubRow(group, mti) {
+        if (exportSubOpen[group] === mti) { closeExportSubRow(group); return; }
+        closeExportSubRow(group);
+        const row = document.getElementById('export-subrow-' + mti);
+        if (!row) return;
+        row.classList.add('sub-expanded');
+        row.insertAdjacentHTML('afterend',
+            `<tr class="export-subpanel" id="export-subpanel-row-${mti}"><td colspan="3">` +
+            `<div class="export-subpanel-clamp"><div class="export-subpanel-box" id="export-subpanel-body-${mti}">` +
+            `<span class="export-collecting">상세 불러오는 중...</span></div></div></td></tr>`);
+        exportSubOpen[group] = mti;
+        let det = exportSubDetailCache[mti];
+        if (!det) {
+            try {
+                const res = await fetch(API_BASE + '/api/korea-export/sub-detail?mti=' + encodeURIComponent(mti));
+                det = await res.json();
+                exportSubDetailCache[mti] = det;
+            } catch (e) { return; }
+        }
+        if (exportSubOpen[group] !== mti) return;
+        renderExportSubPanel(mti, det);
+    }
+
+    function renderExportSubPanel(mti, det) {
+        const el = document.getElementById('export-subpanel-body-' + mti);
+        if (!el) return;
+        if (!det.monthly || !det.monthly.length) {
+            el.innerHTML = `<span class="export-collecting">${det.message || '데이터가 없습니다.'}</span>`;
+            return;
+        }
+        const badgeLabel = det.badge_streak > 1 ? `${det.badge} \u00b7 ${det.badge_streak}개월` : det.badge;
+        const mLabel = `${det.latest_month.slice(0,4)}.${det.latest_month.slice(4)}`;
+        const metrics = [
+            ['최신월', mLabel],
+            ['수출액', exportFmtUsd(det.latest_export)],
+            ['YoY', exportFmtPct(det.yoy, '%')],
+            ['\u0394YoY', exportFmtPct(det.delta_yoy, 'p')],
+            ['12M MA', exportFmtUsd(det.ma12)],
+            ['MA 대비', exportFmtPct(det.ma_gap, '%')],
+        ].map(([l, v]) => `<div class="export-metric"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join('');
+        const pctCell = v => {
+            if (v == null) return '<td>\u2014</td>';
+            const cls = v >= 0 ? 'export-pos' : 'export-neg';
+            return `<td class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</td>`;
+        };
+        const okuCell = v => v == null ? '<td>\u2014</td>' : `<td>${exportFmtOku(v / 1e8)}</td>`;
+        const monthly = det.monthly;
+        const head = `<tr><th class="rowhdr">월별 원자료</th>${monthly.map(r => `<th>${r.month.slice(2,4)}.${r.month.slice(4)}</th>`).join('')}</tr>`;
+        const rawRows = [
+            ['수출액(억 달러)', r => okuCell(r.value)],
+            ['YoY(%)', r => pctCell(r.yoy)],
+            ['\u0394YoY(%p)', r => pctCell(r.delta_yoy)],
+        ].map(([name, cell]) => `<tr><td class="rowhdr">${name}</td>${monthly.map(cell).join('')}</tr>`).join('');
+        const [c1, c2] = exportSubCanvasIds(mti);
+        el.innerHTML =
+            `<div class="export-subpanel-head">${det.name} \u25b4<span class="muted">세부 품목 상세</span></div>` +
+            `<div class="export-subpanel-cols">` +
+            `<div>` +
+            `<div class="export-card-title"><span class="export-badge b-${det.badge}">${badgeLabel}</span></div>` +
+            `<div class="export-metrics">${metrics}</div>` +
+            `<div class="export-comment">${det.comment || ''}</div>` +
+            `</div>` +
+            `<div class="export-chart-box sub"><canvas id="${c1}"></canvas></div>` +
+            `<div class="export-chart-box sub"><canvas id="${c2}"></canvas></div>` +
+            `</div>` +
+            `<div class="export-raw-scroll" style="margin-top:10px;"><table class="export-raw"><thead>${head}</thead><tbody>${rawRows}</tbody></table></div>`;
+
+        const labels = monthly.map(r => `${r.month.slice(0,4)}.${r.month.slice(4)}`);
+        const tooltipOku = { callbacks: { label: c => `${c.dataset.label}: ${exportFmtOku(c.parsed.y)}억 달러` } };
+        const baseOpts = { responsive: true, maintainAspectRatio: false };
+        new Chart(document.getElementById(c1), {
+            data: { labels, datasets: [
+                { type: 'bar', label: '월 수출액(억 달러)', data: monthly.map(r => r.value / 1e8), backgroundColor: 'rgba(9,105,218,0.5)' },
+                { type: 'line', label: '12M MA(억 달러)', data: monthly.map(r => r.ma12 != null ? r.ma12 / 1e8 : null),
+                  borderColor: '#f0883e', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+            ] },
+            options: { ...baseOpts, plugins: { tooltip: tooltipOku }, scales: { y: { ticks: { callback: v => exportFmtOku(v) } } } },
+        });
+        new Chart(document.getElementById(c2), {
+            data: { labels, datasets: [
+                { type: 'bar', label: 'YoY(%)', data: monthly.map(r => r.yoy),
+                  backgroundColor: monthly.map(r => (r.yoy != null && r.yoy >= 0) ? 'rgba(207,34,46,0.55)' : 'rgba(9,105,218,0.55)') },
+            ] },
+            options: baseOpts,
         });
     }
 </script>
