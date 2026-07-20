@@ -1201,6 +1201,10 @@ def snapshot_consensus_today():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "stocks":
+        try:
+            compute_wics_rs()
+        except Exception as e:
+            print(f"[WICS] refresh failed, using existing cache: {e}")
         compute_stock_leaders()
     elif len(sys.argv) > 1 and sys.argv[1] == "wics":
         r = build_wics_cache()
