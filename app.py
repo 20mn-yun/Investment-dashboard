@@ -750,9 +750,37 @@ def _calc_change(series, period):
 _CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 
 
+# 캐시가 이 시간(시간 단위)보다 오래되면 백그라운드에서 배치를 자동 재실행.
+# cron이 Mac 잠자기 등으로 회차를 건너뛰어도 대시보드를 여는 순간 자가 치유된다.
+_GAINERS_STALE_HOURS = 26
+# 실패 시 재시도 간격(초). 배치가 돌고 있거나 방금 실패했으면 이 시간 동안 재트리거 안 함.
+_GAINERS_RETRIGGER_SEC = 3 * 3600
+
+
+def _spawn_gainers_batch(market):
+    """batch_top_gainers.py를 백그라운드로 실행하고 로그를 cache/에 남긴다."""
+    import subprocess, sys as _sys
+    base = os.path.dirname(os.path.abspath(__file__))
+    lock_path = os.path.join(_CACHE_DIR, f"top_gainers_{market}.refreshing")
+    if os.path.exists(lock_path) and time.time() - os.path.getmtime(lock_path) < _GAINERS_RETRIGGER_SEC:
+        return False
+    os.makedirs(_CACHE_DIR, exist_ok=True)
+    with open(lock_path, "w") as f:
+        f.write(datetime.now().isoformat())
+    log_path = os.path.join(_CACHE_DIR, f"batch_top_gainers_{market}.log")
+    log_f = open(log_path, "a")
+    log_f.write(f"\n===== triggered at {datetime.now().isoformat()} =====\n")
+    log_f.flush()
+    subprocess.Popen(
+        [_sys.executable, os.path.join(base, "batch_top_gainers.py"), market],
+        cwd=base, stdout=log_f, stderr=subprocess.STDOUT,
+    )
+    return True
+
+
 @app.route("/api/top-gainers", methods=["GET"])
 def get_top_gainers():
-    """시장별 상승률 TOP 10 (배치 프리페치 파일 기반)"""
+    """시장별 상승률 TOP 10 (배치 프리페치 파일 기반, 오래되면 자동 갱신)"""
     market = request.args.get("market", "us")
     period = request.args.get("period", "1w")
 
@@ -764,7 +792,20 @@ def get_top_gainers():
         with open(cache_path, "r", encoding="utf-8") as f:
             cached = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return jsonify({"error": "아직 배치가 실행되지 않았습니다"}), 503
+        triggered = _spawn_gainers_batch(market)
+        msg = "배치를 방금 시작했습니다. 몇 분 후 새로고침하세요" if triggered \
+            else "배치 실행 중입니다. 잠시 후 새로고침하세요"
+        return jsonify({"error": msg, "refreshing": True}), 503
+
+    # 캐시 나이 계산 → 오래됐으면 백그라운드 갱신 트리거 (응답은 기존 데이터로)
+    refreshing = False
+    try:
+        last_dt = datetime.fromisoformat(cached.get("last_updated", ""))
+        age_h = (datetime.now(last_dt.tzinfo) - last_dt).total_seconds() / 3600
+        if age_h > _GAINERS_STALE_HOURS:
+            refreshing = _spawn_gainers_batch(market)
+    except (ValueError, TypeError):
+        refreshing = _spawn_gainers_batch(market)
 
     items = cached.get("data", {}).get(period, [])
     return jsonify({
@@ -772,6 +813,7 @@ def get_top_gainers():
         "last_updated": cached.get("last_updated", ""),
         "universe_size": cached.get("universe_size", 0),
         "failed_count": cached.get("failed_count", 0),
+        "refreshing": refreshing,
     })
 
 
@@ -791,13 +833,16 @@ def _is_private_ip(addr):
 def refresh_top_gainers():
     if not _is_private_ip(request.remote_addr):
         return jsonify({"error": "forbidden"}), 403
-    import subprocess, sys
     market = request.args.get("market", "us")
-    subprocess.Popen(
-        [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "batch_top_gainers.py"), market],
-        cwd=os.path.dirname(os.path.abspath(__file__)),
-    )
-    return jsonify({"status": "triggered"})
+    # 수동 refresh는 잠금을 무시하고 강제 실행
+    lock_path = os.path.join(_CACHE_DIR, f"top_gainers_{market}.refreshing")
+    if os.path.exists(lock_path):
+        try:
+            os.remove(lock_path)
+        except OSError:
+            pass
+    triggered = _spawn_gainers_batch(market)
+    return jsonify({"status": "triggered" if triggered else "already-running"})
 
 
 @app.route("/api/sector-leaders", methods=["GET"])

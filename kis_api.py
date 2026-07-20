@@ -12,16 +12,23 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+# cron 등 다른 작업 디렉토리에서 실행돼도 .env와 토큰 캐시를 항상 찾도록 절대경로 사용
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_BASE_DIR, ".env"))
 
 BASE_URL = "https://openapi.koreainvestment.com:9443"
-TOKEN_CACHE_PATH = "cache/kis_token.json"
+TOKEN_CACHE_PATH = os.path.join(_BASE_DIR, "cache", "kis_token.json")
 
 APP_KEY = os.getenv("KIS_APP_KEY")
 APP_SECRET = os.getenv("KIS_APP_SECRET")
 
 
 def get_access_token():
+    if not APP_KEY or not APP_SECRET:
+        raise RuntimeError(
+            "KIS_APP_KEY/KIS_APP_SECRET 환경변수가 없습니다. "
+            f".env 파일 위치 확인: {os.path.join(_BASE_DIR, '.env')}"
+        )
     cache_path = Path(TOKEN_CACHE_PATH)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
 

@@ -22,54 +22,92 @@ OUTLIER_THRESHOLDS = {
     "1mo": 200.0,
 }
 
+# 티커 유니버스가 이 개수 미만이면 파싱 실패로 간주 (빈/깨진 목록 캐시 방지)
+MIN_UNIVERSE = {"us": 1000, "kr": 200, "jp": 100, "eu": 300}
+
+_ISHARES_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/csv,text/plain,*/*",
+}
+
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def load_russell1000():
-    path = os.path.join(TICKERS_DIR, "us_russell1000.json")
+def _read_cached_tickers(path, key=None):
+    """캐시 파일을 나이와 무관하게 읽는다. 없거나 비었으면 None."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if key is not None:
+            data = data.get(key, [])
+        if isinstance(data, list) and data:
+            return data
+    except Exception:
+        pass
+    return None
+
+
+def _load_universe(path, market, fetch_fn, max_age_days, save_fn, key=None):
+    """신선한 캐시 → 다운로드 → (실패 시) 만료된 캐시 순으로 티커 목록 확보.
+
+    다운로드가 실패하거나 파싱 결과가 비정상적으로 적어도, 예전 캐시가 있으면
+    그것으로 배치를 계속 진행한다. (기존에는 sys.exit로 배치 전체가 죽어서
+    cache/top_gainers_*.json 이 영영 갱신되지 않았음)
+    """
+    min_count = MIN_UNIVERSE.get(market, 1)
+    stale = None
     if os.path.exists(path):
         age_days = (time.time() - os.path.getmtime(path)) / 86400
-        if age_days < 7:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            log(f"Cached ticker list loaded: {len(data)} tickers (age: {age_days:.1f}d)")
-            return data
+        cached = _read_cached_tickers(path, key)
+        if cached and len(cached) >= min_count:
+            if age_days < max_age_days:
+                log(f"Cached ticker list loaded: {len(cached)} tickers (age: {age_days:.1f}d)")
+                return cached
+            stale = cached
+        elif cached:
+            print(f"WARNING: cached ticker list too small ({len(cached)} < {min_count}), re-downloading",
+                  file=sys.stderr)
 
-    log("Downloading Russell 1000 holdings from iShares...")
-    url = (
-        "https://www.ishares.com/us/products/239707/"
-        "ishares-russell-1000-etf/1467271812596.ajax"
-        "?fileType=csv&fileName=IWB_holdings&dataType=fund"
-    )
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/131.0.0.0 Safari/537.36",
-        "Accept": "text/csv,text/plain,*/*",
-    }
-    resp = req.get(url, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        print(f"ERROR: iShares returned HTTP {resp.status_code}", file=sys.stderr)
-        print(f"Response headers: {dict(resp.headers)}", file=sys.stderr)
-        print(f"Body preview: {resp.text[:500]}", file=sys.stderr)
+    try:
+        tickers = fetch_fn()
+        if len(tickers) < min_count:
+            raise RuntimeError(f"parsed only {len(tickers)} tickers (min {min_count})")
+    except Exception as e:
+        if stale:
+            print(f"WARNING: ticker download failed ({e}); falling back to stale cache "
+                  f"({len(stale)} tickers)", file=sys.stderr)
+            return stale
+        print(f"ERROR: ticker download failed and no usable cache: {e}", file=sys.stderr)
         sys.exit(1)
+
+    save_fn(tickers)
+    log(f"Saved {len(tickers)} tickers to {path}")
+    return tickers
+
+
+def _fetch_ishares_csv(url, header_tokens=("Ticker",)):
+    resp = req.get(url, headers=_ISHARES_HEADERS, timeout=30)
+    if resp.status_code != 200:
+        raise RuntimeError(f"iShares returned HTTP {resp.status_code}; body: {resp.text[:200]!r}")
 
     lines = resp.text.splitlines()
     header_idx = None
     for i, line in enumerate(lines):
-        if line.startswith("Ticker,") or line.startswith('"Ticker"'):
+        if any(tok in line for tok in header_tokens):
             header_idx = i
             break
     if header_idx is None:
-        print("ERROR: Could not find CSV header row", file=sys.stderr)
-        print(f"First 15 lines:\n" + "\n".join(lines[:15]), file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError(f"could not find CSV header row; first lines: {lines[:5]!r}")
 
     csv_text = "\n".join(lines[header_idx:])
-    df = pd.read_csv(io.StringIO(csv_text))
+    return pd.read_csv(io.StringIO(csv_text))
 
+
+def _parse_russell_df(df):
     if "Asset Class" in df.columns:
         df = df[df["Asset Class"] == "Equity"]
 
@@ -86,179 +124,155 @@ def load_russell1000():
         if sector == "nan":
             sector = "-"
         tickers.append({"ticker": t, "name": name, "sector": sector})
-
-    os.makedirs(TICKERS_DIR, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(tickers, f, ensure_ascii=False, indent=1)
-    log(f"Saved {len(tickers)} tickers to {path}")
     return tickers
+
+
+def _save_plain_list(path):
+    def _save(tickers):
+        os.makedirs(TICKERS_DIR, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(tickers, f, ensure_ascii=False, indent=1)
+    return _save
+
+
+def load_russell1000():
+    path = os.path.join(TICKERS_DIR, "us_russell1000.json")
+
+    def fetch():
+        log("Downloading Russell 1000 holdings from iShares...")
+        url = (
+            "https://www.ishares.com/us/products/239707/"
+            "ishares-russell-1000-etf/1467271812596.ajax"
+            "?fileType=csv&fileName=IWB_holdings&dataType=fund"
+        )
+        df = _fetch_ishares_csv(url, header_tokens=("Ticker,", '"Ticker"'))
+        return _parse_russell_df(df)
+
+    return _load_universe(path, "us", fetch, max_age_days=7, save_fn=_save_plain_list(path))
 
 
 def load_russell3000():
     path = os.path.join(TICKERS_DIR, "us_russell3000.json")
-    if os.path.exists(path):
-        age_days = (time.time() - os.path.getmtime(path)) / 86400
-        if age_days < 7:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            log(f"Cached ticker list loaded: {len(data)} tickers (age: {age_days:.1f}d)")
-            return data
 
-    log("Downloading Russell 3000 holdings from iShares...")
-    url = (
-        "https://www.ishares.com/us/products/239714/"
-        "ishares-russell-3000-etf/1467271812596.ajax"
-        "?fileType=csv&fileName=IWV_holdings&dataType=fund"
-    )
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/131.0.0.0 Safari/537.36",
-        "Accept": "text/csv,text/plain,*/*",
-    }
-    resp = req.get(url, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        print(f"ERROR: iShares returned HTTP {resp.status_code}", file=sys.stderr)
-        print(f"Response headers: {dict(resp.headers)}", file=sys.stderr)
-        print(f"Body preview: {resp.text[:500]}", file=sys.stderr)
-        sys.exit(1)
+    def fetch():
+        log("Downloading Russell 3000 holdings from iShares...")
+        url = (
+            "https://www.ishares.com/us/products/239714/"
+            "ishares-russell-3000-etf/1467271812596.ajax"
+            "?fileType=csv&fileName=IWV_holdings&dataType=fund"
+        )
+        df = _fetch_ishares_csv(url, header_tokens=("Ticker,", '"Ticker"'))
+        return _parse_russell_df(df)
 
-    lines = resp.text.splitlines()
-    header_idx = None
-    for i, line in enumerate(lines):
-        if line.startswith("Ticker,") or line.startswith('"Ticker"'):
-            header_idx = i
-            break
-    if header_idx is None:
-        print("ERROR: Could not find CSV header row", file=sys.stderr)
-        print(f"First 15 lines:\n" + "\n".join(lines[:15]), file=sys.stderr)
-        sys.exit(1)
-
-    csv_text = "\n".join(lines[header_idx:])
-    df = pd.read_csv(io.StringIO(csv_text))
-
-    if "Asset Class" in df.columns:
-        df = df[df["Asset Class"] == "Equity"]
-
-    tickers = []
-    for _, row in df.iterrows():
-        t = str(row.get("Ticker", "")).strip()
-        if not t or t == "-" or t == "nan":
-            continue
-        t = t.replace(".", "-")
-        name = str(row.get("Name", "")).strip()
-        sector = str(row.get("Sector", "")).strip()
-        if name == "nan":
-            name = t
-        if sector == "nan":
-            sector = "-"
-        tickers.append({"ticker": t, "name": name, "sector": sector})
-
-    os.makedirs(TICKERS_DIR, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(tickers, f, ensure_ascii=False, indent=1)
-    log(f"Saved {len(tickers)} tickers to {path}")
-    return tickers
+    return _load_universe(path, "us", fetch, max_age_days=7, save_fn=_save_plain_list(path))
 
 
 def load_kr_top600(top_n=300):
     path = os.path.join(TICKERS_DIR, "kr_top600.json")
-    if os.path.exists(path):
-        age_days = (time.time() - os.path.getmtime(path)) / 86400
-        if age_days < 7:
-            with open(path, "r", encoding="utf-8") as f:
-                cached = json.load(f)
-            tickers = cached.get("tickers", [])
-            log(f"Cached KR ticker list loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
-            return tickers
 
-    log("Downloading KR top stocks from KIS Stock Master File...")
-    tickers = []
+    def fetch():
+        log("Downloading KR top stocks from KIS Stock Master File...")
+        tickers = []
+        for market, suffix in [("KOSPI", ".KS"), ("KOSDAQ", ".KQ")]:
+            ranking = get_market_cap_ranking(market, top_n)
+            for s in ranking:
+                tickers.append({
+                    "ticker": s["code"] + suffix,
+                    "code": s["code"],
+                    "name": s["name"],
+                    "market_sub": market,
+                    "sector": "",
+                })
+            log(f"  {market}: {len(ranking)} stocks")
+        return tickers
 
-    for market, suffix in [("KOSPI", ".KS"), ("KOSDAQ", ".KQ")]:
-        ranking = get_market_cap_ranking(market, top_n)
-        for s in ranking:
-            tickers.append({
-                "ticker": s["code"] + suffix,
-                "code": s["code"],
-                "name": s["name"],
-                "market_sub": market,
-                "sector": "",
-            })
-        log(f"  {market}: {len(ranking)} stocks")
+    def save(tickers):
+        from zoneinfo import ZoneInfo
+        now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
+        os.makedirs(TICKERS_DIR, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({
+                "last_updated": now_kst.isoformat(),
+                "source": "KIS Stock Master File",
+                "universe": f"KOSPI top {top_n} + KOSDAQ top {top_n}",
+                "tickers": tickers,
+            }, f, ensure_ascii=False, indent=1)
 
-    from zoneinfo import ZoneInfo
-    now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
-    os.makedirs(TICKERS_DIR, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "last_updated": now_kst.isoformat(),
-            "source": "KIS Stock Master File",
-            "universe": f"KOSPI top {top_n} + KOSDAQ top {top_n}",
-            "tickers": tickers,
-        }, f, ensure_ascii=False, indent=1)
-    log(f"Saved {len(tickers)} KR tickers to {path}")
-    return tickers
+    return _load_universe(path, "kr", fetch, max_age_days=7, save_fn=save, key="tickers")
+
+
+def _pick_nikkei_table(tables):
+    """컬럼명이 조금 바뀌어도 Code/Ticker 컬럼이 있는 표를 찾는다."""
+    for df in tables:
+        cols = {str(c).strip().lower(): c for c in df.columns}
+        code_col = None
+        for cand in ("code", "ticker", "symbol"):
+            if cand in cols:
+                code_col = cols[cand]
+                break
+        name_col = None
+        for cand in ("company name", "company", "name"):
+            if cand in cols:
+                name_col = cols[cand]
+                break
+        if code_col is not None and name_col is not None and len(df) >= 100:
+            sector_col = cols.get("sector")
+            return df, code_col, name_col, sector_col
+    raise RuntimeError(
+        "could not find Nikkei 225 table; available columns: "
+        + "; ".join(str(list(t.columns)) for t in tables[:3])
+    )
 
 
 def load_jp_nikkei225():
     path = os.path.join(TICKERS_DIR, "jp_nikkei225.json")
-    if os.path.exists(path):
-        age_days = (time.time() - os.path.getmtime(path)) / 86400
-        if age_days < 30:
-            with open(path, "r", encoding="utf-8") as f:
-                cached = json.load(f)
-            tickers = cached.get("tickers", [])
-            log(f"Cached JP ticker list loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
-            return tickers
 
-    log("Downloading Nikkei 225 component list...")
-    print("WARNING: iShares JP TOPIX ETF URLs unavailable, using Nikkei 225 fallback (225 tickers instead of 500)", file=sys.stderr)
+    def fetch():
+        log("Downloading Nikkei 225 component list...")
+        url = "https://topforeignstocks.com/indices/the-components-of-the-nikkei-225-index/"
+        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+        resp = req.get(url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            raise RuntimeError(f"topforeignstocks returned HTTP {resp.status_code}")
 
-    url = "https://topforeignstocks.com/indices/the-components-of-the-nikkei-225-index/"
-    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
-    resp = req.get(url, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        print(f"ERROR: topforeignstocks returned HTTP {resp.status_code}", file=sys.stderr)
-        sys.exit(1)
+        tables = pd.read_html(io.StringIO(resp.text), flavor="lxml")
+        if not tables:
+            raise RuntimeError("no tables found in Nikkei 225 page")
 
-    tables = pd.read_html(io.StringIO(resp.text), flavor="lxml")
-    if not tables:
-        print("ERROR: Could not find Nikkei 225 table", file=sys.stderr)
-        sys.exit(1)
+        df, code_col, name_col, sector_col = _pick_nikkei_table(tables)
+        tickers = []
+        for _, row in df.iterrows():
+            code = str(row.get(code_col, "")).strip()
+            name = str(row.get(name_col, "")).strip()
+            sector = str(row.get(sector_col, "")).strip() if sector_col else "-"
+            if not code or code == "nan":
+                continue
+            if name == "nan":
+                name = code
+            if sector == "nan":
+                sector = "-"
+            ticker = code if ".T" in code else code + ".T"
+            tickers.append({
+                "ticker": ticker,
+                "code": code.replace(".T", ""),
+                "name": name,
+                "sector": sector,
+            })
+        return tickers
 
-    df = tables[0]
-    tickers = []
-    for _, row in df.iterrows():
-        code = str(row.get("Code", "")).strip()
-        name = str(row.get("Company Name", "")).strip()
-        sector = str(row.get("Sector", "")).strip()
-        if not code or code == "nan":
-            continue
-        if name == "nan":
-            name = code
-        if sector == "nan":
-            sector = "-"
-        ticker = code if ".T" in code else code + ".T"
-        tickers.append({
-            "ticker": ticker,
-            "code": code.replace(".T", ""),
-            "name": name,
-            "sector": sector,
-        })
+    def save(tickers):
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Asia/Tokyo"))
+        os.makedirs(TICKERS_DIR, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({
+                "last_updated": now.isoformat(),
+                "source": "topforeignstocks Nikkei 225",
+                "universe": "Nikkei 225",
+                "tickers": tickers,
+            }, f, ensure_ascii=False, indent=1)
 
-    from zoneinfo import ZoneInfo
-    now = datetime.now(ZoneInfo("Asia/Tokyo"))
-    os.makedirs(TICKERS_DIR, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "last_updated": now.isoformat(),
-            "source": "Wikipedia Nikkei 225",
-            "universe": "Nikkei 225",
-            "tickers": tickers,
-        }, f, ensure_ascii=False, indent=1)
-    log(f"Saved {len(tickers)} JP tickers to {path}")
-    return tickers
+    return _load_universe(path, "jp", fetch, max_age_days=30, save_fn=save, key="tickers")
 
 
 _EU_EXCHANGE_SUFFIX = {
@@ -283,97 +297,70 @@ _EU_EXCHANGE_SUFFIX = {
 
 def load_eu_stoxx600():
     path = os.path.join(TICKERS_DIR, "eu_stoxx600.json")
-    if os.path.exists(path):
-        age_days = (time.time() - os.path.getmtime(path)) / 86400
-        if age_days < 7:
-            with open(path, "r", encoding="utf-8") as f:
-                cached = json.load(f)
-            tickers = cached.get("tickers", [])
-            log(f"Cached EU ticker list loaded: {len(tickers)} tickers (age: {age_days:.1f}d)")
-            return tickers
 
-    log("Downloading STOXX 600 holdings from iShares DE...")
-    url = (
-        "https://www.ishares.com/de/privatanleger/de/produkte/251931/"
-        "ishares-stoxx-europe-600-ucits-etf-de-fund/1478358465952.ajax"
-        "?fileType=csv&fileName=EXSA_holdings&dataType=fund"
-    )
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/131.0.0.0 Safari/537.36",
-        "Accept": "text/csv,text/plain,*/*",
-    }
-    resp = req.get(url, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        print(f"ERROR: iShares DE returned HTTP {resp.status_code}", file=sys.stderr)
-        sys.exit(1)
+    def fetch():
+        log("Downloading STOXX 600 holdings from iShares DE...")
+        url = (
+            "https://www.ishares.com/de/privatanleger/de/produkte/251931/"
+            "ishares-stoxx-europe-600-ucits-etf-de-fund/1478358465952.ajax"
+            "?fileType=csv&fileName=EXSA_holdings&dataType=fund"
+        )
+        df = _fetch_ishares_csv(url, header_tokens=("Emittententicker", "Ticker"))
 
-    lines = resp.text.splitlines()
-    header_idx = None
-    for i, line in enumerate(lines):
-        if "Emittententicker" in line or "Ticker" in line:
-            header_idx = i
-            break
-    if header_idx is None:
-        print("ERROR: Could not find CSV header row in iShares DE", file=sys.stderr)
-        sys.exit(1)
+        col_ticker = "Emittententicker" if "Emittententicker" in df.columns else "Ticker"
+        col_name = "Name" if "Name" in df.columns else df.columns[1]
+        col_sector = "Sektor" if "Sektor" in df.columns else "Sector"
+        col_asset = "Anlageklasse" if "Anlageklasse" in df.columns else "Asset Class"
+        col_exchange = "Börse" if "Börse" in df.columns else "Exchange"
 
-    csv_text = "\n".join(lines[header_idx:])
-    df = pd.read_csv(io.StringIO(csv_text))
+        if col_asset in df.columns:
+            df = df[df[col_asset] == "Aktien"]
 
-    col_ticker = "Emittententicker" if "Emittententicker" in df.columns else "Ticker"
-    col_name = "Name" if "Name" in df.columns else df.columns[1]
-    col_sector = "Sektor" if "Sektor" in df.columns else "Sector"
-    col_asset = "Anlageklasse" if "Anlageklasse" in df.columns else "Asset Class"
-    col_exchange = "Börse" if "Börse" in df.columns else "Exchange"
+        tickers = []
+        for _, row in df.iterrows():
+            t = str(row.get(col_ticker, "")).strip()
+            if not t or t == "-" or t == "nan":
+                continue
+            name = str(row.get(col_name, "")).strip()
+            sector = str(row.get(col_sector, "")).strip()
+            exchange = str(row.get(col_exchange, "")).strip()
+            if name == "nan":
+                name = t
+            if sector == "nan":
+                sector = "-"
 
-    if col_asset in df.columns:
-        df = df[df[col_asset] == "Aktien"]
+            suffix = _EU_EXCHANGE_SUFFIX.get(exchange, "")
+            if not suffix:
+                for key, val in _EU_EXCHANGE_SUFFIX.items():
+                    if key.lower() in exchange.lower():
+                        suffix = val
+                        break
+            if not suffix:
+                suffix = ".DE"
 
-    tickers = []
-    for _, row in df.iterrows():
-        t = str(row.get(col_ticker, "")).strip()
-        if not t or t == "-" or t == "nan":
-            continue
-        name = str(row.get(col_name, "")).strip()
-        sector = str(row.get(col_sector, "")).strip()
-        exchange = str(row.get(col_exchange, "")).strip()
-        if name == "nan":
-            name = t
-        if sector == "nan":
-            sector = "-"
+            yahoo_ticker = t.replace(" ", "-").replace(".", "-").rstrip("-") + suffix
+            tickers.append({
+                "ticker": yahoo_ticker,
+                "raw_ticker": t,
+                "name": name,
+                "sector": sector,
+                "exchange": exchange,
+            })
+        return tickers
 
-        suffix = _EU_EXCHANGE_SUFFIX.get(exchange, "")
-        if not suffix:
-            for key, val in _EU_EXCHANGE_SUFFIX.items():
-                if key.lower() in exchange.lower():
-                    suffix = val
-                    break
-        if not suffix:
-            suffix = ".DE"
+    def save(tickers):
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Europe/Berlin"))
+        os.makedirs(TICKERS_DIR, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({
+                "last_updated": now.isoformat(),
+                "source": "iShares STOXX Europe 600 (DE)",
+                "universe": "STOXX Europe 600",
+                "tickers": tickers,
+            }, f, ensure_ascii=False, indent=1)
 
-        yahoo_ticker = t.replace(" ", "-").replace(".", "-").rstrip("-") + suffix
-        tickers.append({
-            "ticker": yahoo_ticker,
-            "raw_ticker": t,
-            "name": name,
-            "sector": sector,
-            "exchange": exchange,
-        })
-
-    from zoneinfo import ZoneInfo
-    now = datetime.now(ZoneInfo("Europe/Berlin"))
-    os.makedirs(TICKERS_DIR, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "last_updated": now.isoformat(),
-            "source": "iShares STOXX Europe 600 (DE)",
-            "universe": "STOXX Europe 600",
-            "tickers": tickers,
-        }, f, ensure_ascii=False, indent=1)
-    log(f"Saved {len(tickers)} EU tickers to {path}")
-    return tickers
+    return _load_universe(path, "eu", fetch, max_age_days=7, save_fn=save, key="tickers")
 
 
 def _download_chunk(chunk):
@@ -413,15 +400,27 @@ def _download_kr_via_kis(kr_ticker_list):
     got = {}
     missed = []
     total = len(kr_ticker_list)
+    consecutive_fail = 0
     for i, ticker in enumerate(kr_ticker_list):
         try:
             series = get_daily_price_history(ticker, 90)
             if len(series) >= 2:
                 got[ticker] = series
+                consecutive_fail = 0
             else:
                 missed.append(ticker)
-        except Exception:
+        except Exception as e:
             missed.append(ticker)
+            consecutive_fail += 1
+            # 처음 몇 건은 원인 파악을 위해 에러를 그대로 출력
+            if len(missed) <= 3:
+                print(f"WARNING: KIS fetch failed for {ticker}: {e}", file=sys.stderr)
+            # 연속 30건 실패면 토큰/키 문제 등 전체 장애로 보고 조기 중단
+            if consecutive_fail >= 30:
+                print(f"ERROR: {consecutive_fail} consecutive KIS failures — aborting KR download "
+                      f"(last error: {e})", file=sys.stderr)
+                missed.extend(kr_ticker_list[i + 1:])
+                break
         if (i + 1) % 50 == 0 or i + 1 == total:
             log(f"KR KIS: {i + 1}/{total} done")
         time.sleep(0.05)
@@ -568,6 +567,14 @@ def main():
         print(f"WARNING: high failure rate {fail_rate:.1f}% ({len(failed)}/{len(tickers)})", file=sys.stderr)
 
     rankings, excluded_counts = calc_rankings(price_data, tickers)
+
+    # 가격을 하나도 못 받아서 순위가 전부 비었으면, 멀쩡한 기존 캐시를
+    # 빈 데이터로 덮어쓰지 않고 실패로 종료한다. (화면 '데이터 없음' 방지)
+    if not any(rankings.get(p) for p in ("1d", "1w", "1mo")):
+        print(f"ERROR: all rankings empty for {market} "
+              f"({len(price_data)} priced / {len(failed)} failed) — keeping previous cache",
+              file=sys.stderr)
+        sys.exit(1)
 
     from zoneinfo import ZoneInfo
     tz_map = {"us": "America/New_York", "kr": "Asia/Seoul", "jp": "Asia/Tokyo", "eu": "Europe/Berlin"}

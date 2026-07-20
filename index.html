@@ -3905,9 +3905,7 @@
             const res = await fetch(API_BASE + '/api/top-gainers?market=' + gainerMarket + '&period=' + gainerPeriod);
             const body = await res.json();
             if (res.status === 503) {
-                const schedMap = {us:'06:30', kr:'16:00', jp:'15:15', eu:'02:00'};
-                const sched = schedMap[gainerMarket] || '';
-                container.innerHTML = `<div class="loading">데이터가 아직 생성되지 않았습니다. 다음 배치: ${sched}</div>`;
+                container.innerHTML = `<div class="loading">데이터가 없어 배치를 자동 실행했습니다. 몇 분 후 다시 확인해주세요.</div>`;
                 tsEl.textContent = '';
                 return;
             }
@@ -3930,8 +3928,9 @@
                     String(d.getHours()).padStart(2,'0') + ':' +
                     String(d.getMinutes()).padStart(2,'0');
                 const ageH = (Date.now() - d.getTime()) / 3600000;
-                const style = ageH > 6 ? 'color:#bf8700;' : 'color:#57606a;';
-                tsEl.innerHTML = `<span style="${style}">마지막 갱신: ${fmt}</span>`;
+                const style = ageH > 26 ? 'color:#bf8700;' : 'color:#57606a;';
+                const refreshing = body.refreshing ? ' · 백그라운드 갱신 중...' : '';
+                tsEl.innerHTML = `<span style="${style}">마지막 갱신: ${fmt}${refreshing}</span>`;
             }
             container.innerHTML = `
                 <div class="data-row" style="font-weight:bold; color:#0969da; border-bottom:1px solid #d0d7de;">
