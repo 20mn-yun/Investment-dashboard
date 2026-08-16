@@ -151,6 +151,27 @@ def _fetch_hs_monthly_once(hs10, start_yymm, end_yymm):
     raise RuntimeError(f"HS {hs10} 수집 실패 ({MAX_RETRY}회 시도)")
 
 
+def _notify_telegram(text):
+    """백필 완주·증분 완료 알림. 기존 DART 알림과 동일 방식(TELEGRAM_TOKEN_GENERAL +
+    dart_monitor_config.json의 general chat_id). 실패해도 백필 결과에 영향 없음."""
+    try:
+        token = os.environ.get("TELEGRAM_TOKEN_GENERAL")
+        if not token:
+            return
+        with open(os.path.join(BASE_DIR, "dart_monitor_config.json"), "r", encoding="utf-8") as f:
+            chat_id = (json.load(f).get("telegram_chat_ids") or {}).get("general")
+        if not chat_id:
+            return
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": text,
+                  "parse_mode": "HTML", "disable_web_page_preview": True},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"[korea_export] 텔레그램 알림 실패(무시): {type(e).__name__}: {e}", flush=True)
+
+
 # ===== 진행 체크포인트 =====
 
 def _load_progress(params):
@@ -191,6 +212,19 @@ def _merge_series(cache, mti6, name, group, monthly):
     s["monthly"].update({m: v for m, v in sorted(monthly.items())})
 
 
+def _actual_data_range(cache):
+    """series 실데이터(값이 있는 월) 기준 (최소월, 최대월). 데이터 없으면 (None, None).
+
+    meta.range를 요청 기간이 아닌 실데이터로 기록하기 위한 헬퍼 —
+    미공표 월(빈 응답)이 '수집 완료'로 잠기는 문제 방지."""
+    months = set()
+    for s in cache.get("series", {}).values():
+        months.update(m for m, v in s.get("monthly", {}).items() if v)
+    if not months:
+        return None, None
+    return min(months), max(months)
+
+
 # ===== 백필 =====
 
 def backfill(items, start_yymm, end_yymm=None, max_calls=None):
@@ -218,6 +252,17 @@ def backfill(items, start_yymm, end_yymm=None, max_calls=None):
         if item not in groups:
             raise SystemExit(f"연계표에 없는 품목명: {item} (가능: {', '.join(sorted(groups))})")
         targets[item] = groups[item]
+
+    done_cache = _load_cache()
+    done_meta = done_cache.get("meta", {})
+    done_rng = done_meta.get("range", {})
+    if (not os.path.exists(PROGRESS_PATH)
+            and set(targets) <= set(done_meta.get("items", []))
+            and done_rng.get("from", "999999") <= start_yymm
+            and done_rng.get("to", "000000") >= end_yymm):
+        print(f"[korea_export] 백필 완료됨 — 대상 품목·기간({start_yymm}~{end_yymm})이 "
+              f"캐시에 이미 수집되어 있어 API 호출 없이 종료합니다.", flush=True)
+        return
 
     all_hs = [(g, mti, hs) for g, mtis in targets.items() for mti, hss in mtis.items() for hs in hss]
     n_chunks = len(_month_chunks(start_yymm, end_yymm))
@@ -268,13 +313,21 @@ def backfill(items, start_yymm, end_yymm=None, max_calls=None):
     meta["collected_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     rng = meta.setdefault("range", {})
     rng["from"] = min(rng.get("from", start_yymm), start_yymm)
-    rng["to"] = max(rng.get("to", end_yymm), end_yymm)
+    # 완료 범위는 요청 기간이 아니라 실데이터가 존재하는 마지막 달 기준으로 기록.
+    # 미공표 월(빈 응답)을 완료 처리하면 이후 실행이 해당 월을 영영 채우지 않는다.
+    _, actual_to = _actual_data_range(cache)
+    rng["to"] = actual_to or rng.get("to", start_yymm)
     meta["items"] = sorted(set(meta.get("items", [])) | set(targets))
     _save_cache(cache)
 
     if os.path.exists(PROGRESS_PATH):
         os.remove(PROGRESS_PATH)
     print(f"[korea_export] 백필 완료: {DATA_PATH} (총 {time.time()-t0:.0f}s)", flush=True)
+    _notify_telegram(
+        f"🚢 수출 데이터 백필 완주 — 20대 품목 {len(cache['series'])}개 계열, "
+        f"기간 {start_yymm}~{end_yymm}. 대시보드 수출 탭 확인 후 Claude에 마무리 세션"
+        f"(정합성 검증+정기 스케줄 등록)을 요청하세요."
+    )
 
 
 # ===== 증분 업데이트 =====
@@ -321,9 +374,17 @@ def update():
 
     meta = cache["meta"]
     meta["collected_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    meta["range"]["to"] = max(meta["range"].get("to", end_yymm), end_yymm)
+    # 완료 범위는 실데이터 기준 (미공표 월은 완료 처리하지 않음)
+    _, actual_to = _actual_data_range(cache)
+    if actual_to:
+        meta["range"]["to"] = actual_to
     _save_cache(cache)
-    print(f"[korea_export] 증분 완료: {DATA_PATH} (총 {time.time()-t0:.0f}s)", flush=True)
+    print(f"[korea_export] 증분 완료: {DATA_PATH} (총 {time.time()-t0:.0f}s, 실데이터 최신월 {actual_to})", flush=True)
+    pending = f" (당월분 {end_yymm}은 미공표 — 다음 정기 실행에서 재시도)" if actual_to and actual_to < end_yymm else ""
+    _notify_telegram(
+        f"🚢 수출 증분 업데이트 완료 — {start_yymm}~{end_yymm} 재수집, "
+        f"{len(cache['series'])}개 계열, 캐시 최신월 {actual_to}.{pending}"
+    )
 
 
 # ===== 지표 계산 =====
