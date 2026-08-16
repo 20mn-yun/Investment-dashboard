@@ -2775,7 +2775,17 @@ def get_tg_inbox_reclassify_status():
 
 @app.route("/api/tg-inbox/channels", methods=["GET"])
 def get_tg_inbox_channels():
+    # 확장: 채널별 healthy/last_success_ts/consecutive_errors/last_error 포함
     return jsonify({"channels": tg_inbox.list_channels()})
+
+
+@app.route("/api/tg-inbox/channels/refresh", methods=["POST"])
+def post_tg_inbox_channel_refresh():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.refresh_channel(body.get("channel", ""))
+    if isinstance(result, dict) and result.get("error"):
+        return jsonify(result), 400
+    return jsonify(result)
 
 
 @app.route("/api/tg-inbox/channels", methods=["POST"])

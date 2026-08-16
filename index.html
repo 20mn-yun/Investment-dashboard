@@ -1050,6 +1050,10 @@
         #tab-inbox .inbox-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 3px 10px; font-size: 14px; color: var(--text); }
         #tab-inbox .inbox-chip .x { color: var(--text-muted); cursor: pointer; font-weight: 700; }
         #tab-inbox .inbox-chip .x:hover { color: var(--up); }
+        #tab-inbox .inbox-chip.unhealthy { border-color: #f85149; }
+        #tab-inbox .inbox-chip .warn { color: #f85149; }
+        #tab-inbox .inbox-chip .refresh { color: #58a6ff; cursor: pointer; font-weight: 700; }
+        #tab-inbox .inbox-chip .refresh:hover { color: #79b8ff; }
         #tab-inbox .inbox-ch-add { display: flex; gap: 6px; }
         #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 14px; }
         #tab-inbox .inbox-ch-add button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer; white-space: nowrap; }
@@ -5146,10 +5150,47 @@
         const cont = document.getElementById('inbox-chips');
         let html = '';
         for (const c of channels) {
-            html += `<span class="inbox-chip">${inboxEsc(c.title || c.channel)}
-                <span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
+            const bad = c.healthy === false;   // healthy 필드 없으면(구버전) 정상 취급
+            let ago = '기록 없음';
+            if (c.last_success_ts) {
+                const d = new Date(c.last_success_ts);
+                if (!isNaN(d)) {
+                    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+                    ago = days <= 0 ? '오늘' : days + '일 전';
+                }
+            }
+            const tip = `마지막 수집: ${ago}`
+                + (c.consecutive_errors ? ` / 연속에러 ${c.consecutive_errors}` : '')
+                + (c.last_error ? ` / 에러: ${c.last_error}` : '');
+            const warn = bad ? '<span class="warn">⚠</span> ' : '';
+            const refreshBtn = bad
+                ? `<span class="refresh" title="재해석" onclick="refreshInboxChannel('${inboxEsc(c.channel)}')">↻</span>` : '';
+            html += `<span class="inbox-chip${bad ? ' unhealthy' : ''}" title="${inboxEsc(tip)}">${warn}${inboxEsc(c.title || c.channel)}
+                ${refreshBtn}<span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
         }
         cont.innerHTML = html || '<span style="font-size:12px;color:#6b7280;">등록된 채널이 없습니다</span>';
+    }
+
+    async function refreshInboxChannel(channel) {
+        if (!confirm(`'${channel}' 채널을 강제 재해석할까요? (세션 캐시 우회)`)) return;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/channels/refresh', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({channel: channel})
+            });
+            const r = await res.json();
+            if (r.error) {
+                alert('재해석 실패: ' + r.error);
+            } else {
+                alert(`재해석 완료: ${r.title}`
+                    + `\nid 변경: ${r.id_changed ? '예 (' + r.old_id + '→' + r.new_id + ')' : '아니오'}`
+                    + `\nstate 리셋: ${r.state_reset ? '예' : '아니오'}`
+                    + `\n최신 메시지: ${r.latest_message_date || '-'}`);
+            }
+            loadInboxChannels();
+        } catch (e) {
+            alert('재해석 요청 오류: ' + e.message);
+        }
     }
 
     async function addInboxChannel() {

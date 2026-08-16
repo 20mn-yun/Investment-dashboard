@@ -7,6 +7,9 @@ import hashlib
 import asyncio
 import concurrent.futures
 import threading
+import sqlite3
+import sys
+import traceback
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -324,7 +327,7 @@ async def _fetch_channel(client, username, last_id, limit, retention_cutoff_utc,
         if tx_key:
             local_keys[tx_key] = item_id
 
-    return {"title": title, "max_id": max_id, "records": records}
+    return {"title": title, "max_id": max_id, "records": records, "channel_id": own_id}
 
 
 async def _collect_all(client, channels, state, limit, retention_cutoff_utc, min_text_chars, dedup):
@@ -387,6 +390,8 @@ def collect_once():
         new_count = 0
         dup_skipped = 0
         errors = {}
+        refresh_needed = []          # 자동 재해석 대상(락 해제 후 처리 — 데드락 방지)
+        now_iso = now_utc.isoformat()
 
         for username in channels:
             res = fetch.get(username)
@@ -394,6 +399,15 @@ def collect_once():
                 continue
             if not res.get("ok"):
                 errors[username] = res.get("error", "unknown")
+                # 건강 추적: 연속 에러 증가·마지막 에러 기록(기존 필드 보존)
+                entry = dict(state.get(username, {}) or {})
+                entry["consecutive_errors"] = int(entry.get("consecutive_errors", 0) or 0) + 1
+                entry["last_error"] = res.get("error", "unknown")
+                state[username] = entry
+                ce = entry["consecutive_errors"]
+                # ce가 3에 도달하는 시점 1회, 이후 매 12주기(3,15,27,...)마다 1회만 자동 재해석
+                if ce >= 3 and (ce - 3) % 12 == 0:
+                    refresh_needed.append(username)
                 continue
 
             cdata = res["data"]
@@ -420,7 +434,14 @@ def collect_once():
                 if rec["tx_key"]:
                     dedup[rec["tx_key"]] = {"item_id": item["id"], "ts": ts}
 
-            state[username] = {"last_message_id": new_last}
+            # 건강 추적: 성공(신규 0건이어도 성공) — 기존 필드 보존하며 갱신
+            entry = dict(state.get(username, {}) or {})
+            entry["last_message_id"] = new_last
+            entry["channel_id"] = cdata.get("channel_id")
+            entry["last_success_ts"] = now_iso
+            entry["consecutive_errors"] = 0
+            entry["last_error"] = None
+            state[username] = entry
 
         cutoff_iso = (now_utc.astimezone(KST) - timedelta(days=retention_days)).isoformat()
         # 저장(saved=true) 항목은 롤링 보존 기간이 지나도 삭제하지 않고 영구 보관한다.
@@ -440,6 +461,14 @@ def collect_once():
         _save_data(data)
         _sweep_orphan_media(kept_items)
 
+    # 자동 복구: 락 해제 후 재해석 시도(refresh_channel이 자체적으로 락을 잡으므로 데드락 방지)
+    for ch in refresh_needed:
+        try:
+            r = refresh_channel(ch)
+            print(f"[tg_inbox] auto-refresh {ch}: {r}", flush=True)
+        except Exception as e:
+            print(f"[tg_inbox] auto-refresh {ch} failed: {type(e).__name__}: {e}", flush=True)
+
     cres = classify_pending()
 
     return {
@@ -452,6 +481,66 @@ def collect_once():
         "chat_removed": cres.get("chat_removed", 0),
         "remaining": cres.get("remaining", 0),
     }
+
+
+def refresh_channel(channel):
+    """세션 엔티티 캐시를 우회해 채널을 강제 재해석하고, id가 바뀌었으면 state를 리셋한다.
+    ResolveUsernameRequest는 플러드 제한이 엄격하므로 수동 트리거·자동 복구에서만 호출."""
+    client = telegram_report._shared_client
+    loop = telegram_report._shared_loop
+    if client is None or loop is None:
+        return {"channel": channel, "error": "client_not_ready"}
+    username = (channel or "").lstrip("@").strip()
+    if not username:
+        return {"channel": channel, "error": "empty channel"}
+
+    async def _resolve():
+        from telethon.tl.functions.contacts import ResolveUsernameRequest
+        r = await client(ResolveUsernameRequest(username))   # 캐시 우회 + 캐시 갱신 부수효과
+        entity = None
+        if getattr(r, "chats", None):
+            entity = r.chats[0]
+        elif getattr(r, "users", None):
+            entity = r.users[0]
+        if entity is None:
+            return None, None, None
+        new_id = getattr(entity, "id", None)
+        title = getattr(entity, "title", None) or username
+        latest_date = None
+        async for m in client.iter_messages(entity, limit=1):   # 읽기 가능 검증
+            latest_date = m.date.isoformat() if m.date else None
+            break
+        return new_id, title, latest_date
+
+    try:
+        new_id, title, latest_date = asyncio.run_coroutine_threadsafe(
+            _resolve(), loop).result(timeout=60)
+    except Exception as e:
+        return {"channel": username, "error": f"{type(e).__name__}: {e}"}
+    if new_id is None:
+        return {"channel": username, "error": "resolve returned no entity"}
+
+    with _data_lock:
+        data = _load_data()
+        st = data["state"]
+        entry = dict(st.get(username, {}) or {})
+        old_id = entry.get("channel_id")
+        id_changed = (old_id is None) or (old_id != new_id)
+        state_reset = False
+        if id_changed:
+            entry["last_message_id"] = 0          # 새 채널 번호 체계 → 처음부터 재수집
+            state_reset = True
+        entry["channel_id"] = new_id
+        entry["consecutive_errors"] = 0
+        entry["last_error"] = None
+        entry["last_success_ts"] = datetime.now(timezone.utc).isoformat()
+        st[username] = entry
+        data["state"] = st
+        _save_data(data)                          # state의 해당 채널 항목만 갱신(dedup·items 불변)
+
+    return {"channel": username, "old_id": old_id, "new_id": new_id,
+            "id_changed": id_changed, "title": title,
+            "latest_message_date": latest_date, "state_reset": state_reset}
 
 
 class RateLimitError(Exception):
@@ -885,13 +974,34 @@ RESERVED_TOPICS = {"기타", "잡담", "미분류"}
 def list_channels():
     cfg = get_config()
     data = _load_data()
+    state = data.get("state", {})
     title_by_ch = {}
     for it in data.get("items", []):
         ch = it.get("channel")
         t = it.get("channel_title")
         if ch and t and ch not in title_by_ch:
             title_by_ch[ch] = t
-    return [{"channel": ch, "title": title_by_ch.get(ch, ch)} for ch in cfg.get("channels", [])]
+    now = datetime.now(timezone.utc)
+    out = []
+    for ch in cfg.get("channels", []):
+        s = state.get(ch, {}) or {}
+        lst = s.get("last_success_ts")
+        ce = int(s.get("consecutive_errors", 0) or 0)
+        healthy = False
+        if lst:
+            try:
+                dt = datetime.fromisoformat(lst)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                healthy = (now - dt) <= timedelta(hours=72) and ce < 3
+            except Exception:
+                healthy = False
+        out.append({
+            "channel": ch, "title": title_by_ch.get(ch, ch),
+            "healthy": healthy, "last_success_ts": lst,
+            "consecutive_errors": ce, "last_error": s.get("last_error"),
+        })
+    return out
 
 
 def add_channel(raw):
@@ -919,14 +1029,32 @@ def add_channel(raw):
     try:
         entity = asyncio.run_coroutine_threadsafe(client.get_entity(username), loop).result()
         title = getattr(entity, "title", None) or username
-    except Exception:
-        return {"error": "채널을 찾을 수 없습니다"}
+    except Exception as e:
+        # 원인 구분: 미존재 / 세션 SQLite 잠금 / 기타 — 전체 트레이스백은 로그로
+        print(f"[tg_inbox] add_channel({username}) 검증 실패: {type(e).__name__}: {e}", flush=True)
+        traceback.print_exc()
+        sys.stdout.flush()
+        return {"error": _classify_add_error(e)}
 
     cfg = _read_raw_config()
     cfg.setdefault("channels", [])
     cfg["channels"].append(username)
     _save_config(cfg)
     return {"status": "added", "channel": username, "title": title}
+
+
+def _classify_add_error(e):
+    """add_channel 검증 예외를 사용자 메시지로 구분한다."""
+    from telethon.errors import UsernameNotOccupiedError, UsernameInvalidError
+    if isinstance(e, (UsernameNotOccupiedError, UsernameInvalidError)):
+        return "채널을 찾을 수 없습니다"
+    msg = str(e)
+    if isinstance(e, ValueError) and ("No user has" in msg or "Cannot find any entity" in msg
+                                      or "Could not find the input entity" in msg):
+        return "채널을 찾을 수 없습니다"
+    if isinstance(e, sqlite3.OperationalError) or "database is locked" in msg:
+        return "텔레그램 세션이 일시적으로 잠겨 있습니다. 잠시 후 다시 시도해주세요"
+    return f"채널 확인 중 오류: {type(e).__name__}"
 
 
 def remove_channel(raw):
