@@ -54,11 +54,11 @@ CRACK_ALERT_FLOOR = 20.0   # 3-2-1 크랙 $/bbl 경보선
 
 # ===== 수집 =====
 
-def _fetch_series(sid):
+def _fetch_series(sid, length=FETCH_LENGTH):
     """{date: value} (date는 'YYYY-MM-DD'). 실패 시 예외."""
     r = requests.get(
         API_URL.format(sid=sid),
-        params={"api_key": API_KEY, "length": FETCH_LENGTH},
+        params={"api_key": API_KEY, "length": length},
         timeout=30,
     )
     r.raise_for_status()

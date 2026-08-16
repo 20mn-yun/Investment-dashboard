@@ -3337,5 +3337,20 @@ def get_refinery():
     return jsonify(data)
 
 
+@app.route("/api/refinery/backtest", methods=["GET"])
+def get_refinery_backtest():
+    """정유 지표 백테스트 결과. 캐시 TTL 30일.
+    캐시 없으면 available=false 반환(장시간 자동 계산 방지), ?refresh=1 시 재계산(수 분 소요)."""
+    force = request.args.get("refresh", "").lower() in ("1", "true", "yes")
+    try:
+        import refinery_backtest
+        data = refinery_backtest.get_backtest_data(force=force)
+    except Exception as e:
+        return jsonify({"error": f"백테스트를 계산하지 못했습니다: {e}"}), 500
+    if data is None:
+        return jsonify({"available": False})
+    return jsonify(data)
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8000, debug=False)

@@ -1384,10 +1384,21 @@
         #tab-refinery .metric-card .desc { font-size: 11px; color: var(--text-muted); opacity: 0.65; margin-top: 6px; line-height: 1.45; }
         #tab-refinery .refinery-chart-box { position: relative; height: 200px; }
         #tab-refinery .refinery-chart-sub { font-size: 12px; color: var(--text-muted); margin: -8px 0 8px; }
+        #tab-refinery .bt-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        #tab-refinery .bt-meta { font-size: 13px; color: var(--text-muted); }
+        #tab-refinery .bt-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+        #tab-refinery .bt-table th { text-align: right; padding: 6px 10px; color: var(--text-muted); border-bottom: 1px solid var(--border); font-weight: normal; font-size: 12px; }
+        #tab-refinery .bt-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--bg-panel); }
+        #tab-refinery .bt-table tr:last-child td { border-bottom: none; }
+        #tab-refinery .bt-table th:first-child, #tab-refinery .bt-table td:first-child { text-align: left; }
+        #tab-refinery .bt-judge { font-size: 11px; margin-left: 4px; }
+        #tab-refinery .bt-summary { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+        #tab-refinery .bt-empty { font-size: 13px; color: var(--text-dim); padding: 8px 0; }
         @media (max-width: 900px) {
             #tab-refinery .metrics-grid { grid-template-columns: repeat(2, 1fr); }
             #tab-refinery .metric-card .desc { font-size: 10px; }
             #tab-refinery .refinery-chart-sub { font-size: 11px; }
+            #tab-refinery .bt-table { font-size: 12px; }
         }
     </style>
 </head>
@@ -1913,10 +1924,26 @@
 
         <div class="section-title" style="margin-top:24px;">행동 규칙</div>
         <div class="data-table">
-            <div class="data-row"><span class="data-label">주간지표 2개 경보</span><span class="data-value">포지션 절반 축소</span></div>
+            <div class="data-row"><span class="data-label">매도 방아쇠의 우선순위</span><span class="data-value">① 뉴스(휴전 구체화·중국 쿼터 확대) = 선행 → 즉시 대응 ② 크랙 4주 하락 추세 = 동행 확인 → 축소 개시 ③ $20 하회 = 최종 확인 → 잔여 정리 (크랙은 동행지표라 ③에서 시작하면 늦음)</span></div>
             <div class="data-row"><span class="data-label">러-우 휴전 구체화 헤드라인</span><span class="data-value">즉시 축소</span></div>
             <div class="data-row"><span class="data-label">유분 z &gt; -1 복귀</span><span class="data-value">고마진 국면 종료 신호</span></div>
             <div class="data-row"><span class="data-label">사우디 OSP·중국 수출쿼터 (월초)</span><span class="data-value">뉴스로 별도 확인</span></div>
+        </div>
+
+        <div class="section-title" style="margin-top:24px;">📐 지표 유효성 검증 (백테스트)</div>
+        <div class="data-table">
+            <div class="bt-toolbar">
+                <span class="bt-meta" id="refinery-bt-meta">백테스트 결과 확인 중...</span>
+                <button class="refinery-refresh-btn" id="refinery-bt-btn" onclick="loadRefineryBacktest(true)">재계산</button>
+            </div>
+            <div class="bt-empty" id="refinery-bt-empty" style="display:none;">백테스트 미실행 — 재계산 버튼을 누르세요 (약 2분 소요)</div>
+            <div id="refinery-bt-body" style="display:none;">
+                <table class="bt-table" id="refinery-bt-table"></table>
+                <div class="bt-summary" id="refinery-bt-summary"></div>
+                <div class="section-title" style="margin-top:16px;">3-2-1 크랙 13주 변화 ↔ 3사 평균 주가 13주 수익률 · 104주 롤링 상관</div>
+                <div class="refinery-chart-sub">상관이 장기간 0.3 아래로 내려가면 지표 체계 재설계 필요</div>
+                <div class="refinery-chart-box"><canvas id="refinery-bt-chart"></canvas></div>
+            </div>
         </div>
     </div>
 </div>
@@ -6598,6 +6625,7 @@
             renderRefineryCharts(data.history);
             loading.style.display = 'none';
             content.style.display = 'block';
+            loadRefineryBacktest();
         } catch (e) {
             loading.style.display = 'block';
             loading.textContent = '정유 지표를 불러오지 못했습니다: ' + e.message;
@@ -6620,13 +6648,13 @@
         const fmt = v => v == null ? '—' : Number(v).toFixed(2);
         const cards = [
             ['3-2-1 크랙', latest.crack_321, v => '$' + fmt(v),
-             '원유 3배럴→휘발유 2+디젤 1 정제 시 마진. 정유사 수익성의 핵심 지표. 평시 $15~20, $20 하회 시 호황 논지 훼손 경보'],
+             '원유 3배럴→휘발유 2+디젤 1 정제 시 마진. 정유사 수익성의 핵심 지표. 평시 $15~25(2015~21년 평균 $12~18), $20 하회 시 호황 논지 훼손 경보'],
             ['ULSD-Brent 크랙', latest.ulsd_brent, v => '$' + fmt(v),
-             '디젤값−브렌트유. 유럽 고원가 한계설비의 수익성 프록시. 이 설비까지 돌 만큼 공급이 부족한지를 보여줌. 평시 $15~25'],
+             '디젤값−브렌트유. 유럽 고원가 한계설비의 수익성 프록시 — 이 설비까지 돌 만큼 공급이 부족한지를 보여줌. 평시 $20~40, 스트레스 국면 $60+. 절대값보다 아래 차트의 자기 역사 대비 위치와 추세로 읽을 것'],
             ['유분 재고 z', latest.dist_z, v => fmt(v) + 'σ',
-             '미국 디젤 재고가 최근 5년 같은 시기 평균에서 몇 표준편차 벗어났는지. 음수=재고 부족(마진 지지). -1 위로 복귀하면 완충 재건=호황 종료 신호'],
+             "미국 디젤 재고의 5년 계절 대비 이탈도. 백테스트 결과 주가 '예측력'은 없음(동행 확인용) — 음수 유지 = 타이트 국면 지속의 확인, -1 상향 돌파 = 국면 전환 점검 신호"],
             ['휘발유 재고 z', latest.gas_z, v => fmt(v) + 'σ',
-             '미국 휘발유 재고의 5년 계절 대비 이탈도. 업계가 디젤 생산에 집중하며 휘발유 재고가 고갈 중 — 깊은 음수는 차기 휘발유 크랙 강세 신호'],
+             '미국 휘발유 재고의 5년 계절 대비 이탈도. 깊은 음수 = 차기 휘발유 크랙 강세 후보(백테스트: 3사 중 PSX에서만 약한 예측력 확인)'],
         ];
         document.getElementById('refinery-cards').innerHTML = cards.map(([label, m, f, desc]) => {
             const st = REFINERY_STATUS[m.status] || REFINERY_STATUS.warn;
@@ -6684,6 +6712,96 @@
             ] },
             options: baseOpts,
         }));
+    }
+
+    // ===== 정유 백테스트 =====
+    let refineryBtChart = null;
+    const REFINERY_BT_ROWS = [
+        ['crack_321', '3-2-1 크랙'], ['ulsd_brent', 'ULSD-Brent'],
+        ['dist_z', '유분 z'], ['gas_z', '휘발유 z'],
+    ];
+    const REFINERY_BT_JUDGE_CLS = { '유효': 'positive', '보조': 'neutral', '재검토 필요': 'negative' };
+
+    async function loadRefineryBacktest(force) {
+        const meta = document.getElementById('refinery-bt-meta');
+        const body = document.getElementById('refinery-bt-body');
+        const empty = document.getElementById('refinery-bt-empty');
+        const btn = document.getElementById('refinery-bt-btn');
+        try {
+            if (force) {
+                btn.disabled = true;
+                empty.style.display = 'none';
+                meta.textContent = '재계산 중... (약 2분 소요, 창을 닫지 마세요)';
+            }
+            const res = await fetch(API_BASE + '/api/refinery/backtest' + (force ? '?refresh=1' : ''));
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            if (data.available === false) {
+                meta.textContent = '';
+                empty.style.display = 'block';
+                body.style.display = 'none';
+                return;
+            }
+            renderRefineryBacktest(data);
+        } catch (e) {
+            meta.textContent = '백테스트 결과를 불러오지 못했습니다: ' + e.message;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function renderRefineryBacktest(d) {
+        const tickers = d.tickers;
+        const fmt2 = v => v == null ? '—' : Number(v).toFixed(2);
+        document.getElementById('refinery-bt-empty').style.display = 'none';
+        document.getElementById('refinery-bt-meta').textContent =
+            `분석 기간 ${d.period.start} ~ ${d.period.end} · 관측치 ${d.n_obs.crack_321[tickers[0]]}주 · 셀 = 13주 변화 상관`
+            + (d.failed_tickers && d.failed_tickers.length ? ` · 수집 실패: ${d.failed_tickers.join(',')}` : '')
+            + (d.stale ? ' · 캐시 30일 경과 — 재계산 권장' : '');
+
+        let html = `<tr><th>지표</th>${tickers.map(t => `<th>${t}</th>`).join('')}</tr>`;
+        for (const [key, label] of REFINERY_BT_ROWS) {
+            html += `<tr><td style="font-weight:600;">${label}</td>` + tickers.map(t => {
+                const c = d.corr_chg13[key][t];
+                const cls = REFINERY_BT_JUDGE_CLS[c.judgment] || 'neutral';
+                return `<td><b>${fmt2(c.corr)}</b><span class="bt-judge ${cls}">${c.judgment}</span></td>`;
+            }).join('') + '</tr>';
+        }
+        document.getElementById('refinery-bt-table').innerHTML = html;
+
+        const levels = REFINERY_BT_ROWS.flatMap(([k]) => tickers.map(t => d.corr_level[k][t])).filter(v => v != null);
+        const ll = tickers.map(t =>
+            `${t} ${d.leadlag[t].best_lag > 0 ? '+' : ''}${d.leadlag[t].best_lag}주(r=${fmt2(d.leadlag[t].best_corr)})`).join(', ');
+        const icTxt = [['dist_z', '유분'], ['gas_z', '휘발유']].map(([k, name]) =>
+            `${name} ` + tickers.map(t => {
+                const e = d.ic[k][t];
+                return `${t} ${fmt2(e.corr)}(${e.judgment})`;
+            }).join(' / ')).join(' · ');
+        document.getElementById('refinery-bt-summary').innerHTML =
+            `레벨 상관(참고): ${fmt2(Math.min(...levels))} ~ ${fmt2(Math.max(...levels))} · ` +
+            `선행-후행 최적 lag(crack, +=지표 선행): ${ll} · ` +
+            `IC(현재 z → 향후 13주 수익률): ${icTxt}<br>` +
+            `크랙-주가 상관 서열(VLO&gt;MPC&gt;PSX)은 정유 사업 순도 서열과 일치 — 크랙 상승 국면의 최대 수혜는 VLO, 방어는 PSX`;
+
+        if (refineryBtChart) refineryBtChart.destroy();
+        const n = d.rolling.dates.length;
+        refineryBtChart = new Chart(document.getElementById('refinery-bt-chart'), {
+            type: 'line',
+            data: { labels: d.rolling.dates, datasets: [
+                { label: '104주 롤링 상관 (3사 평균)', data: d.rolling.values, borderColor: '#0969da', pointRadius: 0, borderWidth: 1.5, tension: 0.1, spanGaps: true },
+                { label: '재설계 기준 0.3', data: Array(n).fill(0.3), borderColor: '#cf222e', borderDash: [5, 5], borderWidth: 1, pointRadius: 0, spanGaps: true },
+            ] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: true, position: 'top', labels: { color: '#57606a', font: { size: 11 }, boxWidth: 18 } } },
+                scales: {
+                    x: { ticks: { color: '#1f2937', maxTicksLimit: 12, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                    y: { beginAtZero: false, ticks: { color: '#1f2937', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                },
+            },
+        });
+        document.getElementById('refinery-bt-body').style.display = 'block';
     }
 </script>
 
