@@ -3324,5 +3324,18 @@ def korea_export_sub_detail():
     })
 
 
+# --- 정유 지표(크랙스프레드·재고 z-score) API ---
+@app.route("/api/refinery", methods=["GET"])
+def get_refinery():
+    """정유 조기경보 지표 (EIA). 캐시 6시간 TTL, ?refresh=1 시 캐시 무시."""
+    force = request.args.get("refresh", "").lower() in ("1", "true", "yes")
+    try:
+        import refinery_tracker
+        data = refinery_tracker.get_refinery_data(force=force)
+    except Exception as e:
+        return jsonify({"error": f"정유 지표 데이터를 불러오지 못했습니다: {e}"}), 500
+    return jsonify(data)
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8000, debug=False)
