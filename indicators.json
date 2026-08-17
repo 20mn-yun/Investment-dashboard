@@ -1,0 +1,91 @@
+{
+  "_comment": "주요 지표 탭 수집 대상. source: kis_investor | yfinance | ecos. 지표 추가·삭제는 이 파일만 수정.",
+  "indicators": [
+    {
+      "id": "kospi_foreign_net",
+      "name": "코스피 외국인 순매수",
+      "source": "kis_investor",
+      "source_params": {
+        "fields": ["frgn_ntby_tr_pbmn"]
+      },
+      "unit": "백만원",
+      "display": {
+        "chart": "bar",
+        "derived": ["ma_4w", "cum_2y"]
+      },
+      "enabled": true
+    },
+    {
+      "id": "kospi_investor_net",
+      "name": "코스피 주체별 순매수",
+      "source": "kis_investor",
+      "source_params": {
+        "fields": ["prsn_ntby_tr_pbmn", "frgn_ntby_tr_pbmn", "orgn_ntby_tr_pbmn"]
+      },
+      "unit": "백만원",
+      "display": {
+        "chart": "line",
+        "derived": ["cum_2y"]
+      },
+      "enabled": true
+    },
+    {
+      "id": "usdkrw",
+      "name": "원달러 환율",
+      "source": "yfinance",
+      "source_params": {
+        "ticker": "USDKRW=X"
+      },
+      "unit": "원",
+      "display": {
+        "chart": "line",
+        "derived": []
+      },
+      "enabled": true
+    },
+    {
+      "id": "us10y",
+      "name": "미국채 10년 금리",
+      "source": "yfinance",
+      "source_params": {
+        "ticker": "^TNX"
+      },
+      "unit": "%",
+      "display": {
+        "chart": "line",
+        "derived": []
+      },
+      "enabled": true
+    },
+    {
+      "id": "ktb3y",
+      "name": "국고채 3년 금리",
+      "source": "ecos",
+      "source_params": {
+        "stat_code": "817Y002",
+        "item_code": "010200000",
+        "cycle": "D"
+      },
+      "unit": "%",
+      "display": {
+        "chart": "line",
+        "derived": []
+      },
+      "enabled": true
+    },
+    {
+      "id": "wti",
+      "name": "WTI 선물",
+      "source": "yfinance",
+      "source_params": {
+        "ticker": "CL=F"
+      },
+      "unit": "USD/bbl",
+      "display": {
+        "chart": "line",
+        "derived": []
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -1404,6 +1404,50 @@
             #tab-refinery .refinery-chart-sub { font-size: 11px; }
             #tab-refinery .bt-table { font-size: 12px; }
         }
+
+        /* ===== 주요 지표 탭 ===== */
+        #tab-indicators .ind-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        #tab-indicators .ind-asof { font-size: 13px; color: var(--text-muted); }
+        #tab-indicators .ind-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        #tab-indicators .ind-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; min-width: 0; overflow-wrap: anywhere; }
+        #tab-indicators .ind-card-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+        #tab-indicators .ind-name { font-size: 14px; font-weight: 700; color: var(--text); }
+        #tab-indicators .ind-date { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+        #tab-indicators .ind-value-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+        #tab-indicators .ind-value { font-size: 24px; font-weight: 700; color: var(--text); }
+        #tab-indicators .ind-unit { font-size: 12px; color: var(--text-muted); }
+        #tab-indicators .ind-change { font-size: 13px; font-weight: 600; }
+        #tab-indicators .ind-up { color: var(--up); }
+        #tab-indicators .ind-down { color: var(--accent); }
+        #tab-indicators .ind-flat { color: var(--text-muted); }
+        #tab-indicators .ind-badge { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 9px; white-space: nowrap; }
+        #tab-indicators .ind-badge.above { color: var(--up); background: rgba(207,34,46,0.12); }
+        #tab-indicators .ind-badge.below { color: var(--accent); background: rgba(9,105,218,0.12); }
+        #tab-indicators .ind-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.5; }
+        #tab-indicators .ind-sub b { color: var(--text); font-weight: 600; }
+        #tab-indicators .ind-chart-box { position: relative; height: 200px; min-width: 0; cursor: pointer; border-radius: 6px; transition: background-color 0.15s; -webkit-tap-highlight-color: rgba(9,105,218,0.12); }
+        #tab-indicators .ind-chart-box:hover { background: rgba(9,105,218,0.04); }
+        #tab-indicators .ind-chart-box:active { background: rgba(9,105,218,0.10); }
+        #tab-indicators .ind-chart-hint { position: absolute; right: 6px; top: 2px; font-size: 10px; color: var(--text-dim); pointer-events: none; }
+        #tab-indicators .ind-loading, #tab-indicators .ind-empty { color: var(--text-muted); padding: 40px 0; text-align: center; font-size: 14px; }
+        /* 지표 차트 확대 모달 (기존 .chart-overlay 패턴 준용) */
+        .ind-modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px 20px; width: 90vw; max-width: 1400px; height: 88vh; height: 88dvh; display: flex; flex-direction: column; min-width: 0; }
+        .ind-modal-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-shrink: 0; }
+        .ind-modal-title { font-size: 17px; font-weight: 700; color: var(--accent); overflow-wrap: anywhere; }
+        .ind-modal-sub { font-size: 12px; color: var(--text-muted); margin-left: auto; margin-right: 8px; white-space: nowrap; }
+        .ind-modal-body { position: relative; flex: 1 1 auto; min-height: 0; min-width: 0; }
+        @media (max-width: 480px) {
+            .ind-modal { width: 100vw; height: 100vh; height: 100dvh; border-radius: 0; padding: 10px 12px 14px; }
+            .ind-modal-title { font-size: 15px; }
+            .ind-modal-sub { display: none; }
+        }
+        @media (max-width: 1024px) and (orientation: portrait), (max-width: 768px) {
+            #tab-indicators .ind-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+        @media (max-width: 480px) {
+            #tab-indicators .ind-value { font-size: 20px; }
+            #tab-indicators .ind-chart-box { height: 180px; }
+        }
     </style>
 </head>
 <body>
@@ -1416,7 +1460,8 @@
 
 <!-- 탭 -->
 <div class="tabs">
-    <div class="tab active" onclick="switchTab('market')">🌍 글로벌 마켓</div>
+    <div class="tab active" onclick="switchTab('indicators')">📊 주요 지표</div>
+    <div class="tab" onclick="switchTab('market')">🌍 글로벌 마켓</div>
     <div class="tab" onclick="switchTab('korea')">🇰🇷 한국 마켓</div>
     <div class="tab" onclick="switchTab('export')">🚢 수출</div>
     <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
@@ -1429,8 +1474,30 @@
     <div class="tab" onclick="switchTab('refinery')">🛢️ 정유</div>
 </div>
 
+<!-- 주요 지표 탭 -->
+<div class="tab-content active" id="tab-indicators">
+    <div class="ind-header">
+        <span class="section-title" style="margin:0; border:none;">📊 주요 지표</span>
+        <span class="ind-asof" id="ind-asof"></span>
+    </div>
+    <div class="ind-loading" id="ind-loading">지표 데이터를 불러오는 중...</div>
+    <div class="ind-grid" id="ind-grid" style="display:none;"></div>
+</div>
+
+<!-- 주요 지표 차트 확대 모달 -->
+<div class="chart-overlay" id="ind-overlay" onclick="if(event.target===this)closeIndModal()">
+    <div class="ind-modal">
+        <div class="ind-modal-head">
+            <span class="ind-modal-title" id="ind-modal-title"></span>
+            <span class="ind-modal-sub" id="ind-modal-sub"></span>
+            <span class="chart-close" onclick="closeIndModal()">x</span>
+        </div>
+        <div class="ind-modal-body"><canvas id="ind-modal-canvas"></canvas></div>
+    </div>
+</div>
+
 <!-- 글로벌 마켓 탭 -->
-<div class="tab-content active" id="tab-market">
+<div class="tab-content" id="tab-market">
 
     <!-- 핵심 지표 -->
     <div class="metrics-grid">
@@ -2232,6 +2299,7 @@
     // 탭 전환
     let calLoaded = false;
     let dartLoaded = false;
+    let indicatorsLoaded = false;
     let reportLoaded = false;
     let leadersLoaded = false;
     let stocksLoaded = false;
@@ -2286,6 +2354,10 @@
         if (tabName === 'refinery' && !refineryLoaded) {
             refineryLoaded = true;
             loadRefinery();
+        }
+        if (tabName === 'indicators' && !indicatorsLoaded) {
+            indicatorsLoaded = true;
+            loadIndicators();
         }
     }
 
@@ -4166,6 +4238,9 @@
     loadGroups();
     fetchAllData();
     loadTopGainers();
+    // 주요 지표 탭이 기본 탭이므로 페이지 로드 시 즉시 로드
+    indicatorsLoaded = true;
+    loadIndicators();
 
     // 30초마다 자동 새로고침
     setInterval(fetchAllData, 30000);
@@ -6843,6 +6918,184 @@
             },
         });
         document.getElementById('refinery-bt-body').style.display = 'block';
+    }
+
+    // ===== 주요 지표 =====
+    let indicatorsCharts = [];
+    const IND_AXIS = { ticks: { color: '#1f2937', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } };
+    const IND_LEGEND = { display: true, position: 'top', labels: { color: '#57606a', font: { size: 11 }, usePointStyle: true, boxWidth: 18 } };
+    const IND_SERIES_COLORS = { individual: '#1a7f37', foreign: '#cf222e', institution: '#0969da' };
+    const IND_SERIES_LABELS = { individual: '개인', foreign: '외국인', institution: '기관' };
+
+    function indFmtNum(v, digits) {
+        if (v == null || isNaN(v)) return '—';
+        const d = digits != null ? digits : (Math.abs(v) >= 100 ? 2 : 3);
+        return Number(v).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
+    }
+    // 국내 관례: 상승 빨강(.ind-up = --up), 하락 파랑(.ind-down = --accent)
+    function indChangeHtml(change, pct, unit) {
+        if (change == null) return '<span class="ind-change ind-flat">—</span>';
+        const cls = change > 0 ? 'ind-up' : (change < 0 ? 'ind-down' : 'ind-flat');
+        const sign = change > 0 ? '+' : '';
+        const pctTxt = pct != null ? ` (${sign}${indFmtNum(pct, 2)}%)` : '';
+        return `<span class="ind-change ${cls}">${sign}${indFmtNum(change)}${unit ? ' ' + unit : ''}${pctTxt}</span>`;
+    }
+    // zoom=true(확대 모달)면 X축 눈금을 카드보다 촘촘하게. 데이터 범위는 동일(90일).
+    function indBaseOpts(extra, zoom, xTicks) {
+        const ticks = zoom ? IND_ZOOM_X_TICKS : (xTicks || 8);
+        return Object.assign({
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: IND_LEGEND },
+            scales: { x: { ...IND_AXIS, ticks: { ...IND_AXIS.ticks, maxTicksLimit: ticks } }, y: { ...IND_AXIS, beginAtZero: false } },
+        }, extra || {});
+    }
+
+    // ---- 차트 확대 모달 ----
+    // 카드 렌더러는 buildConfig(zoom) 함수를 돌려주고, mountIndChart가 카드 차트 생성 + 설정 보관 + 클릭 확대를 공통 처리한다.
+    // 지표가 추가되어도(공통/전용 렌더러 무관) 자동으로 확대 기능이 붙는다.
+    const IND_ZOOM_X_TICKS = 18;
+    let indModalChart = null;
+
+    function mountIndChart(canvasId, title, buildConfig, subText) {
+        const canvas = document.getElementById(canvasId);
+        indicatorsCharts.push(new Chart(canvas, buildConfig(false)));
+        const box = canvas.parentElement;
+        box.title = '터치/클릭하면 확대';
+        box.setAttribute('role', 'button');
+        box.setAttribute('tabindex', '0');
+        box.insertAdjacentHTML('beforeend', '<span class="ind-chart-hint">⤢ 확대</span>');
+        const open = () => openIndModal(title, buildConfig, subText);
+        box.addEventListener('click', open);
+        box.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    }
+
+    function openIndModal(title, buildConfig, subText) {
+        document.getElementById('ind-modal-title').textContent = title;
+        document.getElementById('ind-modal-sub').textContent = subText || '';
+        document.getElementById('ind-overlay').classList.add('active');
+        document.body.style.overflow = 'hidden';                 // 배경 스크롤 잠금
+        if (indModalChart) { indModalChart.destroy(); indModalChart = null; }
+        // display:none→flex 전환 후 canvas 크기 인식을 위해 딜레이 (기존 openChart 패턴)
+        setTimeout(() => {
+            if (indModalChart) { indModalChart.destroy(); indModalChart = null; }
+            indModalChart = new Chart(document.getElementById('ind-modal-canvas'), buildConfig(true));
+        }, 50);
+    }
+
+    function closeIndModal() {
+        document.getElementById('ind-overlay').classList.remove('active');
+        document.body.style.overflow = '';
+        if (indModalChart) { indModalChart.destroy(); indModalChart = null; }   // 반복 열닫기 누적 방지
+    }
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.getElementById('ind-overlay').classList.contains('active')) closeIndModal();
+    });
+
+    async function loadIndicators() {
+        const loading = document.getElementById('ind-loading');
+        const grid = document.getElementById('ind-grid');
+        loading.style.display = 'block';
+        loading.textContent = '지표 데이터를 불러오는 중...';
+        grid.style.display = 'none';
+        try {
+            const res = await fetch(API_BASE + '/api/indicators');
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                // 503 등: 화면에 안내 (빈 화면 금지)
+                loading.textContent = '지표 데이터 준비 중' + (data && data.error ? ' — ' + data.error : '');
+                return;
+            }
+            document.getElementById('ind-asof').textContent = data.updated_at ? `갱신 ${data.updated_at} · 최근 ${data.recent_days}일` : '';
+            renderIndicators(data.items || []);
+            loading.style.display = 'none';
+            grid.style.display = 'grid';
+        } catch (e) {
+            loading.textContent = '지표 데이터 준비 중 — ' + e.message;
+        }
+    }
+
+    function renderIndicators(items) {
+        indicatorsCharts.forEach(c => c.destroy());
+        indicatorsCharts = [];
+        const grid = document.getElementById('ind-grid');
+        grid.innerHTML = '';
+        if (!items.length) { grid.innerHTML = '<div class="ind-empty">표시할 지표가 없습니다</div>'; return; }
+        // 응답 지표 목록을 순회해 카드 동적 생성 — 수급 2종은 전용, 나머지는 공통 렌더러
+        items.forEach((it, idx) => {
+            const card = document.createElement('div');
+            card.className = 'ind-card';
+            const canvasId = 'ind-chart-' + idx;
+            if (!it.available) {
+                card.innerHTML = `<div class="ind-card-top"><span class="ind-name">${it.name}</span></div><div class="ind-sub">${it.message || '데이터 없음'}</div>`;
+                grid.appendChild(card); return;
+            }
+            let spec;   // { buildConfig(zoom), subText }
+            if (it.id === 'kospi_foreign_net') spec = renderIndForeignCard(card, it, canvasId);
+            else if (it.id === 'kospi_investor_net') spec = renderIndInvestorsCard(card, it, canvasId);
+            else spec = renderIndScalarCard(card, it, canvasId);
+            grid.appendChild(card);
+            mountIndChart(canvasId, it.name, spec.buildConfig, spec.subText);   // 캔버스가 DOM에 붙은 뒤 차트 생성 + 확대 연결
+        });
+    }
+
+    // 공통 카드: 최신값·전일 대비·기준일 + 90일 라인
+    function renderIndScalarCard(card, it, canvasId) {
+        card.innerHTML =
+            `<div class="ind-card-top"><span class="ind-name">${it.name}</span><span class="ind-date">${it.latest_date}</span></div>` +
+            `<div class="ind-value-row"><span class="ind-value">${indFmtNum(it.latest)}</span><span class="ind-unit">${it.unit_display || it.unit || ''}</span>${indChangeHtml(it.change, it.change_pct)}</div>` +
+            `<div class="ind-chart-box"><canvas id="${canvasId}"></canvas></div>`;
+        const buildConfig = (zoom) => ({
+            type: 'line',
+            data: { labels: it.series.dates, datasets: [
+                { label: it.name, data: it.series.values, borderColor: '#0969da', backgroundColor: 'rgba(9,105,218,0.06)', pointStyle: 'line', pointRadius: 0, borderWidth: zoom ? 2 : 1.5, tension: 0.1, fill: true },
+            ] },
+            options: indBaseOpts(null, zoom),
+        });
+        return { buildConfig, subText: `최근 90일 · 기준일 ${it.latest_date} · 단위 ${it.unit_display || it.unit || ''}` };
+    }
+
+    // 외국인 순매수 전용: 일별 막대 + 4주이평 선, 상단 배지·730일 누적
+    function renderIndForeignCard(card, it, canvasId) {
+        const badge = it.vs_ma_4w ? `<span class="ind-badge ${it.vs_ma_4w}">4주이평 ${it.vs_ma_4w === 'above' ? '상회' : '하회'}</span>` : '';
+        card.innerHTML =
+            `<div class="ind-card-top"><span class="ind-name">${it.name}</span><span class="ind-date">${it.latest_date}</span></div>` +
+            `<div class="ind-value-row"><span class="ind-value">${it.latest > 0 ? '+' : ''}${indFmtNum(it.latest, 2)}</span><span class="ind-unit">조원 (일별)</span>${indChangeHtml(it.change, null, '조원')}${badge}</div>` +
+            `<div class="ind-sub">4주 이평 <b>${indFmtNum(it.ma_4w, 3)}조원</b> · 최근 2년(730일) 누적 <b>${it.cum_2y > 0 ? '+' : ''}${indFmtNum(it.cum_2y, 2)}조원</b> <span style="opacity:.75">(${it.cum_window_start}~)</span></div>` +
+            `<div class="ind-chart-box"><canvas id="${canvasId}"></canvas></div>`;
+        const buildConfig = (zoom) => ({
+            data: { labels: it.series.dates, datasets: [
+                { type: 'line', label: '4주 이평(20영업일)', data: it.series.ma_4w, borderColor: '#9a6700', pointStyle: 'line', pointRadius: 0, borderWidth: zoom ? 2 : 1.5, tension: 0.15, spanGaps: true, order: 1 },
+                { type: 'bar', label: '일별 순매수(조원)', data: it.series.values, pointStyle: 'rect',
+                  backgroundColor: it.series.values.map(v => v >= 0 ? 'rgba(207,34,46,0.55)' : 'rgba(9,105,218,0.55)'), order: 2 },
+            ] },
+            options: indBaseOpts(null, zoom),
+        });
+        return { buildConfig, subText: `최근 90일 · 기준일 ${it.latest_date} · 막대=일별 순매수(조원), 선=4주 이평` };
+    }
+
+    // 주체별 순매수 전용: 개인·외국인·기관 누적 3선 + window_start 명시
+    function renderIndInvestorsCard(card, it, canvasId) {
+        const keys = Object.keys(it.series.cum);
+        const latestTxt = keys.map(k => `${IND_SERIES_LABELS[k] || k} <b class="${it.latest[k] > 0 ? 'ind-up' : (it.latest[k] < 0 ? 'ind-down' : '')}">${it.latest[k] > 0 ? '+' : ''}${indFmtNum(it.latest[k], 2)}</b>`).join(' · ');
+        const cumTxt = keys.map(k => `${IND_SERIES_LABELS[k] || k} <b>${it.cum_2y[k] > 0 ? '+' : ''}${indFmtNum(it.cum_2y[k], 2)}조</b>`).join(' · ');
+        card.innerHTML =
+            `<div class="ind-card-top"><span class="ind-name">${it.name}</span><span class="ind-date">${it.latest_date}</span></div>` +
+            `<div class="ind-sub">일별(조원): ${latestTxt}</div>` +
+            `<div class="ind-sub">누적(조원): ${cumTxt}<br><span style="opacity:.75">기준: ${it.cum_window_start}부터 누적</span></div>` +
+            `<div class="ind-chart-box"><canvas id="${canvasId}"></canvas></div>`;
+        const buildConfig = (zoom) => ({
+            type: 'line',
+            data: { labels: it.series.dates, datasets: keys.map(k => ({
+                label: (IND_SERIES_LABELS[k] || k) + ' 누적', data: it.series.cum[k],
+                borderColor: IND_SERIES_COLORS[k] || '#57606a', pointStyle: 'line', pointRadius: 0, borderWidth: zoom ? 2 : 1.5, tension: 0.1,
+            })) },
+            options: indBaseOpts({ scales: {
+                x: { ...IND_AXIS, ticks: { ...IND_AXIS.ticks, maxTicksLimit: zoom ? IND_ZOOM_X_TICKS : 10 } },
+                y: { ...IND_AXIS, beginAtZero: false, title: { display: true, text: '조원', color: '#57606a', font: { size: 10 } } },
+            } }, zoom),
+        });
+        return { buildConfig, subText: `기준: ${it.cum_window_start}부터 누적(조원) · 최신 ${it.latest_date}` };
     }
 </script>
 

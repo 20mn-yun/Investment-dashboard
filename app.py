@@ -3373,5 +3373,138 @@ def get_refinery_backtest():
     return jsonify(data)
 
 
+# --- 주요 지표 API (indicators_tracker.py 수집분) ---
+INDICATORS_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "indicators.json")
+INDICATORS_HISTORY_PATH = os.path.join("cache", "indicators_history.json")
+INDICATORS_RECENT_DAYS = 90          # 차트용 최근 시계열 길이(일)
+INDICATORS_MA_DAYS = 20              # 4주 이동평균 = 20영업일
+INDICATORS_CUM_WINDOW_DAYS = 730     # 롤링 누적 윈도우(캘린더 일)
+_KRW_TRILLION_PER_MILLION = 1_000_000  # 백만원 → 조원 나눗셈 계수
+_indicators_cache = {"mtime": None, "data": None}
+_indicators_lock = threading.Lock()
+
+
+def _ind_change(series_vals):
+    """(최신값, 직전값) → 변화량·변화율. 직전값 없거나 0이면 None."""
+    if len(series_vals) < 2 or series_vals[-2] in (None, 0):
+        return None, None
+    delta = series_vals[-1] - series_vals[-2]
+    return round(delta, 6), round(delta / abs(series_vals[-2]) * 100, 4)
+
+
+def _ind_build_kis_foreign(dates, raw):
+    """코스피 외국인 순매수: 조원 환산, 20영업일 이평, 이평 상회/하회, 730일 롤링 누적."""
+    vals_t = [round(raw[d] / _KRW_TRILLION_PER_MILLION, 2) for d in dates]
+    ma = []
+    for i in range(len(vals_t)):
+        if i + 1 < INDICATORS_MA_DAYS:
+            ma.append(None)
+        else:
+            ma.append(round(sum(vals_t[i + 1 - INDICATORS_MA_DAYS:i + 1]) / INDICATORS_MA_DAYS, 3))
+    latest_dt = date.fromisoformat(dates[-1])
+    win_start = (latest_dt - timedelta(days=INDICATORS_CUM_WINDOW_DAYS)).isoformat()
+    cum = sum(raw[d] for d in dates if win_start < d <= dates[-1]) / _KRW_TRILLION_PER_MILLION
+    delta, pct = _ind_change(vals_t)
+    ma_latest = ma[-1]
+    return {
+        "unit_display": "조원",
+        "latest": vals_t[-1], "latest_date": dates[-1],
+        "change": delta, "change_pct": pct,
+        "ma_4w": ma_latest,
+        "vs_ma_4w": (None if ma_latest is None else ("above" if vals_t[-1] > ma_latest else "below")),
+        "cum_2y": round(cum, 2), "cum_window_start": win_start,
+        "series": {
+            "dates": dates[-INDICATORS_RECENT_DAYS:],
+            "values": vals_t[-INDICATORS_RECENT_DAYS:],
+            "ma_4w": ma[-INDICATORS_RECENT_DAYS:],
+        },
+    }
+
+
+def _ind_build_kis_investors(dates, raw, fields):
+    """주체별 순매수: 최신일 기준 730일 윈도우 시작점부터의 단순 누적합 시계열(조원)."""
+    latest_dt = date.fromisoformat(dates[-1])
+    win_start = (latest_dt - timedelta(days=INDICATORS_CUM_WINDOW_DAYS)).isoformat()
+    win_dates = [d for d in dates if win_start < d <= dates[-1]]
+    label = {"prsn_ntby_tr_pbmn": "individual", "frgn_ntby_tr_pbmn": "foreign", "orgn_ntby_tr_pbmn": "institution"}
+    out = {"unit_display": "조원", "latest_date": dates[-1], "cum_window_start": win_start,
+           "latest": {}, "change": {}, "cum_2y": {}, "series": {"dates": win_dates, "cum": {}}}
+    for f in fields:
+        key = label.get(f, f)
+        daily_t = [raw[d][f] / _KRW_TRILLION_PER_MILLION for d in dates]
+        out["latest"][key] = round(daily_t[-1], 2)
+        out["change"][key] = round(daily_t[-1] - daily_t[-2], 2) if len(daily_t) >= 2 else None
+        acc, cum_series = 0.0, []
+        for d in win_dates:
+            acc += raw[d][f] / _KRW_TRILLION_PER_MILLION
+            cum_series.append(round(acc, 2))
+        out["cum_2y"][key] = round(acc, 2)
+        out["series"]["cum"][key] = cum_series
+    return out
+
+
+def _ind_build_scalar(dates, raw, unit):
+    """환율·금리·WTI: 원본 값 그대로."""
+    vals = [raw[d] for d in dates]
+    delta, pct = _ind_change(vals)
+    return {
+        "unit_display": unit,
+        "latest": vals[-1], "latest_date": dates[-1],
+        "change": delta, "change_pct": pct,
+        "series": {"dates": dates[-INDICATORS_RECENT_DAYS:], "values": vals[-INDICATORS_RECENT_DAYS:]},
+    }
+
+
+def _build_indicators_payload():
+    with open(INDICATORS_CONFIG_PATH, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+    with open(INDICATORS_HISTORY_PATH, "r", encoding="utf-8") as f:
+        hist = json.load(f)
+    items = []
+    for ind in cfg.get("indicators", []):
+        if not ind.get("enabled", True):
+            continue
+        raw = hist.get(ind["id"]) or {}
+        base = {"id": ind["id"], "name": ind["name"], "source": ind["source"],
+                "unit": ind.get("unit"), "display": ind.get("display", {})}
+        if not raw:
+            base.update({"available": False, "message": "수집된 데이터가 없습니다"})
+            items.append(base)
+            continue
+        dates = sorted(raw)
+        fields = (ind.get("source_params") or {}).get("fields") or []
+        if ind["source"] == "kis_investor" and len(fields) == 1 and not isinstance(raw[dates[-1]], dict):
+            data = _ind_build_kis_foreign(dates, raw)
+        elif ind["source"] == "kis_investor":
+            data = _ind_build_kis_investors(dates, raw, fields)
+        else:
+            data = _ind_build_scalar(dates, raw, ind.get("unit"))
+        base.update({"available": True, "count": len(dates), "first_date": dates[0]})
+        base.update(data)
+        items.append(base)
+    return {"updated_at": (hist.get("_meta") or {}).get("updated_at"),
+            "recent_days": INDICATORS_RECENT_DAYS, "items": items}
+
+
+@app.route("/api/indicators", methods=["GET"])
+def get_indicators():
+    """주요 지표 탭 데이터. indicators.json의 enabled 지표만, cache/indicators_history.json 기반.
+    파일 mtime이 바뀐 경우에만 재계산(프로세스 메모리 캐시). 캐시 없음/파싱 실패는 503."""
+    try:
+        mtime = os.path.getmtime(INDICATORS_HISTORY_PATH)
+    except OSError:
+        return jsonify({"error": "지표 캐시가 아직 생성되지 않았습니다 (indicators_tracker.py --backfill 필요)"}), 503
+    with _indicators_lock:
+        if _indicators_cache["mtime"] == mtime and _indicators_cache["data"] is not None:
+            return jsonify(_indicators_cache["data"])
+        try:
+            payload = _build_indicators_payload()
+        except Exception as e:
+            return jsonify({"error": f"지표 데이터를 읽지 못했습니다: {type(e).__name__}: {e}"}), 503
+        _indicators_cache["mtime"] = mtime
+        _indicators_cache["data"] = payload
+    return jsonify(payload)
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8000, debug=False)
