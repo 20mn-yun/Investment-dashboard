@@ -1719,9 +1719,9 @@ DART_SEEN_FILE = os.path.join(_BD, "dart_seen.json")
 DART_DAILY_FILE = os.path.join(_BD, "dart_daily.json")
 DART_HISTORY_FILE = os.path.join(_BD, "dart_daily_history.json")
 DART_SENT_FILE = os.path.join(_BD, "dart_sent.json")
-EXCEL_PATH = os.path.expanduser(
-    "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/내 드라이브/공시정리/DART_공시_누적.xlsx"
-)
+# 드라이브 마운트는 glob 탐색(telegram_report.drive_path) — 계정 이메일 하드코딩 방지.
+# 마운트 없으면 None → 아래 copy2 지점에서 예외로 잡혀 로컬 파일만 유지됨.
+EXCEL_PATH = telegram_report.drive_path("공시정리", "DART_공시_누적.xlsx")
 EXCEL_PATH_LOCAL = os.path.join(_BD, "DART_공시_누적.xlsx")
 
 DEFAULT_DART_MON_CFG = {
@@ -2520,6 +2520,8 @@ def _save_excel():
 
     # Google Drive로 복사
     try:
+        if not EXCEL_PATH:
+            raise FileNotFoundError("drive mount not found")
         os.makedirs(os.path.dirname(EXCEL_PATH), exist_ok=True)
         shutil.copy2(EXCEL_PATH_LOCAL, EXCEL_PATH)
         _alog("엑셀", "Google Drive 복사 완료")

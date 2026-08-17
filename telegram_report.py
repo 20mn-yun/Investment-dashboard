@@ -17,9 +17,34 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 CONFIG_PATH = "report_config.json"
 REPORT_DB = "report_index.db"
+
+_DRIVE_ROOT_NAMES = ("내 드라이브", "My Drive")
+
+
+def find_drive_root():
+    """구글 드라이브 데스크톱 마운트의 루트 폴더 경로를 탐색한다.
+
+    ~/Library/CloudStorage/GoogleDrive-*/ 중 첫 마운트 아래 '내 드라이브' 또는
+    'My Drive' 중 실재하는 쪽을 반환. 못 찾으면 None. (계정 이메일 하드코딩 방지)
+    """
+    import glob
+    for mount in sorted(glob.glob(os.path.expanduser("~/Library/CloudStorage/GoogleDrive-*"))):
+        for root in _DRIVE_ROOT_NAMES:
+            base = os.path.join(mount, root)
+            if os.path.isdir(base):
+                return base
+    return None
+
+
+def drive_path(*parts):
+    """드라이브 루트 아래 상대 경로를 절대 경로로. 마운트 없으면 None."""
+    root = find_drive_root()
+    return os.path.join(root, *parts) if root else None
+
+
 DEFAULT_CONFIG = {
     "channels": [],
-    "download_base": "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/내 드라이브/Analysis",
+    "download_base": drive_path("Analysis") or "~/Downloads/Analysis",
     "watchlist": [],
     "personal_channels": [],
     "forward_enabled": True,

@@ -53,8 +53,7 @@ DEFAULT_CONFIG = {
     "drive_export_dir": "",
 }
 
-# 드라이브 마운트 자동 탐색: ~/Library/CloudStorage/GoogleDrive-*/{내 드라이브|My Drive}/Analysis/텔레인박스
-_DRIVE_ROOT_NAMES = ("내 드라이브", "My Drive")
+# 드라이브 마운트 자동 탐색은 telegram_report.drive_path() 공통 헬퍼 사용 → {드라이브 루트}/Analysis/텔레인박스
 _DRIVE_EXPORT_SUBDIR = os.path.join("Analysis", "텔레인박스")
 _EXPORT_INTERVAL_SEC = 24 * 3600
 _export_state = {"last_ts": 0.0, "dirty": False}
@@ -1226,13 +1225,7 @@ def _resolve_export_dir(cfg):
     d = (cfg.get("drive_export_dir") or "").strip()
     if d:
         return os.path.expanduser(d)
-    import glob
-    for mount in sorted(glob.glob(os.path.expanduser("~/Library/CloudStorage/GoogleDrive-*"))):
-        for root in _DRIVE_ROOT_NAMES:
-            base = os.path.join(mount, root)
-            if os.path.isdir(base):
-                return os.path.join(base, _DRIVE_EXPORT_SUBDIR)
-    return None
+    return telegram_report.drive_path(_DRIVE_EXPORT_SUBDIR)
 
 
 def _migrate_saved_ts(data):

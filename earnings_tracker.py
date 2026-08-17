@@ -24,9 +24,11 @@ from openpyxl import Workbook, load_workbook
 load_dotenv()
 
 DART_API_KEY = os.environ.get("DART_API_KEY")
-EXCEL_PATH = os.path.expanduser(
-    "~/Library/CloudStorage/GoogleDrive-changyun1222@gmail.com/"
-    "내 드라이브/공시정리/잠정실적_누적.xlsx"
+# 드라이브 마운트는 telegram_report.drive_path()로 탐색(계정 이메일 하드코딩 방지).
+# 마운트가 없으면 로컬 폴더로 대체 — 기존 동작(경로 없음 → makedirs 후 신규 생성)과 동일하게 실패하지 않음.
+from telegram_report import drive_path as _drive_path
+EXCEL_PATH = _drive_path("공시정리", "잠정실적_누적.xlsx") or os.path.expanduser(
+    "~/Downloads/공시정리/잠정실적_누적.xlsx"
 )
 STATE_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "earnings_tracker_state.json"
