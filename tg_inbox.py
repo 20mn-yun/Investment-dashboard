@@ -49,7 +49,15 @@ DEFAULT_CONFIG = {
     "retention_days": 6,
     "poll_interval_minutes": 10,
     "max_fetch_per_channel": 200,
+    # 저장(별표) 자료 드라이브 내보내기 폴더. 비우면 드라이브 마운트에서 자동 탐색
+    "drive_export_dir": "",
 }
+
+# 드라이브 마운트 자동 탐색: ~/Library/CloudStorage/GoogleDrive-*/{내 드라이브|My Drive}/Analysis/텔레인박스
+_DRIVE_ROOT_NAMES = ("내 드라이브", "My Drive")
+_DRIVE_EXPORT_SUBDIR = os.path.join("Analysis", "텔레인박스")
+_EXPORT_INTERVAL_SEC = 24 * 3600
+_export_state = {"last_ts": 0.0, "dirty": False}
 
 _data_lock = threading.Lock()
 
@@ -470,6 +478,10 @@ def collect_once():
             print(f"[tg_inbox] auto-refresh {ch} failed: {type(e).__name__}: {e}", flush=True)
 
     cres = classify_pending()
+
+    # 드라이브 내보내기: 이번 주기에 saved 변화가 있었거나(dirty) 마지막 내보내기 24시간 경과 시
+    if _export_state["dirty"] or time.time() - _export_state["last_ts"] >= _EXPORT_INTERVAL_SEC:
+        export_saved_to_drive()
 
     return {
         "status": "ok",
@@ -1185,8 +1197,192 @@ def set_saved(item_id, saved):
         if target is None:
             return {"error": "항목을 찾을 수 없습니다", "status": 404}
         target["saved"] = saved
+        if saved:
+            target["saved_ts"] = datetime.now(KST).isoformat()
         _save_data(data)
+    # 저장 변경 즉시 드라이브 반영 (실패해도 저장 결과에는 영향 없음; 실패 시 dirty 유지 → 다음 수집 주기에 재시도)
+    _export_state["dirty"] = True
+    export_saved_to_drive()
     return {"status": "ok", "id": item_id, "saved": saved}
+
+
+# ===== 저장(별표) 자료 → 구글 드라이브 내보내기 =====
+
+ANALYSIS_GUIDE = (
+    "이 문서는 사용자가 선별 저장한 투자 정보 아카이브다. 분석에 사용할 때: "
+    "(1) 각 항목의 게시일시를 확인하고 최신 자료를 우선 근거로 삼을 것. "
+    "(2) 오래된 항목과 최신 항목이 상충하면 최신을 따르되, 견해나 상황이 바뀌었다는 사실 자체를 분석에 언급할 것. "
+    "(3) 게시일이 오래된 정보(수개월 이상)는 현재도 유효한지 유보적으로 다룰 것. "
+    "(4) 갱신시각 이후의 상황은 이 문서에 없으므로 필요 시 최신 정보를 별도 확인할 것."
+)
+
+
+def _guide_block():
+    return "> **분석 지침**\n> " + ANALYSIS_GUIDE + "\n"
+
+
+def _resolve_export_dir(cfg):
+    """설정값 우선, 비어 있으면 드라이브 마운트에서 '내 드라이브'/'My Drive' 실재 경로 탐색."""
+    d = (cfg.get("drive_export_dir") or "").strip()
+    if d:
+        return os.path.expanduser(d)
+    import glob
+    for mount in sorted(glob.glob(os.path.expanduser("~/Library/CloudStorage/GoogleDrive-*"))):
+        for root in _DRIVE_ROOT_NAMES:
+            base = os.path.join(mount, root)
+            if os.path.isdir(base):
+                return os.path.join(base, _DRIVE_EXPORT_SUBDIR)
+    return None
+
+
+def _migrate_saved_ts(data):
+    """기존 저장 항목에 saved_ts가 없으면 게시일(date)로 소급 기입. 변경 여부 반환."""
+    changed = False
+    for it in data.get("items", []):
+        if it.get("saved") and not it.get("saved_ts"):
+            it["saved_ts"] = it.get("date") or datetime.now(KST).isoformat()
+            changed = True
+    return changed
+
+
+def _parse_dt(s):
+    try:
+        dt = datetime.fromisoformat(s)
+        return dt if dt.tzinfo else dt.replace(tzinfo=KST)
+    except Exception:
+        return None
+
+
+def _fmt_dt(s):
+    dt = _parse_dt(s)
+    return dt.astimezone(KST).strftime("%Y-%m-%d %H:%M") if dt else (s or "")
+
+
+def _atomic_write(path, text):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, path)
+    return len(text.encode("utf-8"))
+
+
+def _render_item(it):
+    ch = it.get("channel_title") or it.get("channel") or ""
+    lines = [f"### [{_fmt_dt(it.get('date'))}] {ch}", ""]
+    lines.append((it.get("text") or "").strip())
+    lines.append("")
+    if it.get("channel") and it.get("message_id"):
+        lines.append(f"원문: https://t.me/{it['channel']}/{it['message_id']}")
+    imgs = it.get("images") or []
+    if imgs:
+        lines.append(f"[이미지 {len(imgs)}장 — 대시보드에서 확인]")
+    also = it.get("also_in") or []
+    if also:
+        lines.append("동시 게재: " + ", ".join(also))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_year_file(year, items, now_str):
+    by_topic = {}
+    for it in items:
+        by_topic.setdefault(it.get("topic") or "미분류", []).append(it)
+    out = [f"# 텔레 인박스 저장자료 {year}", "",
+           f"갱신시각: {now_str} · 총 {len(items)}건 · 주제 {len(by_topic)}개", "",
+           _guide_block(), "",
+           "각 주제 섹션 안의 항목은 게시일 최신순이다.", ""]
+    for topic in sorted(by_topic, key=lambda t: (-len(by_topic[t]), t)):
+        group = sorted(by_topic[topic], key=lambda x: x.get("date") or "", reverse=True)
+        out.append(f"## {topic} ({len(group)}건)")
+        out.append("")
+        for it in group:
+            out.append(_render_item(it))
+    return "\n".join(out)
+
+
+def _render_index(items, year_counts, now_str, now_dt):
+    def brief(it):
+        t = (it.get("text") or "").replace("\n", " ").strip()
+        return t[:60] + ("…" if len(t) > 60 else "")
+    def rows(days):
+        cutoff = now_dt - timedelta(days=days)
+        rs = [it for it in items if (_parse_dt(it.get("saved_ts") or it.get("date")) or now_dt) >= cutoff]
+        rs.sort(key=lambda x: x.get("saved_ts") or x.get("date") or "", reverse=True)
+        return rs
+    out = ["# 텔레 인박스 저장자료 인덱스", "",
+           f"갱신시각: {now_str} · 총 {len(items)}건", "",
+           _guide_block(), ""]
+    for title, days in (("최근 7일 하이라이트", 7), ("최근 30일 저장", 30)):
+        rs = rows(days)
+        out.append(f"## {title} ({len(rs)}건)")
+        out.append("")
+        if not rs:
+            out.append("_해당 기간 저장 항목 없음_")
+        for it in rs:
+            out.append(f"- {_fmt_dt(it.get('date'))} · {it.get('channel_title') or it.get('channel')} · "
+                       f"[{it.get('topic') or '미분류'}] {brief(it)} → 저장자료_{(it.get('date') or '')[:4]}.md")
+        out.append("")
+    out.append("## 연도별 파일")
+    out.append("")
+    for y in sorted(year_counts, reverse=True):
+        out.append(f"- 저장자료_{y}.md — {year_counts[y]}건")
+    out.append("")
+    topic_counts = {}
+    for it in items:
+        topic_counts[it.get("topic") or "미분류"] = topic_counts.get(it.get("topic") or "미분류", 0) + 1
+    out.append("## 주제별 건수")
+    out.append("")
+    out.append("| 주제 | 건수 |")
+    out.append("|---|---|")
+    for t in sorted(topic_counts, key=lambda t: (-topic_counts[t], t)):
+        out.append(f"| {t} | {topic_counts[t]} |")
+    out.append("")
+    return "\n".join(out)
+
+
+def export_saved_to_drive():
+    """saved=true 항목을 드라이브 폴더에 인덱스 1개 + 연도별 md로 내보낸다.
+
+    경로 접근 실패 등 모든 예외는 로그만 남기고 {"status": "error"}를 반환 —
+    수집·저장 기능에 영향을 주지 않는다.
+    """
+    try:
+        cfg = get_config()
+        export_dir = _resolve_export_dir(cfg)
+        if not export_dir:
+            raise FileNotFoundError("드라이브 마운트 경로를 찾을 수 없습니다 (drive_export_dir 설정 필요)")
+
+        with _data_lock:
+            data = _load_data()
+            if _migrate_saved_ts(data):
+                _save_data(data)
+            items = [dict(it) for it in data.get("items", []) if it.get("saved")]
+
+        os.makedirs(export_dir, exist_ok=True)
+        now_dt = datetime.now(KST)
+        now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+
+        by_year = {}
+        for it in items:
+            by_year.setdefault((it.get("date") or "0000")[:4], []).append(it)
+
+        files, total = {}, 0
+        for year, group in by_year.items():
+            name = f"저장자료_{year}.md"
+            total += _atomic_write(os.path.join(export_dir, name), _render_year_file(year, group, now_str))
+            files[name] = len(group)
+        year_counts = {y: len(g) for y, g in by_year.items()}
+        idx_name = "저장자료_인덱스.md"
+        total += _atomic_write(os.path.join(export_dir, idx_name), _render_index(items, year_counts, now_str, now_dt))
+        files[idx_name] = len(items)
+
+        _export_state["last_ts"] = time.time()
+        _export_state["dirty"] = False
+        print(f"[tg_inbox] drive export ok: {len(items)}건 → {export_dir} ({total} bytes)", flush=True)
+        return {"status": "ok", "dir": export_dir, "files": files, "bytes_total": total}
+    except Exception as e:
+        print(f"[tg_inbox] drive export failed: {type(e).__name__}: {e}", flush=True)
+        return {"status": "error", "error": f"{type(e).__name__}: {e}"}
 
 
 def start_inbox_collector():

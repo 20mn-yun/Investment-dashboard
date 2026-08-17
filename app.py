@@ -2779,6 +2779,15 @@ def get_tg_inbox_channels():
     return jsonify({"channels": tg_inbox.list_channels()})
 
 
+@app.route("/api/tg-inbox/export", methods=["POST"])
+def post_tg_inbox_export():
+    """저장(별표) 자료를 구글 드라이브 폴더에 수동 내보내기 (인덱스 + 연도별 md)."""
+    result = tg_inbox.export_saved_to_drive()
+    if result.get("status") == "error":
+        return jsonify(result), 500
+    return jsonify(result)
+
+
 @app.route("/api/tg-inbox/channels/refresh", methods=["POST"])
 def post_tg_inbox_channel_refresh():
     body = request.get_json(silent=True) or {}
