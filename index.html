@@ -51,24 +51,49 @@
         }
 
         /* 탭 */
-        .tabs {
+        .tabs-nav {
             background-color: var(--bg-card);
             padding: 0 24px;
             border-bottom: 1px solid var(--border);
             display: flex;
-            gap: 4px;
+            align-items: stretch;
+            gap: 24px;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
             -ms-overflow-style: none;
         }
-        .tabs::-webkit-scrollbar { display: none; }
+        .tabs-nav::-webkit-scrollbar { display: none; }
+
+        .tab-group {
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            width: 140px;
+        }
+
+        .tab-group-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-muted);
+            opacity: 0.7;
+            padding: 4px 8px 2px;
+            white-space: nowrap;
+        }
+
+        .tab-group-tabs {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 2px;
+            padding-bottom: 4px;
+        }
 
         .tab {
-            padding: 12px 20px;
+            padding: 5px 16px;
             cursor: pointer;
             color: var(--text-muted);
-            border-bottom: 2px solid transparent;
+            border-left: 2px solid transparent;
             transition: all 0.2s;
             white-space: nowrap;
             flex-shrink: 0;
@@ -76,7 +101,8 @@
 
         .tab.active {
             color: var(--accent);
-            border-bottom: 2px solid var(--accent);
+            border-left: 2px solid var(--accent);
+            background-color: var(--accent-bg);
         }
 
         .tab:hover { color: var(--text); }
@@ -1172,8 +1198,10 @@
             .header h1 { font-size: 16px; }
             .header .date { font-size: 11px; }
 
-            .tabs { padding: 0 12px; }
-            .tab { padding: 10px 14px; font-size: 13px; }
+            .tabs-nav { padding: 0 12px; gap: 16px; }
+            .tab-group-name { font-size: 13px; padding: 4px 6px 2px; }
+            .tab-group-tabs { padding-bottom: 4px; }
+            .tab { padding: 4px 12px; font-size: 13px; }
 
             .tab-content { padding: 16px; }
 
@@ -1459,23 +1487,53 @@
 </div>
 
 <!-- 탭 -->
-<div class="tabs">
-    <div class="tab active" onclick="switchTab('indicators')">📊 주요 지표</div>
-    <div class="tab" onclick="switchTab('market')">🌍 글로벌 마켓</div>
-    <div class="tab" onclick="switchTab('korea')">🇰🇷 한국 마켓</div>
-    <div class="tab" onclick="switchTab('export')">🚢 수출</div>
-    <div class="tab" onclick="switchTab('leaders')">🎯 주도섹터</div>
-    <div class="tab" onclick="switchTab('stocks')">🔍 주도주</div>
-    <div class="tab" onclick="switchTab('valuation')">💰 PER/PBR</div>
-    <div class="tab" onclick="switchTab('dart')">📋 DART 공시</div>
-    <div class="tab" onclick="switchTab('inbox')">📨 텔레 인박스</div>
-    <div class="tab" onclick="switchTab('report')">📄 증권사 Report</div>
-    <div class="tab" onclick="switchTab('calendar')">📅 캘린더</div>
-    <div class="tab" onclick="switchTab('refinery')">🛢️ 정유</div>
+<div class="tabs-nav">
+    <div class="tab-group">
+        <div class="tab-group-name">Daily</div>
+        <div class="tab-group-tabs">
+            <div class="tab active" data-tab="inbox" onclick="switchTab('inbox')">텔레 인박스</div>
+            <div class="tab" data-tab="indicators" onclick="switchTab('indicators')">주요 지표</div>
+            <div class="tab" data-tab="market" onclick="switchTab('market')">글로벌 마켓</div>
+            <div class="tab" data-tab="dart" onclick="switchTab('dart')">DART 공시</div>
+        </div>
+    </div>
+    <div class="tab-group">
+        <div class="tab-group-name">Weekly</div>
+        <div class="tab-group-tabs">
+            <div class="tab" data-tab="leaders" onclick="switchTab('leaders')">주도섹터</div>
+            <div class="tab" data-tab="stocks" onclick="switchTab('stocks')">주도주</div>
+            <div class="tab" data-tab="valuation" onclick="switchTab('valuation')">PER/PBR</div>
+        </div>
+    </div>
+    <div class="tab-group">
+        <div class="tab-group-name">종목분석</div>
+        <div class="tab-group-tabs">
+            <div class="tab" data-tab="report" onclick="switchTab('report')">증권사 Report</div>
+        </div>
+    </div>
+    <div class="tab-group">
+        <div class="tab-group-name">종목 Tracking</div>
+        <div class="tab-group-tabs">
+            <div class="tab" data-tab="export" onclick="switchTab('export')">월별 수출실적</div>
+            <div class="tab" data-tab="refinery" onclick="switchTab('refinery')">정유</div>
+        </div>
+    </div>
+    <div class="tab-group">
+        <div class="tab-group-name">캘린더</div>
+        <div class="tab-group-tabs">
+            <div class="tab" data-tab="calendar" onclick="switchTab('calendar')">캘린더</div>
+        </div>
+    </div>
+    <div class="tab-group">
+        <div class="tab-group-name">기타</div>
+        <div class="tab-group-tabs">
+            <div class="tab" data-tab="korea" onclick="switchTab('korea')">이격도</div>
+        </div>
+    </div>
 </div>
 
 <!-- 주요 지표 탭 -->
-<div class="tab-content active" id="tab-indicators">
+<div class="tab-content" id="tab-indicators">
     <div class="ind-header">
         <span class="section-title" style="margin:0; border:none;">📊 주요 지표</span>
         <span class="ind-asof" id="ind-asof"></span>
@@ -2155,7 +2213,7 @@
 </div>
 
 <!-- 텔레 인박스 탭 -->
-<div class="tab-content" id="tab-inbox">
+<div class="tab-content active" id="tab-inbox">
     <div class="inbox-channels" id="inbox-channels-bar">
         <div class="inbox-chips" id="inbox-chips"></div>
         <div class="inbox-ch-add">
@@ -2306,13 +2364,9 @@
     function switchTab(tabName, programmatic) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        if (!programmatic && typeof event !== 'undefined' && event && event.target) {
-            event.target.classList.add('active');
-        } else {
-            document.querySelectorAll('.tab').forEach(t => {
-                if (t.getAttribute('onclick') && t.getAttribute('onclick').includes("'" + tabName + "'")) t.classList.add('active');
-            });
-        }
+        document.querySelectorAll('.tab').forEach(t => {
+            if (t.getAttribute('data-tab') === tabName) t.classList.add('active');
+        });
         document.getElementById('tab-' + tabName).classList.add('active');
         if (tabName === 'calendar') {
             if (!calLoaded) { calLoaded = true; initCalendar(); }
@@ -4238,9 +4292,6 @@
     loadGroups();
     fetchAllData();
     loadTopGainers();
-    // 주요 지표 탭이 기본 탭이므로 페이지 로드 시 즉시 로드
-    indicatorsLoaded = true;
-    loadIndicators();
 
     // 30초마다 자동 새로고침
     setInterval(fetchAllData, 30000);
@@ -7097,6 +7148,9 @@
         });
         return { buildConfig, subText: `기준: ${it.cum_window_start}부터 누적(조원) · 최신 ${it.latest_date}` };
     }
+
+    // 기본 탭: 텔레 인박스 (모든 Loaded 플래그 let 선언 이후에 호출)
+    switchTab('inbox', true);
 </script>
 
 </body>
