@@ -10,6 +10,7 @@ CLI:
 """
 
 import os
+import re
 import sys
 import json
 import argparse
@@ -78,6 +79,37 @@ def save_history(hist):
 
 def _fmt(d):
     return f"{d[:4]}-{d[4:6]}-{d[6:]}" if len(d) == 8 and d.isdigit() else d
+
+
+# ===== 날짜 키 정규화 규약 =====
+# 캐시 키: 일별·주별 → "YYYY-MM-DD", 월별 → "YYYY-MM", 분기별 → "YYYY-Qn".
+# 소스별 원본 형식을 freq에 맞춰 변환한다 (FRED 월별 "YYYY-MM-01" → "YYYY-MM",
+# FRED 분기 "YYYY-01-01"(분기 첫 달) → "YYYY-Q1", ECOS "YYYYQn"/"YYYYMM"/"YYYYMMDD", DBnomics "YYYY-Qn"/"YYYY-MM").
+_Q_RE = re.compile(r"^(\d{4})[-]?Q([1-4])$")
+_YM_RE = re.compile(r"^(\d{4})-?(\d{2})$")
+_YMD_RE = re.compile(r"^(\d{4})-?(\d{2})-?(\d{2})$")
+
+
+def normalize_period(raw, freq):
+    """원본 기간 문자열을 freq(D/W/M/Q)별 캐시 키 규약으로 변환. 인식 불가 시 ValueError."""
+    s = str(raw).strip()
+    if freq == "Q":
+        m = _Q_RE.match(s)
+        if m:
+            return f"{m.group(1)}-Q{m.group(2)}"
+        m = _YMD_RE.match(s) or _YM_RE.match(s)
+        if m:                                     # 분기 첫 달 날짜(FRED) 또는 YYYY-MM → 분기
+            month = int(m.group(2))
+            return f"{m.group(1)}-Q{(month - 1) // 3 + 1}"
+    elif freq == "M":
+        m = _YMD_RE.match(s) or _YM_RE.match(s)
+        if m:
+            return f"{m.group(1)}-{m.group(2)}"
+    elif freq in ("D", "W"):
+        m = _YMD_RE.match(s)
+        if m:
+            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    raise ValueError(f"기간 형식 인식 불가: {raw!r} (freq={freq})")
 
 
 # ===== KIS 투자자매매동향 =====
@@ -221,8 +253,17 @@ def collect_yfinance(hist, indicators, period="2y"):
 
 # ===== ECOS =====
 
-def fetch_ecos(api_key, stat_code, item_code, cycle, start, end):
-    """ECOS StatisticSearch: {YYYY-MM-DD: float}. 일별(cycle=D) 기준 TIME=YYYYMMDD."""
+def _ecos_time(d, cycle):
+    """ECOS 조회구간 문자열: D→YYYYMMDD, M→YYYYMM, Q→YYYYQn."""
+    if cycle == "Q":
+        return f"{d.year}Q{(d.month - 1) // 3 + 1}"
+    if cycle == "M":
+        return d.strftime("%Y%m")
+    return d.strftime("%Y%m%d")
+
+
+def fetch_ecos(api_key, stat_code, item_code, cycle, start, end, freq="D"):
+    """ECOS StatisticSearch: {정규화 키: float}. TIME은 cycle별(D:YYYYMMDD, M:YYYYMM, Q:YYYYQn) → normalize_period."""
     url = ECOS_URL.format(key=api_key, limit=10000, stat=stat_code, cycle=cycle,
                           start=start, end=end, item=item_code)
     r = requests.get(url, timeout=30)
@@ -240,8 +281,24 @@ def fetch_ecos(api_key, stat_code, item_code, cycle, start, end):
         v = row.get("DATA_VALUE")
         if v in (None, "", "-"):
             continue
-        out[_fmt(t)] = float(v)
+        out[normalize_period(t, freq)] = float(v)
     return out, rows[0].get("ITEM_NAME1")
+
+
+def _lookback_years(freq, default=2):
+    """주기별 수집 룩백(년): 파생(YoY 3년 표시) 여유 포함."""
+    return {"D": default, "W": 3, "M": 6, "Q": 8}.get(freq, default)
+
+
+def _merge_series(hist, ind_id, data, label):
+    """수신 데이터를 캐시에 덮어쓰기 병합(과거치 개정 반영). 빈 데이터면 기존 캐시 유지."""
+    if not data:
+        log(f"{label}: 수신 0건 — 기존 캐시 유지")
+        return
+    series = hist.setdefault(ind_id, {})
+    before = len(series)
+    series.update(data)
+    log(f"{label}: 수신 {len(data)}건 ({min(data)} ~ {max(data)}), 캐시 {before}→{len(series)}건")
 
 
 def collect_ecos(hist, indicators, years=2):
@@ -254,20 +311,136 @@ def collect_ecos(hist, indicators, years=2):
             log(f"경고: ECOS_API_KEY 없음 — {ind['id']}({ind['name']}) 건너뜀 (.env에 ECOS_API_KEY 추가 필요)")
         return
     end = date.today()
-    start = end - timedelta(days=365 * years)
     for ind in targets:
         p = ind["source_params"]
+        cycle = p.get("cycle", "D")
+        freq = ind.get("freq", "D")
+        start = end - timedelta(days=365 * (years if freq == "D" else _lookback_years(freq)))
         try:
-            data, item_name = fetch_ecos(key, p["stat_code"], p["item_code"], p.get("cycle", "D"),
-                                         start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))
+            data, item_name = fetch_ecos(key, p["stat_code"], p["item_code"], cycle,
+                                         _ecos_time(start, cycle), _ecos_time(end, cycle), freq=freq)
         except Exception as e:
             log(f"ECOS {ind['id']} 실패, 건너뜀: {type(e).__name__}: {e}")
             continue
-        series = hist.setdefault(ind["id"], {})
-        before = len(series)
-        series.update(data)
-        log(f"ECOS {ind['id']}({p['stat_code']}/{p['item_code']} '{item_name}'): 수신 {len(data)}건 "
-            f"({min(data)} ~ {max(data)}), 캐시 {before}→{len(series)}건")
+        _merge_series(hist, ind["id"], data, f"ECOS {ind['id']}({p['stat_code']}/{p['item_code']} '{item_name}')")
+
+
+# ===== FRED =====
+
+FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
+
+
+def fetch_fred(api_key, series_id, freq, start):
+    """FRED observations: {정규화 키: float}. 결측('.')은 건너뜀."""
+    r = requests.get(FRED_URL, params={"series_id": series_id, "api_key": api_key, "file_type": "json",
+                                       "observation_start": start.isoformat(), "sort_order": "asc"}, timeout=30)
+    if r.status_code != 200:
+        raise RuntimeError(f"FRED HTTP {r.status_code}: {r.text[:200]}")
+    obs = r.json().get("observations") or []
+    if not obs:
+        raise RuntimeError(f"FRED 빈 응답 {series_id}")
+    out = {}
+    for o in obs:
+        if o.get("value") in (None, "", "."):
+            continue
+        out[normalize_period(o["date"], freq)] = float(o["value"])
+    return out
+
+
+def collect_fred(hist, indicators):
+    targets = [i for i in indicators if i["source"] == "fred"]
+    if not targets:
+        return
+    key = os.environ.get("FRED_API_KEY", "").strip()
+    if not key:
+        for ind in targets:
+            log(f"경고: FRED_API_KEY 없음 — {ind['id']}({ind['name']}) 건너뜀 (.env에 FRED_API_KEY 추가 필요)")
+        return
+    for ind in targets:
+        sid = ind["source_params"]["series_id"]
+        freq = ind.get("freq", "M")
+        start = date.today() - timedelta(days=365 * _lookback_years(freq, 6))
+        try:
+            data = fetch_fred(key, sid, freq, start)
+        except Exception as e:
+            log(f"FRED {ind['id']}({sid}) 실패, 건너뜀: {type(e).__name__}: {e}")
+            continue
+        _merge_series(hist, ind["id"], data, f"FRED {ind['id']}({sid}, {freq})")
+
+
+# ===== DBnomics =====
+
+DBNOMICS_URL = "https://api.db.nomics.world/v22/series/{provider}/{dataset}/{series}"
+
+
+def fetch_dbnomics(provider, dataset, series, freq, start_key):
+    """DBnomics 공개 API(키 불필요): {정규화 키: float}. start_key(정규화 키) 이상만."""
+    r = requests.get(DBNOMICS_URL.format(provider=provider, dataset=dataset, series=series),
+                     params={"observations": 1}, timeout=40)
+    if r.status_code != 200:
+        raise RuntimeError(f"DBnomics HTTP {r.status_code}: {r.text[:200]}")
+    docs = (r.json().get("series") or {}).get("docs") or []
+    if not docs or not docs[0].get("period"):
+        raise RuntimeError(f"DBnomics 빈 응답 {provider}/{dataset}/{series}")
+    d = docs[0]
+    out = {}
+    for p, v in zip(d["period"], d["value"]):
+        if v in (None, "NA", ""):
+            continue
+        k = normalize_period(p, freq)
+        if k >= start_key:
+            out[k] = float(v)
+    return out
+
+
+def collect_dbnomics(hist, indicators):
+    for ind in [i for i in indicators if i["source"] == "dbnomics"]:
+        p = ind["source_params"]
+        freq = ind.get("freq", "Q")
+        start = date.today() - timedelta(days=365 * _lookback_years(freq, 6))
+        start_key = normalize_period(start.isoformat(), freq)
+        try:
+            data = fetch_dbnomics(p["provider"], p["dataset"], p["series"], freq, start_key)
+        except Exception as e:
+            log(f"DBnomics {ind['id']} 실패, 건너뜀: {type(e).__name__}: {e}")
+            continue
+        _merge_series(hist, ind["id"], data, f"DBnomics {ind['id']}({p['provider']}/{p['dataset'][:24]}…/{p['series'][:20]}…, {freq})")
+
+
+# ===== manual (수기 입력) =====
+
+MANUAL_PATH = os.path.join(BASE_DIR, "indicators_manual.json")
+
+
+def collect_manual(hist, indicators):
+    """indicators_manual.json: {지표id: {"YYYY-MM": 값}}. 파일/항목 없으면 경고 후 건너뜀."""
+    targets = [i for i in indicators if i["source"] == "manual"]
+    if not targets:
+        return
+    if not os.path.exists(MANUAL_PATH):
+        log(f"경고: 수기 입력 파일 없음 ({MANUAL_PATH}) — {', '.join(i['id'] for i in targets)} 건너뜀")
+        return
+    try:
+        with open(MANUAL_PATH, "r", encoding="utf-8") as f:
+            manual = json.load(f)
+    except Exception as e:
+        log(f"경고: 수기 입력 파일 파싱 실패 ({type(e).__name__}: {e}) — manual 지표 건너뜀")
+        return
+    for ind in targets:
+        raw = manual.get(ind["id"])
+        if not raw:
+            log(f"경고: 수기 입력 항목 없음/비어 있음 — {ind['id']}({ind['name']}) 건너뜀")
+            continue
+        freq = ind.get("freq", "M")
+        data = {}
+        for k, v in raw.items():
+            if k.startswith("_") or v in (None, ""):
+                continue
+            try:
+                data[normalize_period(k, freq)] = float(v)
+            except (ValueError, TypeError) as e:
+                log(f"경고: manual {ind['id']} 항목 무시 {k!r}: {e}")
+        _merge_series(hist, ind["id"], data, f"manual {ind['id']}")
 
 
 # ===== 실행 =====
@@ -284,8 +457,12 @@ def run(mode):
         else:
             update_kis(hist, indicators)
 
+    # 이하 소스는 실패 격리: 한 소스/지표 실패가 다른 지표에 영향 없음, 빈 수신은 기존 캐시 유지
     collect_yfinance(hist, indicators, period="2y")
     collect_ecos(hist, indicators, years=2)
+    collect_fred(hist, indicators)
+    collect_dbnomics(hist, indicators)
+    collect_manual(hist, indicators)
 
     hist["_meta"] = {"updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "mode": mode}
     save_history(hist)

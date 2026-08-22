@@ -1464,6 +1464,19 @@
         .ind-modal-title { font-size: 17px; font-weight: 700; color: var(--accent); overflow-wrap: anywhere; }
         .ind-modal-sub { font-size: 12px; color: var(--text-muted); margin-left: auto; margin-right: 8px; white-space: nowrap; }
         .ind-modal-body { position: relative; flex: 1 1 auto; min-height: 0; min-width: 0; }
+        #tab-indicators .ind-change-label { font-weight: 400; color: var(--text-muted); font-size: 12px; }
+        #tab-indicators .ind-value.ind-nodata { color: var(--text-dim); font-size: 18px; }
+        #tab-indicators .ind-raw-sub { margin-top: -4px; }
+        #tab-indicators .ind-edit-btn { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; line-height: 1; padding: 4px 8px; cursor: pointer; min-height: 30px; }
+        #tab-indicators .ind-edit-btn:hover { border-color: var(--accent); }
+        .ind-manual-modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; width: 90vw; max-width: 420px; }
+        .ind-manual-row { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
+        .ind-manual-row label { font-size: 12px; color: var(--text-muted); }
+        .ind-manual-row input { font-size: 16px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+        .ind-manual-err { color: var(--up); font-size: 12.5px; min-height: 16px; margin: 4px 0 8px; overflow-wrap: anywhere; }
+        .ind-manual-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .ind-manual-save { background: #1f6feb; border: none; border-radius: 6px; padding: 6px 16px; color: #fff; cursor: pointer; font-size: 14px; }
+        .ind-manual-save:disabled { opacity: 0.5; cursor: default; }
         @media (max-width: 480px) {
             .ind-modal { width: 100vw; height: 100vh; height: 100dvh; border-radius: 0; padding: 10px 12px 14px; }
             .ind-modal-title { font-size: 15px; }
@@ -1551,6 +1564,23 @@
             <span class="chart-close" onclick="closeIndModal()">x</span>
         </div>
         <div class="ind-modal-body"><canvas id="ind-modal-canvas"></canvas></div>
+    </div>
+</div>
+
+<!-- 주요 지표 수기 입력 모달 (ISM PMI 등 source=manual) -->
+<div class="chart-overlay" id="ind-manual-overlay" onclick="if(event.target===this)closeIndManual()">
+    <div class="ind-manual-modal">
+        <div class="ind-modal-head">
+            <span class="ind-modal-title" id="ind-manual-title"></span>
+            <span class="chart-close" onclick="closeIndManual()">x</span>
+        </div>
+        <div class="ind-manual-row"><label for="ind-manual-period">기간 (YYYY-MM)</label><input id="ind-manual-period" type="text" inputmode="numeric" placeholder="2026-07" maxlength="7"></div>
+        <div class="ind-manual-row"><label for="ind-manual-value">값 (0~100)</label><input id="ind-manual-value" type="number" step="0.1" min="0" max="100" placeholder="예: 49.8"></div>
+        <div class="ind-manual-err" id="ind-manual-err"></div>
+        <div class="ind-manual-actions">
+            <button class="refinery-refresh-btn" onclick="closeIndManual()">취소</button>
+            <button class="ind-manual-save" id="ind-manual-save" onclick="saveIndManual()">저장</button>
+        </div>
     </div>
 </div>
 
@@ -6984,16 +7014,18 @@
         return Number(v).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
     }
     // 국내 관례: 상승 빨강(.ind-up = --up), 하락 파랑(.ind-down = --accent)
-    function indChangeHtml(change, pct, unit) {
-        if (change == null) return '<span class="ind-change ind-flat">—</span>';
+    function indChangeHtml(change, pct, unit, label) {
+        const lbl = label ? `<span class="ind-change-label">${label}</span> ` : '';
+        if (change == null) return `<span class="ind-change ind-flat">${lbl}—</span>`;
         const cls = change > 0 ? 'ind-up' : (change < 0 ? 'ind-down' : 'ind-flat');
         const sign = change > 0 ? '+' : '';
         const pctTxt = pct != null ? ` (${sign}${indFmtNum(pct, 2)}%)` : '';
-        return `<span class="ind-change ${cls}">${sign}${indFmtNum(change)}${unit ? ' ' + unit : ''}${pctTxt}</span>`;
+        return `<span class="ind-change ${cls}">${lbl}${sign}${indFmtNum(change)}${unit ? ' ' + unit : ''}${pctTxt}</span>`;
     }
     // zoom=true(확대 모달)면 X축 눈금을 카드보다 촘촘하게. 데이터 범위는 동일(90일).
     function indBaseOpts(extra, zoom, xTicks) {
-        const ticks = zoom ? IND_ZOOM_X_TICKS : (xTicks || 8);
+        // xTicks=포인트 수(선택): 카드 8개·확대 18개를 넘지 않되 포인트 수보다 많지 않게
+        const ticks = xTicks ? Math.min(zoom ? IND_ZOOM_X_TICKS : 8, xTicks) : (zoom ? IND_ZOOM_X_TICKS : 8);
         return Object.assign({
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
@@ -7081,6 +7113,14 @@
                 card.innerHTML = `<div class="ind-card-top"><span class="ind-name">${it.name}</span></div><div class="ind-sub">${it.message || '데이터 없음'}</div>`;
                 grid.appendChild(card); return;
             }
+            // 수기 입력 지표가 아직 미입력이면 값 자리에 '미입력' + 연필 버튼만 (차트 없음)
+            if (it.no_data) {
+                card.innerHTML =
+                    `<div class="ind-card-top"><span class="ind-name">${it.name}</span>${indManualBtnHtml(it)}</div>` +
+                    `<div class="ind-value-row"><span class="ind-value ind-nodata">미입력</span><span class="ind-unit">${it.unit_display || it.unit || ''}</span></div>` +
+                    `<div class="ind-sub">${it.window_label || ''} · 연필 버튼으로 발표값을 입력하세요</div>`;
+                grid.appendChild(card); return;
+            }
             let spec;   // { buildConfig(zoom), subText }
             if (it.id === 'kospi_foreign_net') spec = renderIndForeignCard(card, it, canvasId);
             else if (it.id === 'kospi_investor_net') spec = renderIndInvestorsCard(card, it, canvasId);
@@ -7090,20 +7130,133 @@
         });
     }
 
+    // ---- 수기 입력 모달 ----
+    let indManualId = null;
+    function openIndManual(id, name) {
+        indManualId = id;
+        document.getElementById('ind-manual-title').textContent = `${name} 값 입력`;
+        const d = new Date(); d.setMonth(d.getMonth() - 1);     // 기본값: 직전 월
+        document.getElementById('ind-manual-period').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        document.getElementById('ind-manual-value').value = '';
+        document.getElementById('ind-manual-err').textContent = '';
+        document.getElementById('ind-manual-overlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => document.getElementById('ind-manual-value').focus(), 50);
+    }
+    function closeIndManual() {
+        document.getElementById('ind-manual-overlay').classList.remove('active');
+        document.body.style.overflow = '';
+        indManualId = null;
+    }
+    async function saveIndManual() {
+        const btn = document.getElementById('ind-manual-save');
+        const err = document.getElementById('ind-manual-err');
+        const period = document.getElementById('ind-manual-period').value.trim();
+        const value = document.getElementById('ind-manual-value').value.trim();
+        err.textContent = '';
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) { err.textContent = '기간은 YYYY-MM 형식이어야 합니다'; return; }
+        if (value === '' || isNaN(Number(value))) { err.textContent = '값을 숫자로 입력하세요'; return; }
+        btn.disabled = true;
+        try {
+            const res = await fetch(API_BASE + '/api/indicators/manual', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: indManualId, period, value: Number(value) }),
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) { err.textContent = data.error || `저장 실패 (HTTP ${res.status})`; return; }
+            closeIndManual();
+            loadIndicators();   // 카드 즉시 갱신
+        } catch (e) {
+            err.textContent = '저장 요청 오류: ' + e.message;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.getElementById('ind-manual-overlay').classList.contains('active')) closeIndManual();
+    });
+
+    function indManualBtnHtml(it) {
+        return it.source === 'manual'
+            ? `<button class="ind-edit-btn" title="값 입력" onclick="openIndManual('${it.id}', '${(it.name || '').replace(/'/g, '')}')">✏️</button>`
+            : '';
+    }
+
     // 공통 카드: 최신값·전일 대비·기준일 + 90일 라인
     function renderIndScalarCard(card, it, canvasId) {
+        const primaryPct = it.primary !== 'raw' && (it.transform === 'qoq_pct' || it.transform === 'qoq_saar' || it.transform === 'yoy_pct');
+        const primarySigned = primaryPct || (it.primary !== 'raw' && it.transform === 'diff');
+        const windowLabel = it.window_label || '최근 90일';
+        const changeLabel = it.change_label || '전일 대비';
+        // 헤드라인은 서버가 display.headline 기준으로 내려준 latest/change. 비율·증감 지표는 change_pct=null(증감폭만), 단위는 change_unit(%p 등)
+        const changeHtml = indChangeHtml(it.change, it.change_pct == null ? null : it.change_pct, it.change_unit || null, changeLabel);
+        const latestTxt = primarySigned && it.latest > 0 ? '+' + indFmtNum(it.latest) : indFmtNum(it.latest);
+        const rawSub = it.raw_latest && it.raw_latest.value != null
+            ? `<div class="ind-sub ind-raw-sub">원지표 <b>${indFmtNum(it.raw_latest.value, Math.abs(it.raw_latest.value) >= 1000 ? 0 : 2)}</b> ${it.raw_latest.unit || ''} <span style="opacity:.75">(${it.raw_latest.date})</span></div>`
+            : '';
         card.innerHTML =
-            `<div class="ind-card-top"><span class="ind-name">${it.name}</span><span class="ind-date">${it.latest_date}</span></div>` +
-            `<div class="ind-value-row"><span class="ind-value">${indFmtNum(it.latest)}</span><span class="ind-unit">${it.unit_display || it.unit || ''}</span>${indChangeHtml(it.change, it.change_pct)}</div>` +
+            `<div class="ind-card-top"><span class="ind-name">${it.name}</span>${indManualBtnHtml(it)}<span class="ind-date">${it.latest_date}</span></div>` +
+            `<div class="ind-value-row"><span class="ind-value">${latestTxt}</span><span class="ind-unit">${it.unit_display || it.unit || ''}</span>${changeHtml}</div>` +
+            rawSub +
             `<div class="ind-chart-box"><canvas id="${canvasId}"></canvas></div>`;
-        const buildConfig = (zoom) => ({
-            type: 'line',
-            data: { labels: it.series.dates, datasets: [
-                { label: it.name, data: it.series.values, borderColor: '#0969da', backgroundColor: 'rgba(9,105,218,0.06)', pointStyle: 'line', pointRadius: 0, borderWidth: zoom ? 2 : 1.5, tension: 0.1, fill: true },
-            ] },
-            options: indBaseOpts(null, zoom),
-        });
-        return { buildConfig, subText: `최근 90일 · 기준일 ${it.latest_date} · 단위 ${it.unit_display || it.unit || ''}` };
+        const layers = (it.chart_layers && it.chart_layers.length) ? it.chart_layers : null;
+        const buildConfig = layers ? indComboConfig(it) : indSimpleConfig(it);
+        return { buildConfig, subText: `${windowLabel} · 기준 ${it.latest_date} · 단위 ${it.unit_display || it.unit || ''}` };
+    }
+
+    // 단일 시계열(bar 또는 line) + 선택적 기준선. chart_layers가 없는 지표용
+    function indSimpleConfig(it) {
+        const chartType = ((it.display && it.display.chart) || 'line') === 'bar' ? 'bar' : 'line';
+        const n = it.series.dates.length;
+        return (zoom) => {
+            const datasets = [
+                chartType === 'bar'
+                    ? { label: it.name, data: it.series.values, pointStyle: 'rect',
+                        backgroundColor: it.series.values.map(v => v >= 0 ? 'rgba(207,34,46,0.55)' : 'rgba(9,105,218,0.55)') }
+                    : { label: it.name, data: it.series.values, borderColor: '#0969da', backgroundColor: 'rgba(9,105,218,0.06)', pointStyle: 'line', pointRadius: 0, borderWidth: zoom ? 2 : 1.5, tension: 0.1, fill: true },
+            ];
+            indPushRefLines(datasets, it, n);
+            return { type: chartType, data: { labels: it.series.dates, datasets }, options: indBaseOpts(null, zoom, n) };
+        };
+    }
+
+    // 수평 기준선(예: ISM 50)을 점선 데이터셋으로 추가
+    function indPushRefLines(datasets, it, n) {
+        (it.reference_lines || []).forEach(r => datasets.push({
+            type: 'line', label: r.label || `기준 ${r.value}`, data: Array(n).fill(r.value), yAxisID: 'y',
+            borderColor: '#cf222e', borderDash: [5, 5], borderWidth: 1, pointRadius: 0, pointStyle: 'line', spanGaps: true, order: 0,
+        }));
+    }
+
+    // chart_layers 기반 혼합 차트: 막대+도트선, 좌/우 이중축. 확대 모달도 같은 buildConfig 사용
+    const IND_LAYER_LABEL = { raw: '원지표', transformed: '변환값', ma_3m: '3개월 평균' };   // layer.label 미지정 시 폴백
+    function indComboConfig(it) {
+        const n = it.series.dates.length;
+        const unitOf = k => k === 'raw' ? (it.raw_unit || '') : k === 'transformed' ? (it.transformed_unit || '') : (it.transformed_unit || '');
+        // 범례: indicators.json의 layer.label(구체적 이름) 우선
+        const labelOf = (l) => l.label || `${IND_LAYER_LABEL[l.data] || l.data}${unitOf(l.data) ? ' (' + unitOf(l.data) + ')' : ''}`;
+        const usesRight = it.chart_layers.some(l => l.axis === 'right');
+        return (zoom) => {
+            const datasets = it.chart_layers.map((l, i) => {
+                const data = it.series[l.data] || [];
+                const yAxisID = l.axis === 'right' ? 'y1' : 'y';
+                if (l.type === 'bar') {
+                    return { type: 'bar', label: labelOf(l), data, yAxisID, pointStyle: 'rect', order: 2,
+                             backgroundColor: data.map(v => (v != null && v >= 0) ? 'rgba(207,34,46,0.55)' : 'rgba(9,105,218,0.55)') };
+                }
+                const color = i === 0 ? '#0969da' : (l.axis === 'right' ? '#9a6700' : '#1a7f37');
+                return { type: 'line', label: labelOf(l), data, yAxisID, borderColor: color, backgroundColor: color,
+                         pointStyle: 'circle', pointRadius: l.dot ? (zoom ? 3.5 : 2.5) : 0, pointHoverRadius: 5,
+                         borderWidth: zoom ? 2 : 1.5, tension: 0.15, spanGaps: true, order: 1 };
+            });
+            indPushRefLines(datasets, it, n);
+            const opts = indBaseOpts(null, zoom, n);
+            // 우축: 그리드 끔(좌축 그리드만 남겨 겹침 완화)
+            if (usesRight) {
+                opts.scales.y1 = { ...IND_AXIS, position: 'right', beginAtZero: false, grid: { drawOnChartArea: false } };
+            }
+            return { data: { labels: it.series.dates, datasets }, options: opts };
+        };
     }
 
     // 외국인 순매수 전용: 일별 막대 + 4주이평 선, 상단 배지·730일 누적
@@ -7122,7 +7275,7 @@
             ] },
             options: indBaseOpts(null, zoom),
         });
-        return { buildConfig, subText: `최근 90일 · 기준일 ${it.latest_date} · 막대=일별 순매수(조원), 선=4주 이평` };
+        return { buildConfig, subText: `${it.window_label || "최근 90일"} · 기준일 ${it.latest_date} · 막대=일별 순매수(조원), 선=4주 이평` };
     }
 
     // 주체별 순매수 전용: 개인·외국인·기관 누적 3선 + window_start 명시

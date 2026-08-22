@@ -3444,7 +3444,7 @@ def _ind_build_kis_investors(dates, raw, fields):
 
 
 def _ind_build_scalar(dates, raw, unit):
-    """환율·금리·WTI: 원본 값 그대로."""
+    """환율·금리·WTI: 원본 값 그대로. (freq=D, transform=none 경로 — 기존 일별 지표 응답 구조 유지)"""
     vals = [raw[d] for d in dates]
     delta, pct = _ind_change(vals)
     return {
@@ -3452,6 +3452,127 @@ def _ind_build_scalar(dates, raw, unit):
         "latest": vals[-1], "latest_date": dates[-1],
         "change": delta, "change_pct": pct,
         "series": {"dates": dates[-INDICATORS_RECENT_DAYS:], "values": vals[-INDICATORS_RECENT_DAYS:]},
+    }
+
+
+# 주기별 표시 윈도우(관측치 개수)와 변화 라벨. 날짜 키 규약: D·W=YYYY-MM-DD, M=YYYY-MM, Q=YYYY-Qn
+# (모두 사전순=시간순이라 문자열 정렬만 사용, date.fromisoformat 불필요)
+INDICATORS_WINDOW = {"D": INDICATORS_RECENT_DAYS, "W": 52, "M": 36, "Q": 12}
+INDICATORS_CHANGE_LABEL = {"D": "전일 대비", "W": "전주 대비", "M": "전월 대비", "Q": "전기 대비"}
+INDICATORS_WINDOW_LABEL = {"D": "최근 90일", "W": "최근 52주", "M": "최근 36개월", "Q": "최근 12분기"}
+INDICATORS_TRANSFORM_UNIT = {"qoq_pct": "%", "qoq_saar": "%", "yoy_pct": "%", "diff": None}
+
+
+def _ind_shift_key(key, freq, n):
+    """키 규약 기반 n기 전 키 (M: YYYY-MM, Q: YYYY-Qn). 결측 월/분기가 있어도 달력 기준으로 정확히 참조."""
+    if freq == "M":
+        y, m = int(key[:4]), int(key[5:7])
+        idx = y * 12 + (m - 1) - n
+        return f"{idx // 12}-{idx % 12 + 1:02d}"
+    if freq == "Q":
+        y, q = int(key[:4]), int(key[6])
+        idx = y * 4 + (q - 1) - n
+        return f"{idx // 4}-Q{idx % 4 + 1}"
+    return None
+
+
+def _ind_apply_transform(dates, raw, transform, freq):
+    """수준값 → 변환값 리스트(과거분 부족·결측 구간은 None). API 계산 단계에서만 적용, 캐시 불변.
+    M/Q는 달력 기준 키 참조(결측이 있어도 12개월/4분기 전을 정확히 봄), 그 외는 위치 기준."""
+    vals = [raw[d] for d in dates]
+    if transform in (None, "none"):
+        return vals
+    lag = {"qoq_pct": 1, "qoq_saar": 1, "diff": 1,
+           "yoy_pct": 12 if freq == "M" else (4 if freq == "Q" else 52 if freq == "W" else 1)}[transform]
+    out = []
+    for i, (d, v) in enumerate(zip(dates, vals)):
+        if freq in ("M", "Q"):
+            prev = raw.get(_ind_shift_key(d, freq, lag))
+        else:
+            prev = vals[i - lag] if i >= lag else None
+        if prev in (None, 0) or v is None:
+            out.append(None)
+        elif transform == "diff":
+            out.append(round(v - prev, 6))
+        elif transform == "qoq_saar":            # 전기비 비율의 4제곱 연율화 (미국 GDP 관례)
+            out.append(round(((v / prev) ** 4 - 1) * 100, 4))
+        else:
+            out.append(round((v / prev - 1) * 100, 4))
+    return out
+
+
+def _ind_moving_avg(vals, n):
+    """None을 건너뛰지 않는 단순 이동평균(직전 n개에 None이 있으면 None)."""
+    out = []
+    for i in range(len(vals)):
+        win = vals[i + 1 - n:i + 1] if i + 1 >= n else None
+        out.append(round(sum(win) / n, 4) if win and all(x is not None for x in win) else None)
+    return out
+
+
+def _ind_build_periodic(dates, raw, ind):
+    """W/M/Q 또는 transform이 있는 지표: transform 적용 후 주기별 윈도우·변화 라벨."""
+    freq = ind.get("freq", "D")
+    transform = ind.get("transform", "none")
+    vals = _ind_apply_transform(dates, raw, transform, freq)
+    raw_vals = [raw[d] for d in dates]
+    # 주 지표(카드 요약 기준): chart_layers의 첫 bar layer 데이터. 없으면 transformed(=transform none이면 raw)
+    display = ind.get("display") or {}
+    layers = display.get("chart_layers") or []
+    # 헤드라인(큰 숫자) 기준: display.headline 지정 > 첫 bar layer 데이터 > transformed
+    primary = display.get("headline") or next((l.get("data") for l in layers if l.get("type") == "bar"), "transformed")
+    if primary == "raw":
+        primary_vals = raw_vals
+    else:
+        primary_vals = vals
+    pairs = [(d, v) for d, v in zip(dates, primary_vals) if v is not None]
+    if not pairs:
+        return {"available": False, "message": "변환에 필요한 과거 데이터가 부족합니다"}
+    win = INDICATORS_WINDOW.get(freq, INDICATORS_RECENT_DAYS)
+    series_vals = [v for _, v in pairs]
+    delta, pct = _ind_change(series_vals)
+    primary_is_pct = primary != "raw" and transform in ("qoq_pct", "qoq_saar", "yoy_pct")
+    if primary == "raw":
+        unit = ind.get("unit")
+    else:
+        unit = INDICATORS_TRANSFORM_UNIT.get(transform, ind.get("unit")) if transform != "none" else ind.get("unit")
+    # 값 자체가 비율·증감·지수(PMI)인 지표는 백분율 변화가 무의미 → 증감폭만. 비율 지표의 증감폭 단위는 %p
+    rate_like = primary_is_pct or (unit and str(unit).startswith("%")) or (primary != "raw" and transform == "diff") \
+        or ind.get("source") == "manual"
+    change_unit = "%p" if (primary_is_pct or (unit and str(unit).startswith("%"))) else (ind.get("unit") if rate_like else None)
+    # 보조 표기: 원지표 최신값(헤드라인이 실제 변환값일 때만 — transform none이면 헤드라인과 동일하므로 생략)
+    raw_latest = None
+    if primary != "raw" and transform not in (None, "none"):
+        last_raw = [(d, raw[d]) for d in dates if raw.get(d) is not None]
+        raw_latest = {"value": last_raw[-1][1], "date": last_raw[-1][0], "unit": ind.get("unit")} if last_raw else None
+    # 차트용 시계열: 주 지표 날짜축 기준으로 raw·transformed·파생을 같은 길이로 정렬
+    sdates = [d for d, _ in pairs][-win:]
+    idx = {d: i for i, d in enumerate(dates)}
+    derived = {}
+    if "ma_3m" in (display.get("derived") or []):
+        ma = _ind_moving_avg(vals, 3)
+        derived["ma_3m"] = [ma[idx[d]] for d in sdates]
+    return {
+        "unit_display": unit if unit is not None else ind.get("unit"),
+        "latest": series_vals[-1], "latest_date": pairs[-1][0],
+        "change": delta,
+        # 변환값이 이미 %인 지표는 변화율(%의 %)이 무의미 → change_pct 생략(None)
+        "change_pct": None if rate_like else pct,
+        "change_unit": change_unit,
+        "raw_latest": raw_latest,
+        "change_label": INDICATORS_CHANGE_LABEL.get(freq, "전일 대비"),
+        "window_label": INDICATORS_WINDOW_LABEL.get(freq, "최근 90일"),
+        "freq": freq, "transform": transform, "primary": primary,
+        "raw_unit": ind.get("unit"),
+        "transformed_unit": (INDICATORS_TRANSFORM_UNIT.get(transform) if transform != "none" else ind.get("unit")),
+        "chart_layers": layers, "reference_lines": display.get("reference_lines") or [],
+        "series": {
+            "dates": sdates,
+            "values": series_vals[-win:],                       # 주 지표 (기존 필드 유지)
+            "raw": [raw_vals[idx[d]] for d in sdates],
+            "transformed": [vals[idx[d]] for d in sdates],
+            **derived,
+        },
     }
 
 
@@ -3465,20 +3586,39 @@ def _build_indicators_payload():
         if not ind.get("enabled", True):
             continue
         raw = hist.get(ind["id"]) or {}
+        freq = ind.get("freq", "D")
+        transform = ind.get("transform", "none")
         base = {"id": ind["id"], "name": ind["name"], "source": ind["source"],
-                "unit": ind.get("unit"), "display": ind.get("display", {})}
+                "unit": ind.get("unit"), "display": ind.get("display", {}),
+                "freq": freq, "transform": transform,
+                "change_label": INDICATORS_CHANGE_LABEL.get(freq, "전일 대비"),
+                "window_label": INDICATORS_WINDOW_LABEL.get(freq, "최근 90일")}
         if not raw:
-            base.update({"available": False, "message": "수집된 데이터가 없습니다"})
+            # manual 지표(수기 미입력)는 no_data로 포함 — 전체 503 방지. 그 외 소스는 미수집 표시
+            if ind["source"] == "manual":
+                base.update({"available": True, "no_data": True, "latest": None, "latest_date": None,
+                             "change": None, "change_pct": None, "unit_display": ind.get("unit"),
+                             "chart_layers": (ind.get("display") or {}).get("chart_layers") or [],
+                             "reference_lines": (ind.get("display") or {}).get("reference_lines") or [],
+                             "series": {"dates": [], "values": []}, "message": "미입력"})
+            else:
+                base.update({"available": False, "message": "수집된 데이터가 없습니다"})
             items.append(base)
             continue
-        dates = sorted(raw)
+        dates = sorted(raw)     # 키 규약상 사전순 = 시간순 (D/W/M/Q 모두)
         fields = (ind.get("source_params") or {}).get("fields") or []
         if ind["source"] == "kis_investor" and len(fields) == 1 and not isinstance(raw[dates[-1]], dict):
             data = _ind_build_kis_foreign(dates, raw)
         elif ind["source"] == "kis_investor":
             data = _ind_build_kis_investors(dates, raw, fields)
-        else:
+        elif freq == "D" and transform in (None, "none"):
             data = _ind_build_scalar(dates, raw, ind.get("unit"))
+        else:
+            data = _ind_build_periodic(dates, raw, ind)
+        if data.get("available") is False:
+            base.update(data)
+            items.append(base)
+            continue
         base.update({"available": True, "count": len(dates), "first_date": dates[0]})
         base.update(data)
         items.append(base)
@@ -3504,6 +3644,67 @@ def get_indicators():
         _indicators_cache["mtime"] = mtime
         _indicators_cache["data"] = payload
     return jsonify(payload)
+
+
+INDICATORS_MANUAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "indicators_manual.json")
+_IND_PERIOD_M_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+def _ind_atomic_write_json(path, obj):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+@app.route("/api/indicators/manual", methods=["POST"])
+def post_indicators_manual():
+    """수기 입력 지표(source=manual) 값 등록. {id, period: YYYY-MM, value}.
+    indicators_manual.json과 cache/indicators_history.json에 즉시 병합하고 메모리 캐시를 무효화한다."""
+    body = request.get_json(silent=True) or {}
+    ind_id = str(body.get("id", "")).strip()
+    period = str(body.get("period", "")).strip()
+    value = body.get("value")
+
+    try:
+        with open(INDICATORS_CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception as e:
+        return jsonify({"error": f"indicators.json을 읽지 못했습니다: {e}"}), 500
+    manual_ids = {i["id"] for i in cfg.get("indicators", []) if i.get("source") == "manual"}
+    if ind_id not in manual_ids:
+        return jsonify({"error": f"수기 입력 지표가 아닙니다: {ind_id or '(빈 id)'} (허용: {', '.join(sorted(manual_ids))})"}), 400
+    if not _IND_PERIOD_M_RE.match(period):
+        return jsonify({"error": "period는 YYYY-MM 형식이어야 합니다"}), 400
+    try:
+        fval = float(value)
+    except (TypeError, ValueError):
+        return jsonify({"error": "value는 숫자여야 합니다"}), 400
+    if not (0 < fval < 100):
+        return jsonify({"error": "value는 0 초과 100 미만이어야 합니다 (PMI 지수)"}), 400
+
+    with _indicators_lock:
+        # 1) 수기 입력 파일 병합 (원자 교체)
+        manual = {}
+        if os.path.exists(INDICATORS_MANUAL_PATH):
+            try:
+                with open(INDICATORS_MANUAL_PATH, "r", encoding="utf-8") as f:
+                    manual = json.load(f)
+            except Exception:
+                manual = {}
+        manual.setdefault(ind_id, {})[period] = fval
+        _ind_atomic_write_json(INDICATORS_MANUAL_PATH, manual)
+        # 2) 캐시 즉시 병합 (다음 수집 주기 불필요)
+        hist = {}
+        if os.path.exists(INDICATORS_HISTORY_PATH):
+            with open(INDICATORS_HISTORY_PATH, "r", encoding="utf-8") as f:
+                hist = json.load(f)
+        hist.setdefault(ind_id, {})[period] = fval
+        _ind_atomic_write_json(INDICATORS_HISTORY_PATH, hist)
+        # 3) 메모리 캐시 무효화 → 다음 GET에서 재계산
+        _indicators_cache["mtime"] = None
+        _indicators_cache["data"] = None
+    return jsonify({"status": "ok", "id": ind_id, "period": period, "value": fval})
 
 
 if __name__ == "__main__":

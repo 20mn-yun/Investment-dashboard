@@ -1,17 +1,24 @@
 {
-  "_comment": "주요 지표 탭 수집 대상. source: kis_investor | yfinance | ecos. 지표 추가·삭제는 이 파일만 수정.",
+  "_comment": "주요 지표 탭 수집 대상. source: kis_investor | yfinance | ecos | fred | dbnomics | manual. freq: D/W/M/Q (캐시 키 규약 D·W=YYYY-MM-DD, M=YYYY-MM, Q=YYYY-Qn). transform은 API 계산 단계에서 적용하는 파생(none|qoq_pct|qoq_saar|yoy_pct|diff) — 캐시에는 항상 원지수·수준값만 저장. display.chart_layers: [{type: bar|line, data: raw|transformed|<파생명>, axis: left|right, dot: bool, label: 범례명}] — 규칙: 막대=변환값(성장률·YoY·증감), 도트선=원지표 수준값. display.headline: 헤드라인(큰 숫자) 기준 데이터(raw|transformed) — 미지정 시 첫 bar layer 데이터. 원지표 최신값은 보조 표기. display.reference_lines: [{value, label}] 수평 기준선. 지표 추가·삭제는 이 파일만 수정.",
   "indicators": [
     {
       "id": "kospi_foreign_net",
       "name": "코스피 외국인 순매수",
       "source": "kis_investor",
       "source_params": {
-        "fields": ["frgn_ntby_tr_pbmn"]
+        "fields": [
+          "frgn_ntby_tr_pbmn"
+        ]
       },
+      "freq": "D",
+      "transform": "none",
       "unit": "백만원",
       "display": {
         "chart": "bar",
-        "derived": ["ma_4w", "cum_2y"]
+        "derived": [
+          "ma_4w",
+          "cum_2y"
+        ]
       },
       "enabled": true
     },
@@ -20,12 +27,20 @@
       "name": "코스피 주체별 순매수",
       "source": "kis_investor",
       "source_params": {
-        "fields": ["prsn_ntby_tr_pbmn", "frgn_ntby_tr_pbmn", "orgn_ntby_tr_pbmn"]
+        "fields": [
+          "prsn_ntby_tr_pbmn",
+          "frgn_ntby_tr_pbmn",
+          "orgn_ntby_tr_pbmn"
+        ]
       },
+      "freq": "D",
+      "transform": "none",
       "unit": "백만원",
       "display": {
         "chart": "line",
-        "derived": ["cum_2y"]
+        "derived": [
+          "cum_2y"
+        ]
       },
       "enabled": true
     },
@@ -36,6 +51,8 @@
       "source_params": {
         "ticker": "USDKRW=X"
       },
+      "freq": "D",
+      "transform": "none",
       "unit": "원",
       "display": {
         "chart": "line",
@@ -50,6 +67,8 @@
       "source_params": {
         "ticker": "^TNX"
       },
+      "freq": "D",
+      "transform": "none",
       "unit": "%",
       "display": {
         "chart": "line",
@@ -66,6 +85,8 @@
         "item_code": "010200000",
         "cycle": "D"
       },
+      "freq": "D",
+      "transform": "none",
       "unit": "%",
       "display": {
         "chart": "line",
@@ -80,10 +101,361 @@
       "source_params": {
         "ticker": "CL=F"
       },
+      "freq": "D",
+      "transform": "none",
       "unit": "USD/bbl",
       "display": {
         "chart": "line",
         "derived": []
+      },
+      "enabled": true
+    },
+    {
+      "id": "gdp_kr",
+      "name": "한국 실질 GDP (전기비)",
+      "source": "ecos",
+      "source_params": {
+        "stat_code": "200Y104",
+        "item_code": "1400",
+        "cycle": "Q"
+      },
+      "freq": "Q",
+      "transform": "qoq_pct",
+      "unit": "십억원(SA, 실질)",
+      "display": {
+        "chart": "bar",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전기비 (%)"
+          },
+          {
+            "type": "line",
+            "data": "raw",
+            "axis": "right",
+            "dot": true,
+            "label": "실질 GDP (십억원)"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "gdp_us",
+      "name": "미국 실질 GDP (전기비 연율)",
+      "source": "fred",
+      "source_params": {
+        "series_id": "GDPC1",
+        "_note": "실질 GDP 수준값(10억 연쇄 2017달러, SAAR) — 전기비 4제곱 연율화(qoq_saar)"
+      },
+      "freq": "Q",
+      "transform": "qoq_saar",
+      "unit": "10억달러(SAAR, 실질)",
+      "display": {
+        "chart": "bar",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전기비 연율 (%)"
+          },
+          {
+            "type": "line",
+            "data": "raw",
+            "axis": "right",
+            "dot": true,
+            "label": "실질 GDP (10억달러)"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "gdp_ea",
+      "name": "유로존 실질 GDP (전기비)",
+      "source": "fred",
+      "source_params": {
+        "series_id": "CLV10MNACB1GQSCAEA20Q",
+        "_note": "EA20(현행 20개국, 2010년 연쇄 백만유로, SA) — EA19(CLVMNACSCAB1GQEA19)와 완결성 동일, 현행 구성 기준 선택"
+      },
+      "freq": "Q",
+      "transform": "qoq_pct",
+      "unit": "백만유로(SA, 실질)",
+      "display": {
+        "chart": "bar",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전기비 (%)"
+          },
+          {
+            "type": "line",
+            "data": "raw",
+            "axis": "right",
+            "dot": true,
+            "label": "실질 GDP (백만유로)"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "gdp_cn",
+      "name": "중국 실질 GDP (전년동기비)",
+      "source": "dbnomics",
+      "source_params": {
+        "provider": "OECD",
+        "dataset": "DSD_NAMAIN1@DF_QNA_EXPENDITURE_GROWTH_OECD",
+        "series": "Q.Y.CHN.S1.S1.B1GQ._Z._Z._Z.PC.L.GY.T0102"
+      },
+      "freq": "Q",
+      "transform": "none",
+      "unit": "% (YoY)",
+      "display": {
+        "chart": "bar",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "raw",
+            "axis": "left",
+            "label": "전년동기비 (%)"
+          }
+        ],
+        "headline": "raw"
+      },
+      "enabled": true
+    },
+    {
+      "id": "us_payems",
+      "name": "미국 비농업 고용 (전월 증감)",
+      "source": "fred",
+      "source_params": {
+        "series_id": "PAYEMS"
+      },
+      "freq": "M",
+      "transform": "diff",
+      "unit": "천명",
+      "display": {
+        "chart": "bar",
+        "derived": [
+          "ma_3m"
+        ],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전월 증감 (천명)"
+          },
+          {
+            "type": "line",
+            "data": "ma_3m",
+            "axis": "left",
+            "dot": true,
+            "label": "3개월 평균"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "us_core_cpi",
+      "name": "미국 Core CPI (전년동월비)",
+      "source": "fred",
+      "source_params": {
+        "series_id": "CPILFESL"
+      },
+      "freq": "M",
+      "transform": "yoy_pct",
+      "unit": "지수(1982-84=100)",
+      "display": {
+        "chart": "line",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전년동월비 (%)"
+          },
+          {
+            "type": "line",
+            "data": "raw",
+            "axis": "right",
+            "dot": true,
+            "label": "CPI 지수"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "us_core_pce",
+      "name": "미국 Core PCE (전년동월비)",
+      "source": "fred",
+      "source_params": {
+        "series_id": "PCEPILFE"
+      },
+      "freq": "M",
+      "transform": "yoy_pct",
+      "unit": "지수(2017=100)",
+      "display": {
+        "chart": "line",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전년동월비 (%)"
+          },
+          {
+            "type": "line",
+            "data": "raw",
+            "axis": "right",
+            "dot": true,
+            "label": "PCE 지수"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "us_retail",
+      "name": "미국 소매판매 (전년동월비)",
+      "source": "fred",
+      "source_params": {
+        "series_id": "RSAFS"
+      },
+      "freq": "M",
+      "transform": "yoy_pct",
+      "unit": "백만달러",
+      "display": {
+        "chart": "line",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전년동월비 (%)"
+          },
+          {
+            "type": "line",
+            "data": "raw",
+            "axis": "right",
+            "dot": true,
+            "label": "판매액 (백만달러)"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "us_indpro",
+      "name": "미국 산업생산 (전년동월비)",
+      "source": "fred",
+      "source_params": {
+        "series_id": "INDPRO"
+      },
+      "freq": "M",
+      "transform": "yoy_pct",
+      "unit": "지수(2017=100)",
+      "display": {
+        "chart": "line",
+        "derived": [],
+        "chart_layers": [
+          {
+            "type": "bar",
+            "data": "transformed",
+            "axis": "left",
+            "label": "전년동월비 (%)"
+          },
+          {
+            "type": "line",
+            "data": "raw",
+            "axis": "right",
+            "dot": true,
+            "label": "생산지수 (2017=100)"
+          }
+        ],
+        "headline": "transformed"
+      },
+      "enabled": true
+    },
+    {
+      "id": "us_claims_4w",
+      "name": "미국 실업수당 청구 4주평균",
+      "source": "fred",
+      "source_params": {
+        "series_id": "IC4WSA"
+      },
+      "freq": "W",
+      "transform": "none",
+      "unit": "명",
+      "display": {
+        "chart": "line",
+        "derived": []
+      },
+      "enabled": true
+    },
+    {
+      "id": "ism_mfg_pmi",
+      "name": "미국 ISM 제조업 PMI",
+      "source": "manual",
+      "source_params": {
+        "_note": "자동 소스 없음 — indicators_manual.json에 YYYY-MM: 값으로 수기 입력"
+      },
+      "freq": "M",
+      "transform": "none",
+      "unit": "지수(50=기준)",
+      "display": {
+        "chart": "line",
+        "derived": [],
+        "reference_lines": [
+          {
+            "value": 50,
+            "label": "기준선 50"
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "ism_svc_pmi",
+      "name": "미국 ISM 서비스 PMI",
+      "source": "manual",
+      "source_params": {
+        "_note": "자동 소스 없음 — indicators_manual.json에 YYYY-MM: 값으로 수기 입력"
+      },
+      "freq": "M",
+      "transform": "none",
+      "unit": "지수(50=기준)",
+      "display": {
+        "chart": "line",
+        "derived": [],
+        "reference_lines": [
+          {
+            "value": 50,
+            "label": "기준선 50"
+          }
+        ]
       },
       "enabled": true
     }
