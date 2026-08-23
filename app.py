@@ -3086,6 +3086,42 @@ def stop_dart_download(job_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/sec-report/download", methods=["POST"])
+def start_sec_download():
+    import sec_report
+    body = request.json or {}
+    ticker = str(body.get("ticker", "")).strip().upper()
+    date_from = body.get("date_from", "")
+    date_to = body.get("date_to", "")
+    want_md = body.get("want_md", True)
+    want_json = body.get("want_json", True)
+    if not ticker:
+        return jsonify({"error": "티커를 입력하세요"}), 400
+    if not want_md and not want_json:
+        return jsonify({"error": "MD 또는 JSON 중 하나는 선택하세요"}), 400
+    job_id = sec_report.start_download_job(ticker, date_from, date_to, want_md, want_json)
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/api/sec-report/status/<job_id>", methods=["GET"])
+def get_sec_report_status(job_id):
+    import sec_report
+    job = sec_report.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+
+@app.route("/api/sec-report/stop/<job_id>", methods=["POST"])
+def stop_sec_download(job_id):
+    import sec_report
+    job = sec_report.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    job["stop_requested"] = True
+    return jsonify({"ok": True})
+
+
 @app.route("/api/report/config", methods=["GET"])
 def get_report_config():
     return jsonify(telegram_report.get_config())

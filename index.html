@@ -1522,6 +1522,7 @@
         <div class="tab-group-name">종목분석</div>
         <div class="tab-group-tabs">
             <div class="tab" data-tab="report" onclick="switchTab('report')">증권사 Report</div>
+            <div class="tab" data-tab="edgar" onclick="switchTab('edgar')">미국주식 EDGAR</div>
         </div>
     </div>
     <div class="tab-group">
@@ -2367,6 +2368,34 @@
             <tbody id="rpt-result-body"></tbody>
         </table>
     </div>
+</div>
+
+<!-- 미국주식 EDGAR 탭 -->
+<div class="tab-content" id="tab-edgar">
+    <div class="section-title">📥 SEC 실적보고서 다운로드 (10-K / 10-Q)</div>
+    <div class="rpt-search-grid">
+        <div class="rpt-field"><label>티커</label><input type="text" id="edgar-ticker" placeholder="예: AAPL" autocomplete="off" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="rpt-field"><label>시작일</label><input type="date" id="edgar-from"></div>
+        <div class="rpt-field"><label>종료일</label><input type="date" id="edgar-to"></div>
+    </div>
+    <div style="margin:8px 0;font-size:13px;">
+        <label><input type="checkbox" id="edgar-md" checked> 본문 Markdown(MD)</label>
+        <label style="margin-left:14px;"><input type="checkbox" id="edgar-json" checked> 재무 JSON(XBRL)</label>
+    </div>
+    <button class="btn" onclick="startEdgarDownload()">다운로드</button>
+    <div id="edgar-progress" class="rpt-progress" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+                <div class="rpt-progress-text" id="edgar-progress-text"></div>
+                <div class="rpt-progress-path" id="edgar-progress-path"></div>
+            </div>
+            <button class="btn" id="edgar-stop" onclick="stopEdgarDownload()" style="background:#da3633;display:none;white-space:nowrap;">⏹ 중단</button>
+        </div>
+    </div>
+    <div id="edgar-result" class="data-table" style="display:none;margin-top:8px;">
+        <table class="rpt-result-table"><thead><tr><th>파일명</th><th>구분</th><th>날짜</th></tr></thead><tbody id="edgar-result-body"></tbody></table>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">저장 위치: 구글 드라이브 Analysis/{티커}/SEC보고서/MD, JSON · 이미 존재하는 파일은 건너뜁니다 · 데이터 출처: SEC EDGAR</div>
 </div>
 
 <script>
@@ -5016,6 +5045,104 @@
         tbody.innerHTML = files.map(f => `<tr><td>${f.filename}</td><td>${f.kind||''}</td><td>${f.rcept_dt||''}</td></tr>`).join('');
         container.style.display = 'block';
     }
+
+    // ===== 미국주식 EDGAR (SEC 10-K/10-Q 다운로드) — DART 정기보고서 다운로드와 동일 패턴 =====
+    let _edgarJobId = null;
+    let _edgarTimer = null;
+
+    function initEdgarDownload() {
+        const today = new Date();
+        const past = new Date(today);
+        past.setFullYear(today.getFullYear() - 2);
+        document.getElementById('edgar-from').value = past.toISOString().slice(0,10);
+        document.getElementById('edgar-to').value = today.toISOString().slice(0,10);
+    }
+
+    async function startEdgarDownload() {
+        const ticker = document.getElementById('edgar-ticker').value.trim().toUpperCase();
+        if (!ticker) { alert('티커를 입력하세요'); return; }
+        const wantMd = document.getElementById('edgar-md').checked;
+        const wantJson = document.getElementById('edgar-json').checked;
+        if (!wantMd && !wantJson) { alert('MD 또는 JSON 중 하나는 선택하세요'); return; }
+        const body = {
+            ticker: ticker,
+            date_from: document.getElementById('edgar-from').value,
+            date_to: document.getElementById('edgar-to').value,
+            want_md: wantMd,
+            want_json: wantJson
+        };
+        document.getElementById('edgar-progress').style.display = 'block';
+        document.getElementById('edgar-result').style.display = 'none';
+        document.getElementById('edgar-progress-text').textContent = '검색 준비 중...';
+        document.getElementById('edgar-progress-path').textContent = '';
+        const stopBtn = document.getElementById('edgar-stop');
+        stopBtn.style.display = 'inline-block';
+        stopBtn.disabled = false;
+        try {
+            const res = await fetch(API_BASE + '/api/sec-report/download', {
+                method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.error) { document.getElementById('edgar-progress-text').textContent = '오류: ' + data.error; stopBtn.style.display='none'; return; }
+            _edgarJobId = data.job_id;
+            pollEdgarStatus();
+        } catch(e) {
+            document.getElementById('edgar-progress-text').textContent = '시작 실패: ' + e.message;
+            stopBtn.style.display = 'none';
+        }
+    }
+
+    async function stopEdgarDownload() {
+        if (!_edgarJobId) return;
+        document.getElementById('edgar-stop').disabled = true;
+        try { await fetch(API_BASE + '/api/sec-report/stop/' + _edgarJobId, {method:'POST'}); } catch(e) {}
+    }
+
+    function pollEdgarStatus() {
+        if (_edgarTimer) clearInterval(_edgarTimer);
+        _edgarTimer = setInterval(async () => {
+            try {
+                const res = await fetch(API_BASE + '/api/sec-report/status/' + _edgarJobId);
+                const job = await res.json();
+                const txt = document.getElementById('edgar-progress-text');
+                const pathEl = document.getElementById('edgar-progress-path');
+                const stopBtn = document.getElementById('edgar-stop');
+                const who = job.company ? `${job.ticker} (${job.company})` : (job.ticker || '');
+                if (job.status === 'done') {
+                    clearInterval(_edgarTimer);
+                    txt.textContent = `완료! ${who} · 발견 ${job.found} / 다운로드 ${job.done}` + (job.skipped ? ` / 건너뜀 ${job.skipped}` : '');
+                    if (job.download_path) pathEl.textContent = '저장 경로: ' + job.download_path;
+                    stopBtn.style.display = 'none';
+                    showEdgarResult(job.files);
+                } else if (job.status === 'error') {
+                    clearInterval(_edgarTimer);
+                    txt.textContent = '오류: ' + (job.error || '알 수 없는 오류');
+                    stopBtn.style.display = 'none';
+                } else if (job.status === 'stopping') {
+                    txt.textContent = `중단 중... (${job.done}/${job.found})`;
+                } else if (job.status === 'financials') {
+                    txt.textContent = `${who} · 재무 JSON 생성 중... (본문 ${job.done}/${job.found})`;
+                } else if (job.status === 'copying') {
+                    txt.textContent = `${who} · 드라이브로 복사 중...`;
+                } else {
+                    txt.textContent = `진행 중... ${who} · 발견 ${job.found} / 완료 ${job.done}` + (job.skipped ? ` / 건너뜀 ${job.skipped}` : '');
+                }
+            } catch(e) {
+                clearInterval(_edgarTimer);
+                document.getElementById('edgar-progress-text').textContent = '상태 조회 실패';
+            }
+        }, 2000);
+    }
+
+    function showEdgarResult(files) {
+        const container = document.getElementById('edgar-result');
+        const tbody = document.getElementById('edgar-result-body');
+        if (!files || !files.length) { container.style.display = 'none'; return; }
+        tbody.innerHTML = files.map(f => `<tr><td>${f.filename}</td><td>${f.kind||''}${f.form ? ' · ' + f.form : ''}</td><td>${f.filingDate||''}</td></tr>`).join('');
+        container.style.display = 'block';
+    }
+
+    initEdgarDownload();
 
     let _digestAllItems = [];
     let _digestPage = 1;
