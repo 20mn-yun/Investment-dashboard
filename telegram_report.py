@@ -524,18 +524,42 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
         os.makedirs(local_staging, exist_ok=True)
         job["download_path"] = final_path
 
+        def _listdir_retry(path, attempts=2, wait=1.0):
+            last_err = None
+            for i in range(attempts):
+                try:
+                    return os.listdir(path)
+                except OSError as e:
+                    last_err = e
+                    if i < attempts - 1:
+                        time.sleep(wait)
+            print(f"[report] 폴더 나열 실패(건너뜀): {path} — {type(last_err).__name__}: {last_err}", flush=True)
+            return None
+
         def _collect_existing_filenames(root):
             existing = set()
             if not os.path.exists(root):
                 return existing
-            for sub in os.listdir(root):
+            subs = _listdir_retry(root)
+            if subs is None:
+                print(f"[report] 루트 나열 실패로 중복검사 생략: {root}", flush=True)
+                return existing
+            for sub in subs:
                 sub_path = os.path.join(root, sub)
-                if os.path.isdir(sub_path):
-                    for f in os.listdir(sub_path):
-                        existing.add(f)
+                try:
+                    is_dir = os.path.isdir(sub_path)
+                except OSError:
+                    is_dir = False
+                if not is_dir:
+                    continue
+                files = _listdir_retry(sub_path)
+                if files is None:
+                    continue
+                for f in files:
+                    existing.add(f)
             return existing
 
-        existing_files = _collect_existing_filenames(stock_root)
+        existing_files = await asyncio.to_thread(_collect_existing_filenames, stock_root)
         job["skipped"] = 0
 
         channel = await client.get_entity(channel_username)
