@@ -28,6 +28,99 @@ MEDIA_DIR = "cache/tg_media"
 
 KST = timezone(timedelta(hours=9))
 
+# ── 뉴스 기사 정제용 상수/함수 (news_channels 자동 수록 글에만 적용) ──────────────
+# 단독 줄로 등장하는 웹/앱 UI 잡음. strip 후 정확히 일치하는 줄만 삭제(본문 문장 중간 단어는 보존).
+UI_JUNK_LINES = [
+    "Save", "Translate", "Listen", "Share", "Follow", "Gift this article",
+    "Comment", "Bookmark",
+    "글자크기", "공유하기", "댓글", "본문듣기", "요약봇", "번역 설정",
+    "텍스트 음성 변환 서비스 사용하기",
+]
+
+# 본문 URL 도메인 → 매체명
+NEWS_DOMAINS = {
+    "bloomberg.com": "Bloomberg",
+    "ft.com": "FT",
+    "wsj.com": "WSJ",
+    "reuters.com": "Reuters",
+    "hankyung.com": "한국경제",
+    "mk.co.kr": "매일경제",
+    "yna.co.kr": "연합뉴스",
+    "sedaily.com": "서울경제",
+    "biz.chosun.com": "조선비즈",
+    "edaily.co.kr": "이데일리",
+    "mt.co.kr": "머니투데이",
+}
+
+_PLAYBACK_TIME_RE = re.compile(r"^\d{1,2}:\d{2}$")          # 분:초 재생시간 단독 줄 (예: 3:45, 12:07)
+_MONTHS_EN = {
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+}
+_DATE_EN_RE = re.compile(
+    r"\b(January|February|March|April|May|June|July|August|September|October|November|December)"
+    r"\s+(\d{1,2}),\s+(\d{4})\b", re.IGNORECASE)
+_DATE_KO_RE = re.compile(r"\b(\d{4})[.\-](\d{1,2})[.\-](\d{1,2})\b")
+
+
+def clean_news_article(text, msg_date):
+    """뉴스 기사 본문 정제. (정제된 텍스트, 정제 발생 여부 bool) 반환.
+    msg_date: 메시지 발송 시각을 KST YYYY-MM-DD로 변환한 문자열(본문에서 날짜를 못 찾을 때 사용)."""
+    if not text:
+        return text, False
+    original = text
+
+    # 가. UI 잡음 줄 제거 (strip 후 정확히 일치하는 단독 줄, 재생시간만 있는 단독 줄)
+    junk = set(UI_JUNK_LINES)
+    kept = []
+    for line in text.split("\n"):
+        s = line.strip()
+        if s in junk:
+            continue
+        if _PLAYBACK_TIME_RE.match(s):
+            continue
+        kept.append(line)
+    body = "\n".join(kept)
+
+    # 나. 매체명: 본문 URL에서 도메인 매칭
+    media = None
+    low = body.lower()
+    for dom, name in NEWS_DOMAINS.items():
+        if dom in low:
+            media = name
+            break
+
+    # 다. 날짜: 영문(August 24, 2026) 우선, 국문(2026.08.24 / 2026-08-24) 다음, 없으면 msg_date
+    date_str = None
+    m = _DATE_EN_RE.search(body)
+    if m:
+        mon = _MONTHS_EN.get(m.group(1).lower())
+        if mon:
+            date_str = f"{int(m.group(3)):04d}-{mon:02d}-{int(m.group(2)):02d}"
+    if date_str is None:
+        m2 = _DATE_KO_RE.search(body)
+        if m2:
+            date_str = f"{int(m2.group(1)):04d}-{int(m2.group(2)):02d}-{int(m2.group(3)):02d}"
+    if date_str is None:
+        date_str = msg_date
+
+    # 라. 머리말: 첫(비어있지 않은) 줄이 이미 대괄호로 시작하면 추가하지 않음
+    first_nonempty = ""
+    for ln in body.split("\n"):
+        if ln.strip():
+            first_nonempty = ln.strip()
+            break
+    if first_nonempty.startswith("["):
+        result = body
+    else:
+        header = f"[{media}|{date_str}]" if media else f"[{date_str}]"
+        result = header + "\n" + body
+
+    return result, (result != original)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 DEFAULT_CHANNELS = [
     "EarlyStock1",
     "kkkontemp",
@@ -51,6 +144,9 @@ DEFAULT_CONFIG = {
     "auto_save_channels": [],
     # 숨김 채널: 대시보드 화면(인박스·자료 목록·건수)에서만 제외. 수집·저장·분류·전사·드라이브·감시는 유지
     "hidden_channels": [],
+    # 뉴스 전용 채널: 여기 등록된 채널의 자동 수록 글은 저장 직전 clean_news_article로 기사 본문을 정제한다.
+    # (수집·Gemini 토픽 분류·이미지 비전 전사는 다른 채널과 완전히 동일하게 거친다 — 우회 없음)
+    "news_channels": [],
     "retention_days": 6,
     "poll_interval_minutes": 10,
     "max_fetch_per_channel": 200,
@@ -100,6 +196,7 @@ def get_config():
     cfg["channels"] = [_normalize_channel(c) for c in cfg.get("channels", [])]
     cfg["auto_save_channels"] = [_normalize_channel(c) for c in cfg.get("auto_save_channels", [])]
     cfg["hidden_channels"] = [_normalize_channel(c) for c in cfg.get("hidden_channels", [])]
+    cfg["news_channels"] = [_normalize_channel(c) for c in cfg.get("news_channels", [])]
     return cfg
 
 
@@ -386,6 +483,7 @@ def collect_once():
     cfg = get_config()
     channels = cfg.get("channels", [])
     auto_save_set = set(cfg.get("auto_save_channels", []))
+    news_save_set = set(cfg.get("news_channels", []))
     retention_days = int(cfg.get("retention_days", 6))
     limit = int(cfg.get("max_fetch_per_channel", 200))
     min_text_chars = int(cfg.get("min_text_chars", 0))
@@ -454,6 +552,15 @@ def collect_once():
                 item = rec["item"]
                 # 자동 수록 채널이면 수집 즉시 저장 처리(기존 저장 파이프라인 사용)
                 if username in auto_save_set:
+                    # 뉴스 전용 채널이면 저장 텍스트만 기사 정제(분류·전사·별표 경로는 불변)
+                    if username in news_save_set:
+                        msg_date = (item.get("date") or now_kst_iso)[:10]
+                        cleaned_text, did_clean = clean_news_article(item.get("text", ""), msg_date)
+                        if did_clean:
+                            item["raw_body"] = item.get("text", "")
+                            item["text"] = cleaned_text
+                            print(f"뉴스정제 {item['id']} ({username}): "
+                                  f"{len(item.get('raw_body') or '')}→{len(cleaned_text)}자", flush=True)
                     item["saved"] = True
                     item["saved_ts"] = now_kst_iso
                     item["auto_saved"] = True
@@ -1920,6 +2027,43 @@ def _fmt_dt(s):
     return dt.astimezone(KST).strftime("%Y-%m-%d %H:%M") if dt else (s or "")
 
 
+_HEADER_DATE_RE = re.compile(r"^\[(?:[^\]|]*\|)?(\d{4}-\d{2}-\d{2})\]")
+
+
+def _news_header_date(it):
+    """항목 본문 첫(비어있지 않은) 줄이 [매체|YYYY-MM-DD] 또는 [YYYY-MM-DD] 형태면 그 날짜를 반환, 아니면 None."""
+    txt = it.get("text") or ""
+    for ln in txt.split("\n"):
+        s = ln.strip()
+        if not s:
+            continue
+        m = _HEADER_DATE_RE.match(s)
+        return m.group(1) if m else None
+    return None
+
+
+def _item_month_date(it):
+    """월별 배정·정렬용 날짜(YYYY-MM-DD). 머리말 날짜가 있으면 그것을, 없으면 저장 시각(saved_ts) 기준."""
+    d = _news_header_date(it)
+    if d:
+        return d
+    dt = _parse_dt(it.get("saved_ts") or it.get("date"))
+    return (dt or datetime.now(KST)).astimezone(KST).strftime("%Y-%m-%d")
+
+
+def _recent_months(now_dt, n=12):
+    """now_dt 포함 최근 n개월의 YYYY-MM 집합."""
+    allowed = set()
+    y, mo = now_dt.year, now_dt.month
+    for _ in range(n):
+        allowed.add(f"{y:04d}-{mo:02d}")
+        mo -= 1
+        if mo == 0:
+            mo = 12
+            y -= 1
+    return allowed
+
+
 def _atomic_write(path, text):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -1930,7 +2074,9 @@ def _atomic_write(path, text):
 
 def _render_item(it):
     ch = it.get("channel_title") or it.get("channel") or ""
-    lines = [f"### [{_fmt_dt(it.get('date'))}] {ch}", ""]
+    topic = it.get("topic") or "미분류"
+    # 첫 줄 맨 앞에 [토픽명] 태그(분류 수정 시 재생성으로 갱신). 나머지 형식은 기존과 동일.
+    lines = [f"### [{topic}] [{_fmt_dt(it.get('date'))}] {ch}", ""]
     lines.append((it.get("text") or "").strip())
     lines.append("")
     if it.get("channel") and it.get("message_id"):
@@ -1971,7 +2117,22 @@ def _render_year_file(year, items, now_str):
     return "\n".join(out)
 
 
-def _render_index(items, year_counts, now_str, now_dt):
+def _render_month_file(ym, items, now_str):
+    """월별 파일: 날짜 최신순 평면 나열. 각 항목 첫 줄에 [토픽] 태그(_render_item가 부여)."""
+    by_topic = {}
+    for it in items:
+        by_topic.setdefault(it.get("topic") or "미분류", []).append(it)
+    group = sorted(items, key=lambda x: _item_month_date(x), reverse=True)
+    out = [f"# 텔레 인박스 저장자료 {ym}", "",
+           f"갱신시각: {now_str} · 총 {len(items)}건 · 주제 {len(by_topic)}개", "",
+           _guide_block(), "",
+           "항목은 날짜 최신순이며, 각 항목 첫 줄 맨 앞 대괄호는 토픽이다.", ""]
+    for it in group:
+        out.append(_render_item(it))
+    return "\n".join(out)
+
+
+def _render_index(items, by_month, allowed_months, now_str, now_dt):
     def brief(it):
         t = (it.get("text") or "").replace("\n", " ").strip()
         return t[:60] + ("…" if len(t) > 60 else "")
@@ -1983,6 +2144,7 @@ def _render_index(items, year_counts, now_str, now_dt):
     out = ["# 텔레 인박스 저장자료 인덱스", "",
            f"갱신시각: {now_str} · 총 {len(items)}건", "",
            _guide_block(), ""]
+    # 최근 저장 목록(유지)
     for title, days in (("최근 7일 하이라이트", 7), ("최근 30일 저장", 30)):
         rs = rows(days)
         out.append(f"## {title} ({len(rs)}건)")
@@ -1991,13 +2153,23 @@ def _render_index(items, year_counts, now_str, now_dt):
             out.append("_해당 기간 저장 항목 없음_")
         for it in rs:
             out.append(f"- {_fmt_dt(it.get('date'))} · {it.get('channel_title') or it.get('channel')} · "
-                       f"[{it.get('topic') or '미분류'}] {brief(it)} → 저장자료_{(it.get('date') or '')[:4]}.md")
+                       f"[{it.get('topic') or '미분류'}] {brief(it)} → {_item_month_date(it)[:7]}.md")
         out.append("")
-    out.append("## 연도별 파일")
+    # 월별 파일 목록 + 각 월의 토픽별 항목 수 분포
+    out.append("## 월별 파일")
     out.append("")
-    for y in sorted(year_counts, reverse=True):
-        out.append(f"- 저장자료_{y}.md — {year_counts[y]}건")
+    for ym in sorted(by_month, reverse=True):
+        group = by_month[ym]
+        loc = "" if ym in allowed_months else " (아카이브/)"
+        out.append(f"- {ym}.md — {len(group)}건{loc}")
+        tc = {}
+        for it in group:
+            tc[it.get("topic") or "미분류"] = tc.get(it.get("topic") or "미분류", 0) + 1
+        dist = " · ".join(f"{t} {tc[t]}" for t in sorted(tc, key=lambda t: (-tc[t], t)))
+        if dist:
+            out.append(f"  - {dist}")
     out.append("")
+    # 전체 주제별 건수(유지)
     topic_counts = {}
     for it in items:
         topic_counts[it.get("topic") or "미분류"] = topic_counts.get(it.get("topic") or "미분류", 0) + 1
@@ -2012,8 +2184,11 @@ def _render_index(items, year_counts, now_str, now_dt):
 
 
 def export_saved_to_drive():
-    """saved=true 항목을 드라이브 폴더에 인덱스 1개 + 연도별 md로 내보낸다.
+    """saved=true 항목을 드라이브 폴더에 인덱스 1개 + 월별 md(YYYY-MM.md)로 내보낸다.
 
+    매 동기화마다 저장 항목 전체에서 전면 재생성한다(분류·토픽 태그가 바뀌면 반영).
+    최근 12개월분만 텔레인박스 폴더에 두고, 초과분은 '아카이브/'로 이동(삭제 안 함).
+    기존 연도별 파일(저장자료_YYYY.md)은 삭제하지 않고 .bak을 붙여 보관한다.
     경로 접근 실패 등 모든 예외는 로그만 남기고 {"status": "error"}를 반환 —
     수집·저장 기능에 영향을 주지 않는다.
     """
@@ -2058,18 +2233,53 @@ def export_saved_to_drive():
         if copied:
             print(f"[tg_inbox] drive image copy: +{copied}장 → {img_dir}", flush=True)
 
-        by_year = {}
+        # 기존 연도별 파일은 삭제하지 않고 .bak으로 보관(최초 1회; 이후 연도 파일은 생성하지 않음)
+        try:
+            for fn in os.listdir(export_dir):
+                if re.fullmatch(r"저장자료_\d{4}\.md", fn):
+                    src = os.path.join(export_dir, fn)
+                    try:
+                        os.replace(src, src + ".bak")
+                        print(f"[tg_inbox] 연도 파일 보관: {fn} → {fn}.bak", flush=True)
+                    except OSError as be:
+                        print(f"[tg_inbox] 연도 파일 .bak 보관 실패 {fn}: {be}", flush=True)
+        except OSError as e:
+            print(f"[tg_inbox] 연도 파일 스캔 실패: {e}", flush=True)
+
+        # 머리말 날짜(없으면 저장 시각) 기준 월별 그룹
+        by_month = {}
         for it in items:
-            by_year.setdefault((it.get("date") or "0000")[:4], []).append(it)
+            by_month.setdefault(_item_month_date(it)[:7], []).append(it)
+
+        allowed = _recent_months(now_dt, 12)
+        archive_dir = os.path.join(export_dir, "아카이브")
 
         files, total = {}, 0
-        for year, group in by_year.items():
-            name = f"저장자료_{year}.md"
-            total += _atomic_write(os.path.join(export_dir, name), _render_year_file(year, group, now_str))
+        for ym, group in by_month.items():
+            target_dir = export_dir if ym in allowed else archive_dir
+            if target_dir is archive_dir:
+                os.makedirs(archive_dir, exist_ok=True)
+            name = f"{ym}.md"
+            total += _atomic_write(os.path.join(target_dir, name), _render_month_file(ym, group, now_str))
             files[name] = len(group)
-        year_counts = {y: len(g) for y, g in by_year.items()}
+
+        # 보존 정책: 텔레인박스 폴더에 남아 있는 12개월 초과 월 파일을 아카이브로 이동(삭제 금지)
+        try:
+            for fn in os.listdir(export_dir):
+                m = re.fullmatch(r"(\d{4}-\d{2})\.md", fn)
+                if m and m.group(1) not in allowed:
+                    os.makedirs(archive_dir, exist_ok=True)
+                    try:
+                        os.replace(os.path.join(export_dir, fn), os.path.join(archive_dir, fn))
+                        print(f"[tg_inbox] 월 파일 아카이브 이동: {fn}", flush=True)
+                    except OSError as me:
+                        print(f"[tg_inbox] 월 파일 아카이브 이동 실패 {fn}: {me}", flush=True)
+        except OSError as e:
+            print(f"[tg_inbox] 아카이브 스윕 실패: {e}", flush=True)
+
         idx_name = "저장자료_인덱스.md"
-        total += _atomic_write(os.path.join(export_dir, idx_name), _render_index(items, year_counts, now_str, now_dt))
+        total += _atomic_write(os.path.join(export_dir, idx_name),
+                               _render_index(items, by_month, allowed, now_str, now_dt))
         files[idx_name] = len(items)
 
         _export_state["last_ts"] = time.time()
