@@ -2686,6 +2686,11 @@ def get_tg_inbox():
 
     data = tg_inbox._load_data()
     items = sorted(data.get("items", []), key=lambda x: x.get("date", ""), reverse=True)
+    # 숨김 채널: 데이터는 불변, 대시보드 표시(목록·건수·주제집계)에서만 제외
+    hidden = set(tg_inbox.get_config().get("hidden_channels", []))
+    if hidden:
+        items = [it for it in items
+                 if tg_inbox._normalize_channel(it.get("channel") or "") not in hidden]
     if saved_only:
         items = [it for it in items if it.get("saved")]
 
@@ -2787,6 +2792,45 @@ def post_tg_inbox_export():
     result = tg_inbox.export_saved_to_drive()
     if result.get("status") == "error":
         return jsonify(result), 500
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/transcribe-backfill", methods=["POST"])
+def post_tg_inbox_transcribe_backfill():
+    """저장 항목 중 이미지가 있고 미전사인 것 전부를 백그라운드로 정밀 전사(완료 후 자동 export)."""
+    data = tg_inbox._load_data()
+    targets = [it for it in data.get("items", [])
+               if it.get("saved") and (tg_inbox._needs_transcription(it)
+                                        or tg_inbox._has_unhealthy_desc(it))]
+    n = len(targets)
+    threading.Thread(target=tg_inbox.backfill_transcriptions, daemon=True).start()
+    return jsonify({"status": "started", "targets": n})
+
+
+@app.route("/api/tg-inbox/channels/hidden", methods=["POST"])
+def post_tg_inbox_hidden():
+    """채널 숨김 on/off. 대시보드 화면에서만 제외(수집·저장·전사·드라이브·감시는 유지)."""
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.set_hidden(body.get("channel", ""), bool(body.get("enabled", False)))
+    if isinstance(result, dict) and result.get("error"):
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/channels/auto-save", methods=["POST"])
+def post_tg_inbox_auto_save():
+    """채널 자동 수록 on/off. 켤 때 보존기간 내 기존 항목도 일괄 자동 저장(전사+export 포함)."""
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.set_auto_save(body.get("channel", ""), bool(body.get("enabled", False)))
+    if isinstance(result, dict) and result.get("error"):
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/transcribe-sample", methods=["POST"])
+def post_tg_inbox_transcribe_sample():
+    """주간 전사 표본 검사 리포트를 즉시 발송(테스트·수동 점검용)."""
+    result = tg_inbox.send_weekly_transcribe_sample()
     return jsonify(result)
 
 

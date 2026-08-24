@@ -1080,6 +1080,14 @@
         #tab-inbox .inbox-chip .warn { color: #f85149; }
         #tab-inbox .inbox-chip .refresh { color: #58a6ff; cursor: pointer; font-weight: 700; }
         #tab-inbox .inbox-chip .refresh:hover { color: #79b8ff; }
+        #tab-inbox .inbox-chip .pin { cursor: pointer; opacity: 0.35; filter: grayscale(1); }
+        #tab-inbox .inbox-chip .pin:hover { opacity: 0.7; }
+        #tab-inbox .inbox-chip.autosaved { border-color: var(--accent); background: var(--accent-bg); }
+        #tab-inbox .inbox-chip.autosaved .pin { opacity: 1; filter: none; }
+        #tab-inbox .inbox-chip.hidden-ch { opacity: 0.5; border-style: dashed; }
+        #tab-inbox .inbox-chip .eye { cursor: pointer; opacity: 0.5; }
+        #tab-inbox .inbox-chip .eye:hover { opacity: 0.9; }
+        #tab-inbox .inbox-chip.hidden-ch .eye { opacity: 1; }
         #tab-inbox .inbox-ch-add { display: flex; gap: 6px; }
         #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 14px; }
         #tab-inbox .inbox-ch-add button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer; white-space: nowrap; }
@@ -5448,8 +5456,14 @@
             const warn = bad ? '<span class="warn">⚠</span> ' : '';
             const refreshBtn = bad
                 ? `<span class="refresh" title="재해석" onclick="refreshInboxChannel('${inboxEsc(c.channel)}')">↻</span>` : '';
-            html += `<span class="inbox-chip${bad ? ' unhealthy' : ''}" title="${inboxEsc(tip)}">${warn}${inboxEsc(c.title || c.channel)}
-                ${refreshBtn}<span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
+            const auto = c.auto_save === true;
+            const pinTip = auto ? '자동 수록 ON — 끄기' : '자동 수록 OFF — 켜기';
+            const pinBtn = `<span class="pin" title="${pinTip}" onclick="toggleAutoSave('${inboxEsc(c.channel)}', ${auto ? 'true' : 'false'})">📌</span>`;
+            const hid = c.hidden === true;
+            const hidMark = hid ? '<span class="eye" title="화면에서 숨김 — 표시하려면 클릭" onclick="toggleHidden(\'' + inboxEsc(c.channel) + '\', true)">👁‍🗨</span> ' : '';
+            const eyeBtn = hid ? '' : `<span class="eye" title="화면에서 숨기기" onclick="toggleHidden('${inboxEsc(c.channel)}', false)">👁</span>`;
+            html += `<span class="inbox-chip${bad ? ' unhealthy' : ''}${auto ? ' autosaved' : ''}${hid ? ' hidden-ch' : ''}" title="${inboxEsc(tip)}">${hidMark}${warn}${inboxEsc(c.title || c.channel)}
+                ${pinBtn}${eyeBtn}${refreshBtn}<span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
         }
         cont.innerHTML = html || '<span style="font-size:12px;color:#6b7280;">등록된 채널이 없습니다</span>';
     }
@@ -5473,6 +5487,49 @@
             loadInboxChannels();
         } catch (e) {
             alert('재해석 요청 오류: ' + e.message);
+        }
+    }
+
+    async function toggleAutoSave(channel, currentlyOn) {
+        const enable = !currentlyOn;
+        const msg = enable
+            ? '이 채널의 모든 글을 영구 보관·드라이브 수록할까요?'
+            : '자동 수록을 끌까요? 기존 저장분은 유지됩니다';
+        if (!confirm(msg)) return;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/channels/auto-save', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({channel: channel, enabled: enable})
+            });
+            const r = await res.json();
+            if (r.error) { alert('설정 실패: ' + r.error); }
+            else if (enable && r.backfilled) {
+                alert(`자동 수록 ON\n기존 항목 ${r.backfilled}건을 저장하고 전사를 시작했습니다.`);
+            }
+            await loadInboxChannels();
+            loadInbox(_inboxPeriod);
+        } catch (e) {
+            alert('설정 요청 오류: ' + e.message);
+        }
+    }
+
+    async function toggleHidden(channel, currentlyHidden) {
+        const enable = !currentlyHidden;
+        const msg = enable
+            ? '이 채널을 대시보드 화면에서 숨길까요? (수집·저장·전사·드라이브 수록은 계속됩니다)'
+            : '숨김을 해제하고 화면에 다시 표시할까요?';
+        if (!confirm(msg)) return;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/channels/hidden', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({channel: channel, enabled: enable})
+            });
+            const r = await res.json();
+            if (r.error) { alert('설정 실패: ' + r.error); }
+            await loadInboxChannels();
+            loadInbox(_inboxPeriod);
+        } catch (e) {
+            alert('설정 요청 오류: ' + e.message);
         }
     }
 
