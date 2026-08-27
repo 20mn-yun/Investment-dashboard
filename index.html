@@ -2353,30 +2353,34 @@
       </div>
     </div>
 
-    <div class="section-title">📥 SEC 실적보고서 다운로드 (10-K / 10-Q)</div>
-    <div class="rpt-search-grid">
-        <div class="rpt-field"><label>티커</label><input type="text" id="edgar-ticker" placeholder="예: AAPL" autocomplete="off" oninput="this.value=this.value.toUpperCase()"></div>
+    <div class="dart-section" style="margin-top:16px;">
+      <div class="dart-section-title">📥 SEC 실적보고서 다운로드 (10-K / 10-Q)</div>
+      <div style="position:relative;margin-bottom:8px;">
+        <input type="text" id="edgar-ticker" data-cal-search="edgar_ticker" placeholder="예: AAPL" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="rpt-search-grid">
         <div class="rpt-field"><label>시작일</label><input type="date" id="edgar-from"></div>
         <div class="rpt-field"><label>종료일</label><input type="date" id="edgar-to"></div>
-    </div>
-    <div style="margin:8px 0;font-size:13px;">
+      </div>
+      <div style="margin:8px 0;font-size:13px;">
         <label><input type="checkbox" id="edgar-md" checked> 본문 Markdown(MD)</label>
         <label style="margin-left:14px;"><input type="checkbox" id="edgar-json" checked> 재무 JSON(XBRL)</label>
-    </div>
-    <button class="btn" onclick="startEdgarDownload()">다운로드</button>
-    <div id="edgar-progress" class="rpt-progress" style="display:none;">
+      </div>
+      <button class="btn" onclick="startEdgarDownload()">다운로드</button>
+      <div id="edgar-progress" class="rpt-progress" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-            <div>
-                <div class="rpt-progress-text" id="edgar-progress-text"></div>
-                <div class="rpt-progress-path" id="edgar-progress-path"></div>
-            </div>
-            <button class="btn" id="edgar-stop" onclick="stopEdgarDownload()" style="background:#da3633;display:none;white-space:nowrap;">⏹ 중단</button>
+          <div>
+            <div class="rpt-progress-text" id="edgar-progress-text"></div>
+            <div class="rpt-progress-path" id="edgar-progress-path"></div>
+          </div>
+          <button class="btn" id="edgar-stop" onclick="stopEdgarDownload()" style="background:#da3633;display:none;white-space:nowrap;">⏹ 중단</button>
         </div>
-    </div>
-    <div id="edgar-result" class="data-table" style="display:none;margin-top:8px;">
+      </div>
+      <div id="edgar-result" class="data-table" style="display:none;margin-top:8px;">
         <table class="rpt-result-table"><thead><tr><th>파일명</th><th>구분</th><th>날짜</th></tr></thead><tbody id="edgar-result-body"></tbody></table>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">저장 위치: 구글 드라이브 Analysis/{티커}/SEC보고서/MD, JSON · 이미 존재하는 파일은 건너뜁니다 · 데이터 출처: SEC EDGAR</div>
     </div>
-    <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">저장 위치: 구글 드라이브 Analysis/{티커}/SEC보고서/MD, JSON · 이미 존재하는 파일은 건너뜁니다 · 데이터 출처: SEC EDGAR</div>
 </div>
 
 <!-- 글로벌 뉴스 검색 탭 -->
@@ -4940,6 +4944,14 @@
             _dartRptSelected = {code: code, name: r.name};
             document.getElementById('dart-rpt-selected').textContent = '선택: ' + r.name + ' (' + code + ')';
             document.getElementById('dart-rpt-search').value = '';
+            document.querySelectorAll('.cal-dropdown').forEach(d => d.style.display = 'none');
+            return;
+        }
+
+        if (calSearchKey === 'edgar_ticker') {
+            if (r.market === 'us') {
+                document.getElementById('edgar-ticker').value = r.code.toUpperCase();
+            }
             document.querySelectorAll('.cal-dropdown').forEach(d => d.style.display = 'none');
             return;
         }
