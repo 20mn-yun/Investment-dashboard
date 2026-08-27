@@ -36,6 +36,32 @@ dart_daily_history.json.bak
 disparity_config.json
 cache/disparity.json
 
+# 포트폴리오 자동화 개인설정·시크릿·상태 (public repo: 절대 커밋 금지)
+portfolio_config.json
+portfolio-sync-key.json
+cache/portfolio_state.json
+cache/portfolio_pending.json
+cache/portfolio_last_batch.json
+cache/portfolio_debug.log
+
 # 수출 탭 (관세청 MTI) 원천·작업 파일
 scratchpad/
 2026 MTI-HSK 코드표_vFF_260507.xlsx
+*무역통계.xls
+
+# 개발 중단 모듈 (로컬 보관용)
+portfolio_sync.py
+
+# 일회성 진단 스크립트·결과물, 일회성 검증 스크립트
+diag_*
+tools/
+
+# Claude Code 로컬 설정
+.claude/
+
+# DART 다운로드 테스트 산물
+_dart_test/
+_dart_test_drive/
+
+# 지표 수동입력 런타임 데이터
+indicators_manual.json
