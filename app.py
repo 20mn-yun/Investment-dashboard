@@ -2691,6 +2691,10 @@ def get_tg_inbox():
     if hidden:
         items = [it for it in items
                  if tg_inbox._normalize_channel(it.get("channel") or "") not in hidden]
+    # 숨김 주제: 데이터·분류는 불변, 표시(목록·건수·주제집계·칩)에서만 제외
+    hidden_topics = set(tg_inbox.get_config().get("hidden_topics", []))
+    if hidden_topics:
+        items = [it for it in items if (it.get("topic") or "") not in hidden_topics]
     if saved_only:
         items = [it for it in items if it.get("saved")]
 
@@ -2727,7 +2731,8 @@ def get_tg_inbox():
         period_items = items
 
     cfg = tg_inbox.get_config()
-    topics = cfg.get("topics", [])
+    # 숨김 주제는 칩 목록에서도 제외(프론트 칩 자동 소멸)
+    topics = [t for t in cfg.get("topics", []) if t not in hidden_topics]
 
     topic_counts = {}
     for t in topics + ["기타", "미분류"]:
@@ -2757,6 +2762,7 @@ def get_tg_inbox():
         "counts": counts,
         "topic_counts": topic_counts,
         "topics": topics,
+        "hidden_topics": sorted(hidden_topics),
         "retention_days": cfg.get("retention_days", 6),
     })
 
@@ -2874,6 +2880,15 @@ def post_tg_inbox_topics():
 def delete_tg_inbox_topics():
     body = request.get_json(silent=True) or {}
     result = tg_inbox.remove_topic(body.get("name", ""))
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/api/tg-inbox/topics/hidden", methods=["POST"])
+def post_tg_inbox_topic_hidden():
+    body = request.get_json(silent=True) or {}
+    result = tg_inbox.set_topic_hidden(body.get("name", ""), bool(body.get("enabled", False)))
     if "error" in result:
         return jsonify(result), 400
     return jsonify(result)

@@ -144,6 +144,8 @@ DEFAULT_CONFIG = {
     "auto_save_channels": [],
     # 숨김 채널: 대시보드 화면(인박스·자료 목록·건수)에서만 제외. 수집·저장·분류·전사·드라이브·감시는 유지
     "hidden_channels": [],
+    # 숨김 주제: 대시보드 화면(목록·건수·주제집계·칩)에서만 제외. 분류·드라이브·자동수록·별표는 불변
+    "hidden_topics": [],
     # 뉴스 전용 채널: 여기 등록된 채널의 자동 수록 글은 저장 직전 clean_news_article로 기사 본문을 정제한다.
     # (수집·Gemini 토픽 분류·이미지 비전 전사는 다른 채널과 완전히 동일하게 거친다 — 우회 없음)
     "news_channels": [],
@@ -1243,6 +1245,26 @@ def set_hidden(channel, enabled):
     cfg["hidden_channels"] = lst
     _save_config(cfg)
     return {"status": "ok", "channel": ident, "hidden": enabled}
+
+
+def set_topic_hidden(name, enabled):
+    """주제 숨김 on/off. 대시보드 화면(목록·건수·주제집계·칩)에서만 제외되며
+    분류 선택지(topics)·드라이브 내보내기·자동수록·별표 데이터는 불변."""
+    name = (name or "").strip()
+    if not name:
+        return {"error": "주제명을 입력하세요"}
+    if name in RESERVED_TOPICS:
+        return {"error": "예약어는 숨길 수 없습니다"}
+    enabled = bool(enabled)
+    cfg = _read_raw_config()
+    lst = list(cfg.get("hidden_topics") or [])
+    if enabled and name not in lst:
+        lst.append(name)
+    elif not enabled and name in lst:
+        lst = [t for t in lst if t != name]
+    cfg["hidden_topics"] = lst
+    _save_config(cfg)
+    return {"status": "ok", "name": name, "hidden": enabled}
 
 
 def backfill_transcriptions():

@@ -1068,6 +1068,12 @@
         #tab-inbox .inbox-topic-item.dragging { opacity: 0.4; touch-action: none; }
         body.inbox-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
         #tab-inbox .inbox-topic-item[data-topic] { border-top: 1px solid transparent; }
+        #tab-inbox .inbox-topic-item .topic-eye { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); padding: 3px; margin: -3px 0; border-radius: 6px; }
+        #tab-inbox .inbox-topic-item .topic-eye:hover { color: var(--text); }
+        #tab-inbox .inbox-topic-item .topic-eye.off { color: #d29922; }
+        #tab-inbox .inbox-topic-item .ic { display: block; width: 15px; height: 15px; }
+        #tab-inbox .inbox-topic-item.hidden-topic { opacity: 0.5; cursor: default; }
+        #tab-inbox .inbox-topic-item.hidden-topic:hover { background: transparent; color: var(--text-muted); }
         #tab-inbox .inbox-channels { margin-bottom: 14px; }
         #tab-inbox .inbox-subtabs { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
         #tab-inbox .inbox-subtab { padding: 8px 16px; cursor: pointer; color: var(--text-muted); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -1077,17 +1083,25 @@
         #tab-inbox .inbox-chip .x { color: var(--text-muted); cursor: pointer; font-weight: 700; }
         #tab-inbox .inbox-chip .x:hover { color: var(--up); }
         #tab-inbox .inbox-chip.unhealthy { border-color: #f85149; }
+        /* 상태 아이콘: 인라인 SVG(stroke=currentColor) — color로 상태별 색 제어, 칩 안 수직중앙, 터치영역 확보 */
+        #tab-inbox .inbox-chip .pin, #tab-inbox .inbox-chip .eye,
+        #tab-inbox .inbox-chip .refresh, #tab-inbox .inbox-chip .warn {
+            display: inline-flex; align-items: center; justify-content: center; }
+        #tab-inbox .inbox-chip .ic { display: block; width: 16px; height: 16px; }
+        #tab-inbox .inbox-chip .pin, #tab-inbox .inbox-chip .eye,
+        #tab-inbox .inbox-chip .refresh {
+            cursor: pointer; padding: 4px; margin: -4px; border-radius: 6px; }
         #tab-inbox .inbox-chip .warn { color: #f85149; }
-        #tab-inbox .inbox-chip .refresh { color: #58a6ff; cursor: pointer; font-weight: 700; }
-        #tab-inbox .inbox-chip .refresh:hover { color: #79b8ff; }
-        #tab-inbox .inbox-chip .pin { cursor: pointer; opacity: 0.35; filter: grayscale(1); }
-        #tab-inbox .inbox-chip .pin:hover { opacity: 0.7; }
+        #tab-inbox .inbox-chip .refresh { color: var(--text-muted); }
+        #tab-inbox .inbox-chip .refresh:hover { color: #58a6ff; }
+        #tab-inbox .inbox-chip .pin { color: var(--text-muted); }
+        #tab-inbox .inbox-chip .pin:hover { color: var(--text); }
         #tab-inbox .inbox-chip.autosaved { border-color: var(--accent); background: var(--accent-bg); }
-        #tab-inbox .inbox-chip.autosaved .pin { opacity: 1; filter: none; }
+        #tab-inbox .inbox-chip.autosaved .pin { color: #58a6ff; }
         #tab-inbox .inbox-chip.hidden-ch { opacity: 0.5; border-style: dashed; }
-        #tab-inbox .inbox-chip .eye { cursor: pointer; opacity: 0.5; }
-        #tab-inbox .inbox-chip .eye:hover { opacity: 0.9; }
-        #tab-inbox .inbox-chip.hidden-ch .eye { opacity: 1; }
+        #tab-inbox .inbox-chip .eye { color: var(--text-muted); }
+        #tab-inbox .inbox-chip .eye:hover { color: var(--text); }
+        #tab-inbox .inbox-chip.hidden-ch .eye { color: #d29922; }
         #tab-inbox .inbox-ch-add { display: flex; gap: 6px; }
         #tab-inbox .inbox-ch-add input { flex: 0 1 320px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 14px; }
         #tab-inbox .inbox-ch-add button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer; white-space: nowrap; }
@@ -5284,6 +5298,7 @@
             document.getElementById('inbox-cnt-today').textContent = c.today || 0;
             document.getElementById('inbox-cnt-week').textContent = c.week || 0;
             document.getElementById('inbox-cnt-month').textContent = c.month || 0;
+            _inboxHiddenTopics = data.hidden_topics || [];
             renderInboxTopics(data.topics || [], data.topic_counts || {});
             renderInbox();
         } catch (e) {
@@ -5294,6 +5309,7 @@
 
     let _inboxTopicsList = [];
     let _inboxTopicCounts = {};
+    let _inboxHiddenTopics = [];
     let _topicAdmin = false;
 
     function renderInboxTopics(topics, topicCounts) {
@@ -5312,11 +5328,20 @@
             const draggable = !reserved.has(t);
             const delX = (_topicAdmin && draggable)
                 ? `<span class="tx" onclick="event.stopPropagation();removeInboxTopic('${inboxEsc(t)}')">×</span>` : '';
+            const eyeTgl = (_topicAdmin && draggable)
+                ? `<span class="topic-eye" title="이 주제를 화면에서 숨기기" onclick="event.stopPropagation();toggleTopicHidden('${inboxEsc(t)}', true)">${SVG_EYE}</span>` : '';
             const handle = (_topicAdmin && draggable)
                 ? `<span class="drag-handle">≡</span>` : '';
             const dataAttr = draggable ? ` data-topic="${inboxEsc(t)}"` : '';
             html += `<div class="inbox-topic-item${active}"${dataAttr} onclick="selectInboxTopic('${inboxEsc(t)}')">
-                <span class="lbl">${handle}${inboxEsc(label)}</span><span class="cnt">${cnt}${delX}</span></div>`;
+                <span class="lbl">${handle}${inboxEsc(label)}</span><span class="cnt">${eyeTgl}${cnt}${delX}</span></div>`;
+        }
+        // 숨김 주제: 관리 모드에서만 하단에 반투명 + eye-off로 노출 (완전히 숨기면 다시 켤 방법이 없으므로)
+        if (_topicAdmin) {
+            for (const t of (_inboxHiddenTopics || [])) {
+                html += `<div class="inbox-topic-item hidden-topic" title="숨김 주제 — 눈 아이콘을 눌러 다시 표시">
+                <span class="lbl">${inboxEsc(t)}</span><span class="cnt"><span class="topic-eye off" title="다시 표시하기" onclick="event.stopPropagation();toggleTopicHidden('${inboxEsc(t)}', false)">${SVG_EYE_OFF}</span></span></div>`;
+            }
         }
         cont.innerHTML = html;
         attachTopicDrag();
@@ -5446,6 +5471,23 @@
         } catch (e) { alert('삭제 실패'); }
     }
 
+    async function toggleTopicHidden(name, enabled) {
+        const msg = enabled
+            ? `'${name}' 주제를 화면에서 숨길까요? (분류는 계속 되며 목록·건수·칩에서만 제외됩니다)`
+            : `'${name}' 주제를 다시 표시할까요?`;
+        if (!confirm(msg)) return;
+        try {
+            const res = await fetch(API_BASE + '/api/tg-inbox/topics/hidden', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({name: name, enabled: enabled})
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            if (enabled && _inboxTopic === name) _inboxTopic = 'all';
+            loadInbox(_inboxPeriod);
+        } catch (e) { alert('주제 숨김 변경 실패'); }
+    }
+
     async function loadInboxChannels() {
         try {
             const res = await fetch(API_BASE + '/api/tg-inbox/channels');
@@ -5453,6 +5495,14 @@
             renderInboxChannels(data.channels || []);
         } catch (e) {}
     }
+
+    // 인박스 상태 아이콘 (인라인 SVG, stroke=currentColor — 색은 CSS에서 상태별 제어). 외부 라이브러리·CDN 없음.
+    const _SVG_ATTR = 'class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+    const SVG_PIN = `<svg ${_SVG_ATTR}><path d="M9 4h6l-1 7 3 3v1H7v-1l3-3z"/><line x1="12" y1="15" x2="12" y2="21"/></svg>`;
+    const SVG_EYE = `<svg ${_SVG_ATTR}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    const SVG_EYE_OFF = `<svg ${_SVG_ATTR}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+    const SVG_ALERT = `<svg ${_SVG_ATTR}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    const SVG_REFRESH = `<svg ${_SVG_ATTR}><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>`;
 
     function renderInboxChannels(channels) {
         const cont = document.getElementById('inbox-chips');
@@ -5470,15 +5520,15 @@
             const tip = `마지막 수집: ${ago}`
                 + (c.consecutive_errors ? ` / 연속에러 ${c.consecutive_errors}` : '')
                 + (c.last_error ? ` / 에러: ${c.last_error}` : '');
-            const warn = bad ? '<span class="warn">⚠</span> ' : '';
+            const warn = bad ? `<span class="warn">${SVG_ALERT}</span> ` : '';
             const refreshBtn = bad
-                ? `<span class="refresh" title="재해석" onclick="refreshInboxChannel('${inboxEsc(c.channel)}')">↻</span>` : '';
+                ? `<span class="refresh" title="재해석" onclick="refreshInboxChannel('${inboxEsc(c.channel)}')">${SVG_REFRESH}</span>` : '';
             const auto = c.auto_save === true;
             const pinTip = auto ? '자동 수록 ON — 끄기' : '자동 수록 OFF — 켜기';
-            const pinBtn = `<span class="pin" title="${pinTip}" onclick="toggleAutoSave('${inboxEsc(c.channel)}', ${auto ? 'true' : 'false'})">📌</span>`;
+            const pinBtn = `<span class="pin" title="${pinTip}" onclick="toggleAutoSave('${inboxEsc(c.channel)}', ${auto ? 'true' : 'false'})">${SVG_PIN}</span>`;
             const hid = c.hidden === true;
-            const hidMark = hid ? '<span class="eye" title="화면에서 숨김 — 표시하려면 클릭" onclick="toggleHidden(\'' + inboxEsc(c.channel) + '\', true)">👁‍🗨</span> ' : '';
-            const eyeBtn = hid ? '' : `<span class="eye" title="화면에서 숨기기" onclick="toggleHidden('${inboxEsc(c.channel)}', false)">👁</span>`;
+            const hidMark = hid ? '<span class="eye" title="화면에서 숨김 — 표시하려면 클릭" onclick="toggleHidden(\'' + inboxEsc(c.channel) + '\', true)">' + SVG_EYE_OFF + '</span> ' : '';
+            const eyeBtn = hid ? '' : `<span class="eye" title="화면에서 숨기기" onclick="toggleHidden('${inboxEsc(c.channel)}', false)">${SVG_EYE}</span>`;
             html += `<span class="inbox-chip${bad ? ' unhealthy' : ''}${auto ? ' autosaved' : ''}${hid ? ' hidden-ch' : ''}" title="${inboxEsc(tip)}">${hidMark}${warn}${inboxEsc(c.title || c.channel)}
                 ${pinBtn}${eyeBtn}${refreshBtn}<span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
         }
