@@ -257,6 +257,8 @@ def build_data():
         "gas_z": pick(gas_z),
         "wti": pick(raw["wti"]),
         "brent": pick(raw["brent"]),
+        "dist_stock": pick(raw["dist_stock"]),
+        "gas_stock": pick(raw["gas_stock"]),
     }
 
     # 최신값·판정 (판정은 각 시리즈 자체 기준 최근값 사용)
