@@ -51,6 +51,16 @@ SERIES = {
 
 CRACK_ALERT_FLOOR = 20.0   # 3-2-1 크랙 $/bbl 경보선
 
+# 일간 시리즈 4개 (외부 공유용 원자료 — 대시보드/크랙 계산에는 미사용, best-effort 수집).
+# 특정 일간 시리즈가 실패해도 나머지와 주간 로직은 그대로 유지된다.
+DAILY_SERIES = {
+    "wti_d": "PET.RWTC.D",                          # WTI 스팟 $/bbl (일간)
+    "brent_d": "PET.RBRTE.D",                       # Brent 스팟 $/bbl (일간)
+    "gasoline_d": "PET.EER_EPMRU_PF4_Y35NY_DPG.D",  # NY하버 휘발유 스팟 $/gal (일간)
+    "ulsd_d": "PET.EER_EPD2DXL0_PF4_Y35NY_DPG.D",   # NY하버 ULSD 스팟 $/gal (일간)
+}
+DAILY_FETCH_LENGTH = 400   # 일간 최근 400일치
+
 
 # ===== 수집 =====
 
@@ -75,7 +85,10 @@ def _fetch_series(sid, length=FETCH_LENGTH):
 
 
 def fetch_all():
-    """6개 시리즈 수집. 일부 실패 시 실패한 시리즈명을 명시해 예외."""
+    """6개 주간 시리즈 수집. 일부 실패 시 실패한 시리즈명을 명시해 예외.
+
+    주간 시리즈는 크랙 계산·대시보드에 필수라 전량 성공을 요구한다(기존 동작 유지).
+    """
     if not API_KEY:
         raise RuntimeError("EIA_API_KEY가 설정되지 않았습니다 (.env 확인)")
     data, failed = {}, []
@@ -87,6 +100,35 @@ def fetch_all():
     if failed:
         raise RuntimeError("EIA 시리즈 수집 실패 — " + " / ".join(failed))
     return data
+
+
+def fetch_daily():
+    """일간 4개 시리즈를 best-effort 수집. 개별 실패는 건너뛰고 로그만 남긴다.
+
+    반환: (series_dict, failed_list)
+      series_dict = {key: {"series_id", "latest": {"date","value"}, "count", "values": {date:value}}}
+      failed_list = ["key(sid): 이유", ...]
+    실패 시에도 예외를 던지지 않아 주간 로직·저장을 깨지 않는다.
+    """
+    out, failed = {}, []
+    if not API_KEY:
+        # 키 값은 출력하지 않는다 (존재 여부만).
+        print("[refinery] 일간 수집 건너뜀: EIA_API_KEY 미설정", flush=True)
+        return out, failed
+    for name, sid in DAILY_SERIES.items():
+        try:
+            vals = _fetch_series(sid, length=DAILY_FETCH_LENGTH)
+            last_date = max(vals)
+            out[name] = {
+                "series_id": sid,
+                "latest": {"date": last_date, "value": round(vals[last_date], 4)},
+                "count": len(vals),
+                "values": vals,
+            }
+        except Exception as e:
+            failed.append(f"{name}({sid}): {e}")
+            print(f"[refinery] 일간 시리즈 실패(건너뜀) {name} {sid}: {type(e).__name__}: {e}", flush=True)
+    return out, failed
 
 
 # ===== 계산 =====
@@ -254,14 +296,21 @@ def build_data():
     level, msg = _judge_overall(latest)
     data_as_of = max(m["date"] for m in latest.values() if m["date"])
 
-    return {
+    # 일간 원자료(외부 공유용) — best-effort. 실패해도 주간 결과는 그대로 반환.
+    daily, daily_failed = fetch_daily()
+
+    result = {
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "data_as_of": data_as_of,
         "source_note": "EIA 주간 시리즈. 휘발유는 NY하버 Conventional Regular 스팟(RBOB 주간 스팟 부재로 대체).",
         "latest": latest,
         "overall": {"level": level, "message": msg},
         "history": history,
+        "daily": daily,
     }
+    if daily_failed:
+        result["daily_failed"] = daily_failed
+    return result
 
 
 # ===== 캐시 =====
@@ -300,8 +349,13 @@ def get_refinery_data(force=False):
 
 if __name__ == "__main__":
     import sys
-    force = "--refresh" in sys.argv
+    force = ("--refresh" in sys.argv) or ("--force" in sys.argv)
     result = get_refinery_data(force=force)
-    out = {k: v for k, v in result.items() if k != "history"}
+    out = {k: v for k, v in result.items() if k not in ("history", "daily")}
     out["history_weeks"] = len(result["history"]["dates"])
+    daily = result.get("daily", {})
+    out["daily_latest"] = {
+        k: v.get("latest") for k, v in daily.items()
+    }
+    out["daily_counts"] = {k: v.get("count") for k, v in daily.items()}
     print(json.dumps(out, ensure_ascii=False, indent=2))
