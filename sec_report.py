@@ -93,6 +93,29 @@ def get_cik(ticker):
     return f"{entry['cik']:010d}", entry.get("title", "")
 
 
+def search_tickers(q, limit=15):
+    q = str(q or "").strip().upper()
+    if not q:
+        return []
+    ql = q.lower()
+    scored = []
+    for ticker, entry in _load_cik_map().items():
+        title = entry.get("title", "")
+        if ql not in ticker.lower() and ql not in title.lower():
+            continue
+        if ticker == q:
+            rank = 0
+        elif ticker.startswith(q):
+            rank = 1
+        elif title.lower().startswith(ql):
+            rank = 2
+        else:
+            rank = 3
+        scored.append((rank, len(ticker), ticker, title))
+    scored.sort()
+    return [{"code": t, "name": title, "market": "us"} for _, _, t, title in scored[:limit]]
+
+
 def list_filings(cik10, date_from, date_to):
     res = _sec_get(SEC_SUBMISSIONS_URL.format(cik=cik10))
     data = res.json()

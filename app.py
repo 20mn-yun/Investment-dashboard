@@ -1327,7 +1327,7 @@ def load_us_stock_map():
                 # 유효한 티커만 (알파벳, 테스트 종목 제외)
                 if (not symbol or not name or len(symbol) > 5
                         or "$" in symbol or "File Creation" in name
-                        or symbol.endswith("W") or symbol.endswith("R")):
+                        or (len(symbol) == 5 and (symbol.endswith("W") or symbol.endswith("R")))):
                     continue
                 mapping[symbol] = {"name": name, "exchange": exchange}
         except Exception:
@@ -3179,6 +3179,15 @@ def stop_sec_download(job_id):
         return jsonify({"error": "Job not found"}), 404
     job["stop_requested"] = True
     return jsonify({"ok": True})
+
+
+@app.route("/api/sec-report/search", methods=["GET"])
+def sec_report_search():
+    import sec_report
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    return jsonify(sec_report.search_tickers(q))
 
 
 @app.route("/api/report/config", methods=["GET"])

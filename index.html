@@ -4906,7 +4906,10 @@
 
     async function calDoSearch(inputId, query) {
         try {
-            const res = await fetch(API_BASE + '/api/stock/search?q=' + encodeURIComponent(query));
+            const url = inputId === 'edgar-ticker'
+                ? '/api/sec-report/search?q=' + encodeURIComponent(query)
+                : '/api/stock/search?q=' + encodeURIComponent(query);
+            const res = await fetch(API_BASE + url);
             calSearchResults = await res.json();
             showCalDd(inputId);
         } catch(e) {}
