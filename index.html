@@ -4287,14 +4287,16 @@
                 const ageH = (Date.now() - d.getTime()) / 3600000;
                 const style = ageH > 26 ? 'color:#bf8700;' : 'color:#57606a;';
                 const refreshing = body.refreshing ? ' · 백그라운드 갱신 중...' : '';
-                tsEl.innerHTML = `<span style="${style}">마지막 갱신: ${fmt}${refreshing}</span>`;
+                const universeNote = gainerMarket === 'us' ? ' · S&amp;P 500 시총 상위 100 기준' : '';
+                tsEl.innerHTML = `<span style="${style}">마지막 갱신: ${fmt}${universeNote}${refreshing}</span>`;
             }
+            const col4Label = gainerMarket === 'us' ? '지수 비중' : '업종';
             container.innerHTML = `
                 <div class="data-row" style="font-weight:bold; color:#0969da; border-bottom:1px solid #d0d7de;">
                     <span style="flex:0.4">#</span>
                     <span style="flex:2">종목명</span>
                     <span style="flex:1.2">섹터</span>
-                    <span style="flex:1.2">업종</span>
+                    <span style="flex:1.2">${col4Label}</span>
                     <span style="flex:1; text-align:right">상승률</span>
                 </div>
                 ${items.map((d, i) => `
@@ -4302,7 +4304,7 @@
                         <span style="flex:0.4; color:#57606a;">${i+1}</span>
                         <span style="flex:2">${d.name}</span>
                         <span style="flex:1.2; color:#57606a;">${d.sector}</span>
-                        <span style="flex:1.2; color:#57606a;">${d.industry}</span>
+                        <span style="flex:1.2; color:#57606a;">${d.weight != null ? '비중 ' + d.weight.toFixed(2) + '%' : (d.industry || '-')}</span>
                         <span style="flex:1; text-align:right" class="${d.change_pct >= 0 ? 'positive' : 'negative'}">
                             ${d.change_pct >= 0 ? '+' : ''}${d.change_pct.toFixed(2)}%
                         </span>

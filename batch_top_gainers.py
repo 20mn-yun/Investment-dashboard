@@ -703,6 +703,7 @@ def calc_rankings(price_data, ticker_meta):
                 "sector": m.get("sector", "-"),
                 "industry": "",
                 "change_pct": round(pct, 2),
+                "weight": round(m["weight"], 2) if m.get("weight") is not None else None,
             })
         result[period_key] = items
 
@@ -783,8 +784,8 @@ def main():
     log(f"=== Batch top gainers: {market} ===")
 
     if market == "us":
-        tickers = load_russell3000()
-        universe_label = "Russell 3000"
+        tickers = load_sp500()
+        universe_label = "S&P 500 시총 상위 100"
     elif market == "kr":
         tickers = load_kr_top600()
         universe_label = "KOSPI top 300 + KOSDAQ top 300"
@@ -803,7 +804,19 @@ def main():
     if fail_rate > 15:
         print(f"WARNING: high failure rate {fail_rate:.1f}% ({len(failed)}/{len(tickers)})", file=sys.stderr)
 
-    rankings, excluded_counts = calc_rankings(price_data, tickers)
+    # 미장: S&P 500 전체(약 500개) 가격은 히트맵이 재활용하고,
+    # 상승률 랭킹은 지수 비중(시총) 상위 100개만 대상으로 한다.
+    rank_tickers = tickers
+    rank_price_data = price_data
+    if market == "us":
+        top100 = sorted(tickers, key=lambda t: -(t.get("weight") or 0))[:100]
+        top100_syms = {t["ticker"] for t in top100}
+        rank_tickers = top100
+        rank_price_data = {s: ser for s, ser in price_data.items() if s in top100_syms}
+        log(f"US ranking universe: top {len(rank_tickers)} by weight "
+            f"({len(rank_price_data)} priced)")
+
+    rankings, excluded_counts = calc_rankings(rank_price_data, rank_tickers)
 
     # 가격을 하나도 못 받아서 순위가 전부 비었으면, 멀쩡한 기존 캐시를
     # 빈 데이터로 덮어쓰지 않고 실패로 종료한다. (화면 '데이터 없음' 방지)
@@ -820,7 +833,7 @@ def main():
     output = {
         "market": market,
         "universe": universe_label,
-        "universe_size": len(tickers),
+        "universe_size": len(rank_tickers),
         "last_updated": now.isoformat(),
         "failed_tickers": failed[:50],
         "failed_count": len(failed),
@@ -840,10 +853,10 @@ def main():
             log(f"  {p} top: {items[0]['ticker']} ({items[0]['change_pct']:+.2f}%)")
 
     # 히트맵 맵 생성 (us/jp). 실패해도 Top10 결과에는 영향 없음.
+    # us는 tickers가 이미 S&P 500(IVV) 전체이고 가격도 전체를 받았으므로 그대로 재활용.
     try:
         if market == "us":
-            sp500 = load_sp500()
-            build_market_map("us", sp500, price_data, None, "S&P 500 (IVV)", "weight")
+            build_market_map("us", tickers, price_data, None, "S&P 500 (IVV)", "weight")
         elif market == "jp":
             caps = load_jp_market_caps([t["ticker"] for t in tickers])
             build_market_map("jp", tickers, price_data, caps, "Nikkei 225", "jpy")
