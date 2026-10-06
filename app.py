@@ -853,100 +853,188 @@ _US_WRAP_STALE_HOURS = 20
 _US_WRAP_RETRIGGER_SEC = 3600
 
 
-def _us_wrap_fmt(d):
-    return f"{d.get('price', 0):,.2f} ({d.get('change_pct', 0):+.2f}%)"
+_US_WRAP_SECTOR_EN = {
+    "에너지": "energy", "헬스케어": "healthcare", "부동산": "real estate",
+    "필수소비재": "consumer staples", "자유소비재": "consumer discretionary",
+    "금융": "financial", "통신서비스": "communication services", "산업재": "industrials",
+    "정보기술": "technology", "소재": "materials", "유틸리티": "utilities",
+    "M7": "megacap tech", "반도체": "semiconductor",
+}
+
+
+def _fetch_news_for(query, limit=4):
+    """Google News RSS에서 쿼리 관련 최근 2일 헤드라인 상위 limit개. 실패 시 빈 리스트."""
+    try:
+        url = ("https://news.google.com/rss/search?q="
+               + requests.utils.quote(query + " when:2d")
+               + "&hl=en-US&gl=US&ceid=US:en")
+        resp = requests.get(url, timeout=10)
+        feed = feedparser.parse(resp.content)
+        out = []
+        for entry in feed.entries[:limit]:
+            source = (entry.get("source", {}).get("title", "")
+                      if hasattr(entry, "source") else "")
+            out.append({
+                "title": entry.get("title", ""),
+                "source": source,
+                "published": entry.get("published", ""),
+            })
+        return out
+    except Exception:
+        return []
+
+
+def _us_wrap_select():
+    """1단계: 지수·특징주(지수 대비 ±1.5%p)·특징 섹터(상/하위 2개)·매크로 선별."""
+    indices = fetch_batch_data({
+        "S&P500": "^GSPC", "나스닥": "^IXIC", "다우": "^DJI", "러셀2000": "^RUT",
+    })
+    spx = indices.get("S&P500", {}).get("change_pct", 0) or 0
+
+    movers = []
+    base_date = ""
+    try:
+        with open(os.path.join(_CACHE_DIR, "market_map_us.json"), encoding="utf-8") as f:
+            mm = json.load(f)
+        base_date = mm.get("base_date", "")
+        top100 = sorted(mm.get("items", []), key=lambda x: -(x.get("cap") or 0))[:100]
+        cands = [it for it in top100
+                 if it.get("c1d") is not None and abs(it["c1d"] - spx) >= 1.5]
+        cands.sort(key=lambda x: -abs(x["c1d"]))
+        movers = [{"ticker": it["t"], "name": it["n"], "pct": it["c1d"]} for it in cands[:6]]
+    except Exception:
+        pass
+    try:
+        with open(os.path.join(_CACHE_DIR, "top_gainers_us.json"), encoding="utf-8") as f:
+            tg = json.load(f)
+        seen = {m["ticker"] for m in movers}
+        for it in tg.get("data", {}).get("1d", []):
+            if len(movers) >= 6:
+                break
+            if it["ticker"] in seen or abs(it["change_pct"] - spx) < 1.5:
+                continue
+            movers.append({"ticker": it["ticker"], "name": it["name"], "pct": it["change_pct"]})
+            seen.add(it["ticker"])
+    except Exception:
+        pass
+    if not base_date:
+        from zoneinfo import ZoneInfo
+        base_date = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+
+    sector_pcts = fetch_batch_data(SECTOR_TICKERS)
+    diffs = sorted(
+        ((k, v["change_pct"], v["change_pct"] - spx)
+         for k, v in sector_pcts.items() if v.get("price")),
+        key=lambda x: x[2], reverse=True)
+    sel_sectors = [{"name": k, "pct": p} for k, p, _ in diffs[:2]] + \
+                  [{"name": k, "pct": p} for k, p, _ in diffs[-2:]]
+
+    macro = fetch_batch_data({"us10y": "^TNX", "brent": "BZ=F"})
+    rate_bp = round((macro.get("us10y", {}).get("change", 0) or 0) * 100)
+    rate = {"level": macro.get("us10y", {}).get("price", 0), "bp": rate_bp}
+    oil = {"price": macro.get("brent", {}).get("price", 0),
+           "pct": macro.get("brent", {}).get("change_pct", 0)}
+    return indices, spx, movers, sel_sectors, rate, oil, base_date
 
 
 def _generate_us_wrap():
-    """지수/섹터/특징주/매크로 수치를 모아 anthropic으로 모닝브리프 생성 후 캐시 저장."""
+    """특이 움직임 선별 → 관련 뉴스 수집 → anthropic 1회 호출로 원인 분석 브리프 생성."""
     lock_path = os.path.join(_CACHE_DIR, f"{_US_WRAP_PATH_NAME}.refreshing")
     try:
-        indices = fetch_batch_data({
-            "S&P500": "^GSPC", "나스닥": "^IXIC", "다우": "^DJI", "러셀2000": "^RUT",
-        })
-        sectors = fetch_batch_data(SECTOR_TICKERS)
-        macro = fetch_batch_data({
-            "미10년물": "^TNX", "미2년물": "^IRX", "달러인덱스": "DX-Y.NYB",
-            "브렌트유": "BZ=F", "VIX": "^VIX",
-        })
+        indices, spx, movers, sel_sectors, rate, oil, base_date = _us_wrap_select()
 
-        sec_sorted = sorted(
-            ((k, v["change_pct"]) for k, v in sectors.items() if v.get("price")),
-            key=lambda x: x[1], reverse=True)
-        sec_top = ", ".join(f"{k} {p:+.2f}%" for k, p in sec_sorted[:3])
-        sec_bot = ", ".join(f"{k} {p:+.2f}%" for k, p in sec_sorted[-3:])
+        news = {}
+        for m in movers:
+            news[m["ticker"]] = _fetch_news_for(f"{m['name']} stock")
+            time.sleep(0.3)
+        for s in sel_sectors:
+            en = _US_WRAP_SECTOR_EN.get(s["name"], s["name"])
+            news[s["name"]] = _fetch_news_for(f"{en} sector stocks")
+            time.sleep(0.3)
+        news["금리"] = _fetch_news_for("Treasury yields")
+        time.sleep(0.3)
+        news["유가"] = _fetch_news_for("oil prices crude")
 
-        movers = []
-        try:
-            with open(os.path.join(_CACHE_DIR, "top_gainers_us.json"), encoding="utf-8") as f:
-                tg = json.load(f)
-            movers += [f"{it['name']}({it['ticker']}) {it['change_pct']:+.1f}%"
-                       for it in tg.get("data", {}).get("1d", [])[:5]]
-        except Exception:
-            pass
-        base_date = ""
-        try:
-            with open(os.path.join(_CACHE_DIR, "market_map_us.json"), encoding="utf-8") as f:
-                mm = json.load(f)
-            base_date = mm.get("base_date", "")
-            big = sorted(mm.get("items", []), key=lambda x: -(x.get("cap") or 0))[:20]
-            big = [b for b in big if b.get("c1d") is not None]
-            big.sort(key=lambda x: -abs(x["c1d"]))
-            movers += [f"{b['n']}({b['t']}) {b['c1d']:+.1f}%" for b in big[:5]]
-        except Exception:
-            pass
-        if not base_date:
-            from zoneinfo import ZoneInfo
-            base_date = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+        def _news_block(key):
+            items = news.get(key) or []
+            if not items:
+                return "  (관련 헤드라인 없음)"
+            return "\n".join(f"  - {h['title']} ({h['source']}, {h['published'][:16]})" for h in items)
 
-        idx_line = " / ".join(f"{k} {_us_wrap_fmt(v)}" for k, v in indices.items())
-        macro_line = " / ".join(
-            f"{k} {v.get('price', 0):,.2f} ({v.get('change_pct', 0):+.2f}%)"
-            for k, v in macro.items())
+        idx_line = " / ".join(f"{k} {v.get('change_pct', 0):+.2f}%" for k, v in indices.items())
+        lines = [f"[기준일] {base_date} (미국 직전 거래일)", f"[지수] {idx_line}", ""]
+        lines.append("[특징 종목 (S&P500 시총 상위 100 중 지수 대비 ±1.5%p 이상)]")
+        if movers:
+            for m in movers:
+                lines.append(f"{m['name']}({m['ticker']}) {m['pct']:+.2f}%")
+                lines.append(_news_block(m["ticker"]))
+        else:
+            lines.append("해당 없음 (지수 대비 크게 움직인 대형주 없음)")
+        lines.append("")
+        lines.append("[특징 섹터 (S&P500 대비 괴리 상/하위 2개)]")
+        for s in sel_sectors:
+            lines.append(f"{s['name']} {s['pct']:+.2f}%")
+            lines.append(_news_block(s["name"]))
+        lines.append("")
+        lines.append(f"[금리] 미 10년물 {rate['level']:.2f}%, 전일 대비 {rate['bp']:+d}bp")
+        lines.append(_news_block("금리"))
+        lines.append(f"[유가] 브렌트 {oil['price']:.2f}달러, 전일 대비 {oil['pct']:+.2f}%")
+        lines.append(_news_block("유가"))
+        data_block = "\n".join(lines)
 
-        data_block = (
-            f"[기준일] {base_date} (미국 직전 거래일)\n"
-            f"[지수] {idx_line}\n"
-            f"[섹터 상위] {sec_top}\n[섹터 하위] {sec_bot}\n"
-            f"[특징주] {'; '.join(movers) if movers else '데이터 없음'}\n"
-            f"[매크로] {macro_line}"
+        prompt = (
+            "너는 증권사 모닝브리프 작성자다. 아래 수치와 뉴스 헤드라인을 근거로, "
+            "'왜 움직였는지'를 한국어로 정리하라. 규칙:\n"
+            "(1) 수치 나열 금지 — 모든 항목은 반드시 '사유'가 중심.\n"
+            "(2) 헤드라인에서 사유를 찾으면 그 근거로 쓰고, 못 찾으면 '뚜렷한 재료 없이 "
+            "지수 흐름에 동조' 또는 '사유 불분명'이라고 솔직히 쓸 것. 사유를 지어내지 말 것.\n"
+            "(3) 추정이면 '~로 보인다'로 표기.\n"
+            "(4) 반드시 아래 JSON으로만 응답:\n"
+            '{\n'
+            '  "market_line": "지수 전반 요약 + 주된 동인 1문장",\n'
+            '  "movers": [{"ticker":"NVDA","name":"엔비디아","pct":3.2,"reason":"사유 1~2문장"}],\n'
+            '  "sectors": [{"name":"에너지","pct":-1.8,"reason":"사유 1문장"}],\n'
+            '  "rates": {"change":"10년물 +7bp","reason":"상승/하락 사유 1~2문장"},\n'
+            '  "oil": {"change":"브렌트 -2.1%","reason":"상승/하락 사유 1~2문장"}\n'
+            '}\n\n' + data_block
         )
 
-        text = None
+        parsed = None
+        raw_text = None
         try:
             resp = claude_client.messages.create(
                 model="claude-haiku-4-5-20251001",
-                max_tokens=800,
-                messages=[{"role": "user", "content": (
-                    "아래 수치를 바탕으로 증권사 모닝브리프 톤의 한국어 5~7문장을 써라. "
-                    "지수 등락과 주요 원인, 특징 섹터와 종목, 금리/달러/유가 순서로. "
-                    "과장 없이 수치 기반으로 쓰고, 불릿 없이 줄글로만. "
-                    "마크다운 문법(#, *, -, 등)을 절대 쓰지 마라.\n\n" + data_block
-                )}],
+                max_tokens=1500,
+                messages=[{"role": "user", "content": prompt}],
             )
-            text = resp.content[0].text.strip()
+            raw_text = resp.content[0].text.strip()
+            json_str = raw_text
+            if json_str.startswith("```"):
+                json_str = re.sub(r"^```(?:json)?\s*|\s*```$", "", json_str, flags=re.DOTALL)
+            parsed = json.loads(json_str)
         except Exception as e:
-            print(f"[us-wrap] anthropic 호출 실패, 템플릿 폴백: {e}", flush=True)
-        if not text:
-            text = (
-                f"{base_date} 미국증시는 {idx_line}로 마감했습니다. "
-                f"섹터별로는 {sec_top}가 상대적으로 강했고 {sec_bot}가 부진했습니다. "
-                + (f"특징주로는 {', '.join(movers[:5])} 등이 움직였습니다. " if movers else "")
-                + f"매크로 지표는 {macro_line}를 기록했습니다."
+            print(f"[us-wrap] anthropic 호출/파싱 실패: {e}", flush=True)
+
+        out = {"date": base_date, "indices": indices,
+               "last_updated": datetime.now().astimezone().isoformat()}
+        if isinstance(parsed, dict) and parsed.get("market_line"):
+            out.update({k: parsed.get(k) for k in ("market_line", "movers", "sectors", "rates", "oil")})
+        elif raw_text:
+            out["raw"] = raw_text
+        else:
+            out["raw"] = (
+                f"{base_date} 미국증시: {idx_line}. "
+                + ("특징주: " + ", ".join(f"{m['name']} {m['pct']:+.1f}%" for m in movers) + ". " if movers else "")
+                + f"미 10년물 {rate['bp']:+d}bp, 브렌트 {oil['pct']:+.2f}%. (요약 생성 실패 — 수치만 표시)"
             )
 
-        out = {
-            "date": base_date,
-            "text": text,
-            "indices": indices,
-            "last_updated": datetime.now().astimezone().isoformat(),
-        }
         path = os.path.join(_CACHE_DIR, _US_WRAP_PATH_NAME)
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False)
         os.replace(tmp, path)
-        print(f"[us-wrap] 생성 완료 ({base_date})", flush=True)
+        print(f"[us-wrap] 생성 완료 ({base_date}, movers {len(movers)}개, "
+              f"{'JSON' if 'market_line' in out else 'raw 폴백'})", flush=True)
     except Exception as e:
         print(f"[us-wrap] 생성 실패: {type(e).__name__}: {e}", flush=True)
     finally:

@@ -4432,23 +4432,50 @@
     }
 
     // ===== 전일 미국증시 시황 =====
+    function usWrapEsc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    }
+    // 텍스트 속 등락률·bp 수치에 상승 빨강/하락 파랑 색 입히기
+    function usWrapColorNums(s) {
+        return usWrapEsc(s).replace(/([+\-−]\d+(?:[.,]\d+)?(?:%|bp))/g, m =>
+            `<span class="${(m.startsWith('-') || m.startsWith('−')) ? 'negative' : 'positive'}" style="font-weight:600;">${m}</span>`);
+    }
+    function usWrapPct(pct) {
+        if (pct == null || isNaN(pct)) return '';
+        return `<span class="${pct >= 0 ? 'positive' : 'negative'}" style="font-weight:700;">${pct >= 0 ? '+' : ''}${Number(pct).toFixed(1)}%</span>`;
+    }
+    function usWrapRow(label, reason) {
+        return `<div style="padding:7px 0; border-bottom:1px solid var(--bg-panel);">` +
+               `<span style="font-weight:600;">${label}</span>` +
+               `<span style="color:var(--text-muted);"> — ${usWrapEsc(reason || '사유 불분명')}</span></div>`;
+    }
+
     async function loadUsWrap() {
         const body = document.getElementById('uswrap-body');
         const meta = document.getElementById('uswrap-meta');
         try {
             const res = await fetch(API_BASE + '/api/us-wrap');
             const data = await res.json();
-            if (res.status === 503 || !data.text) {
+            if (res.status === 503 || (!data.market_line && !data.raw && !data.text)) {
                 body.innerHTML = '<div class="loading">시황 요약을 생성 중입니다. 1~2분 후 새로고침해주세요.</div>';
                 meta.textContent = '';
                 return;
             }
-            // 본문 속 등락률 수치(+x.x% / -x.x%)에 상승 빨강/하락 파랑 색 입히기
-            const colored = data.text
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-                .replace(/([+\-−]\d+(?:[.,]\d+)?%)/g, m =>
-                    `<span class="${(m.startsWith('-') || m.startsWith('−')) ? 'negative' : 'positive'}" style="font-weight:600;">${m}</span>`);
-            body.innerHTML = colored;
+            if (data.market_line) {
+                let html = `<div style="font-size:15px; font-weight:600; margin-bottom:10px;">${usWrapColorNums(data.market_line)}</div>`;
+                (data.movers || []).forEach(m => {
+                    html += usWrapRow(`${usWrapEsc(m.name)} ${usWrapPct(m.pct)}`, m.reason);
+                });
+                (data.sectors || []).forEach(s => {
+                    html += usWrapRow(`${usWrapEsc(s.name)} 섹터 ${usWrapPct(s.pct)}`, s.reason);
+                });
+                if (data.rates) html += usWrapRow(`금리 · ${usWrapColorNums(data.rates.change || '')}`, data.rates.reason);
+                if (data.oil) html += usWrapRow(`유가 · ${usWrapColorNums(data.oil.change || '')}`, data.oil.reason);
+                body.innerHTML = html;
+            } else {
+                // raw 폴백(JSON 파싱 실패) 또는 구버전 캐시(text): 줄글 표시
+                body.innerHTML = usWrapColorNums(data.raw || data.text);
+            }
             let metaTxt = data.date ? `기준일: ${data.date} (미국 직전 거래일)` : '';
             if (data.last_updated) {
                 const d = new Date(data.last_updated);
