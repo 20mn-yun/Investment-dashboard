@@ -1511,6 +1511,28 @@
             #tab-indicators .ind-value { font-size: 20px; }
             #tab-indicators .ind-chart-box { height: 180px; }
         }
+
+        /* ===== 시장 히트맵 ===== */
+        .mmap-tile {
+            position: absolute; box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,0.65); overflow: hidden; cursor: pointer;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; line-height: 1.15; user-select: none; -webkit-user-select: none;
+        }
+        .mmap-tile:hover { filter: brightness(0.93); }
+        .mmap-tile .tk { font-weight: 700; letter-spacing: -0.2px; }
+        .mmap-sector {
+            position: absolute; box-sizing: border-box;
+            border: 1px solid rgba(87,96,106,0.55); pointer-events: none;
+        }
+        .mmap-sector-label {
+            position: absolute; z-index: 5; font-size: 10px; font-weight: 700; color: #57606a;
+            background: rgba(248,249,250,0.92); padding: 0 4px; border-radius: 3px;
+            pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        @media (max-width: 768px) {
+            #mmap-container { height: 400px !important; }
+        }
     </style>
 </head>
 <body>
@@ -1694,6 +1716,36 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- 전일 미국증시 시황 -->
+    <div style="margin-bottom: 24px;">
+        <div class="section-title">🇺🇸 전일 미국증시 시황</div>
+        <div id="uswrap-meta" style="font-size:12px; color:#57606a; margin-bottom:8px;"></div>
+        <div class="data-table">
+            <div id="uswrap-body" style="font-size:14px; line-height:1.75; color:var(--text);">
+                <div class="loading">시황 요약을 불러오는 중...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 시장 히트맵 -->
+    <div style="margin-bottom: 24px;">
+        <div class="section-title">🗺️ 시장 히트맵</div>
+        <div id="mmap-meta" style="font-size:12px; color:#57606a; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+            <button class="period-btn active" data-mmap-market="us" onclick="switchMmapMarket('us')">미장 S&P500</button>
+            <button class="period-btn" data-mmap-market="jp" onclick="switchMmapMarket('jp')">일장 니케이225</button>
+            <span style="width:16px"></span>
+            <button class="period-btn active" data-mmap-period="1d" onclick="switchMmapPeriod('1d')">1일</button>
+            <button class="period-btn" data-mmap-period="1w" onclick="switchMmapPeriod('1w')">1주일</button>
+            <button class="period-btn" data-mmap-period="1mo" onclick="switchMmapPeriod('1mo')">1개월</button>
+            <span id="mmap-legend" style="margin-left:auto; display:flex; align-items:center; gap:6px; font-size:11px; color:#57606a;"></span>
+        </div>
+        <div id="mmap-container" style="position:relative; height:520px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+            <div class="loading">히트맵 데이터를 불러오는 중...</div>
+        </div>
+        <div id="mmap-tooltip" style="display:none; position:fixed; z-index:1200; background:rgba(255,255,255,0.98); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:12px; line-height:1.5; box-shadow:0 4px 12px rgba(0,0,0,0.18); pointer-events:none; max-width:260px;"></div>
     </div>
 
     <!-- 섹터별 등락 -->
@@ -4377,10 +4429,255 @@
         ]);
     }
 
+    // ===== 전일 미국증시 시황 =====
+    async function loadUsWrap() {
+        const body = document.getElementById('uswrap-body');
+        const meta = document.getElementById('uswrap-meta');
+        try {
+            const res = await fetch(API_BASE + '/api/us-wrap');
+            const data = await res.json();
+            if (res.status === 503 || !data.text) {
+                body.innerHTML = '<div class="loading">시황 요약을 생성 중입니다. 1~2분 후 새로고침해주세요.</div>';
+                meta.textContent = '';
+                return;
+            }
+            // 본문 속 등락률 수치(+x.x% / -x.x%)에 상승 빨강/하락 파랑 색 입히기
+            const colored = data.text
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/([+\-−]\d+(?:[.,]\d+)?%)/g, m =>
+                    `<span class="${(m.startsWith('-') || m.startsWith('−')) ? 'negative' : 'positive'}" style="font-weight:600;">${m}</span>`);
+            body.innerHTML = colored;
+            let metaTxt = data.date ? `기준일: ${data.date} (미국 직전 거래일)` : '';
+            if (data.last_updated) {
+                const d = new Date(data.last_updated);
+                metaTxt += (metaTxt ? ' · ' : '') + '갱신: ' +
+                    d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') +
+                    ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+            }
+            if (data.refreshing) metaTxt += ' · 백그라운드 갱신 중...';
+            meta.textContent = metaTxt;
+        } catch (e) {
+            body.innerHTML = '<div class="loading">시황 요약을 불러오지 못했습니다</div>';
+        }
+    }
+
+    // ===== 시장 히트맵 (바닐라 squarified treemap) =====
+    let mmapMarket = 'us';
+    let mmapPeriod = '1d';
+    const mmapData = { us: null, jp: null };
+    let mmapTiles = [];
+    const MMAP_RANGE = { '1d': 3, '1w': 7, '1mo': 15 };
+    let _mmapResizeTimer = null;
+
+    function switchMmapMarket(m) {
+        mmapMarket = m;
+        document.querySelectorAll('[data-mmap-market]').forEach(b =>
+            b.classList.toggle('active', b.getAttribute('data-mmap-market') === m));
+        hideMmapTooltip();
+        if (mmapData[m]) renderMarketMap(); else loadMarketMap(m);
+    }
+
+    function switchMmapPeriod(p) {
+        mmapPeriod = p;
+        document.querySelectorAll('[data-mmap-period]').forEach(b =>
+            b.classList.toggle('active', b.getAttribute('data-mmap-period') === p));
+        hideMmapTooltip();
+        renderMarketMap();
+    }
+
+    async function loadMarketMap(market) {
+        const container = document.getElementById('mmap-container');
+        try {
+            const res = await fetch(API_BASE + '/api/market-map?market=' + market);
+            const data = await res.json();
+            if (res.status === 503) {
+                if (market === mmapMarket)
+                    container.innerHTML = '<div class="loading">데이터가 없어 배치를 자동 실행했습니다. 몇 분 후 다시 확인해주세요.</div>';
+                return;
+            }
+            if (!data.items || !data.items.length) {
+                if (market === mmapMarket) container.innerHTML = '<div class="loading">데이터 없음</div>';
+                return;
+            }
+            data.items.sort((a, b) => b.cap - a.cap);
+            mmapData[market] = data;
+            if (market === mmapMarket) renderMarketMap();
+        } catch (e) {
+            if (market === mmapMarket)
+                container.innerHTML = '<div class="loading">히트맵 데이터를 불러오지 못했습니다</div>';
+        }
+    }
+
+    function mmapChange(it) {
+        return mmapPeriod === '1d' ? it.c1d : (mmapPeriod === '1w' ? it.c1w : it.c1mo);
+    }
+
+    function mmapColor(pct) {
+        if (pct == null || isNaN(pct)) return { bg: '#d8dbe0', white: false };
+        const t = Math.min(Math.abs(pct) / MMAP_RANGE[mmapPeriod], 1);
+        const base = [216, 219, 224];
+        const target = pct >= 0 ? [207, 34, 46] : [9, 105, 218];
+        const c = base.map((b, i) => Math.round(b + (target[i] - b) * t));
+        return { bg: `rgb(${c[0]},${c[1]},${c[2]})`, white: t > 0.55 };
+    }
+
+    function _mmapWorst(areas, sum, side) {
+        const mx = Math.max(...areas), mn = Math.min(...areas);
+        const s2 = sum * sum, d2 = side * side;
+        return Math.max(d2 * mx / s2, s2 / (d2 * mn));
+    }
+
+    // squarified treemap: values(내림차순 가정) → 입력 순서와 같은 [{x,y,w,h}]
+    function mmapLayout(values, x, y, w, h) {
+        const total = values.reduce((s, v) => s + v, 0);
+        if (total <= 0 || w <= 1 || h <= 1) return values.map(() => ({ x, y, w: 0, h: 0 }));
+        const scale = (w * h) / total;
+        const areas = values.map(v => Math.max(v * scale, 0.0001));
+        const rects = new Array(values.length);
+        let i = 0, cx = x, cy = y, cw = w, ch = h;
+        while (i < areas.length) {
+            const horizontal = cw >= ch;          // 줄은 짧은 변 방향으로 쌓음
+            const side = horizontal ? ch : cw;
+            let row = [areas[i]], rowSum = areas[i];
+            let worst = _mmapWorst(row, rowSum, side);
+            let j = i + 1;
+            while (j < areas.length) {
+                const cand = row.concat(areas[j]);
+                const candWorst = _mmapWorst(cand, rowSum + areas[j], side);
+                if (candWorst > worst) break;
+                row = cand; rowSum += areas[j]; worst = candWorst; j++;
+            }
+            const thickness = rowSum / side;
+            let off = 0;
+            for (let k = i; k < j; k++) {
+                const len = areas[k] / thickness;
+                rects[k] = horizontal
+                    ? { x: cx, y: cy + off, w: thickness, h: len }
+                    : { x: cx + off, y: cy, w: len, h: thickness };
+                off += len;
+            }
+            if (horizontal) { cx += thickness; cw -= thickness; }
+            else { cy += thickness; ch -= thickness; }
+            i = j;
+        }
+        return rects;
+    }
+
+    function renderMarketMap() {
+        const data = mmapData[mmapMarket];
+        const container = document.getElementById('mmap-container');
+        if (!data) return;
+        const W = container.clientWidth, H = container.clientHeight;
+        if (W < 50 || H < 50) return;          // 탭 숨김 상태(폭 0) → 탭 진입 리스너가 재호출
+
+        const bySector = {};
+        for (const it of data.items) {
+            (bySector[it.s || '-'] = bySector[it.s || '-'] || []).push(it);
+        }
+        const sectors = Object.entries(bySector)
+            .map(([name, items]) => ({ name, items, cap: items.reduce((s, x) => s + x.cap, 0) }))
+            .sort((a, b) => b.cap - a.cap);
+
+        const secRects = mmapLayout(sectors.map(s => s.cap), 0, 0, W, H);
+        mmapTiles = [];
+        let html = '';
+        sectors.forEach((sec, si) => {
+            const r = secRects[si];
+            if (r.w < 2 || r.h < 2) return;
+            const showHeader = r.h >= 56 && r.w >= 70;
+            const headH = showHeader ? 14 : 0;
+            if (showHeader) {
+                html += `<div class="mmap-sector-label" style="left:${r.x + 2}px;top:${r.y + 1}px;max-width:${r.w - 6}px;">${sec.name}</div>`;
+            }
+            const tileRects = mmapLayout(sec.items.map(x => x.cap), r.x, r.y + headH, r.w, r.h - headH);
+            sec.items.forEach((it, ti) => {
+                const tr = tileRects[ti];
+                if (tr.w < 1.5 || tr.h < 1.5) return;
+                const pct = mmapChange(it);
+                const col = mmapColor(pct);
+                const idx = mmapTiles.length;
+                mmapTiles.push(it);
+                let label = '';
+                if (tr.w > 34 && tr.h > 16) {
+                    const code = mmapMarket === 'jp' ? it.t.replace('.T', '') : it.t;
+                    label = `<span class="tk" style="font-size:10px;">${code}</span>`;
+                    if (tr.h > 30 && pct != null) label += `<span style="font-size:9.5px;">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</span>`;
+                }
+                html += `<div class="mmap-tile" data-i="${idx}" style="left:${tr.x}px;top:${tr.y}px;width:${tr.w}px;height:${tr.h}px;background:${col.bg};color:${col.white ? '#fff' : '#1f2937'};">${label}</div>`;
+            });
+            html += `<div class="mmap-sector" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;"></div>`;
+        });
+        container.innerHTML = html;
+
+        const range = MMAP_RANGE[mmapPeriod];
+        document.getElementById('mmap-legend').innerHTML =
+            `<span>-${range}%</span>` +
+            `<span style="display:inline-block;width:90px;height:10px;border-radius:2px;background:linear-gradient(90deg, rgb(9,105,218), #d8dbe0, rgb(207,34,46));"></span>` +
+            `<span>+${range}%</span>`;
+        const mLabel = { us: 'S&P 500', jp: '니케이 225' }[data.market] || data.market;
+        let metaTxt = `${mLabel} · 기준일 ${data.base_date || '-'} · 크기 = ${data.cap_kind === 'weight' ? '지수 비중' : '시가총액'}`;
+        if (data.last_updated) {
+            const d = new Date(data.last_updated);
+            metaTxt += ` · 갱신 ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+        if (data.refreshing) metaTxt += ' · 백그라운드 갱신 중...';
+        document.getElementById('mmap-meta').textContent = metaTxt;
+    }
+
+    function hideMmapTooltip() {
+        document.getElementById('mmap-tooltip').style.display = 'none';
+    }
+
+    function _mmapCapText(it) {
+        const data = mmapData[mmapMarket];
+        if (data && data.cap_kind === 'weight') return '지수 비중 ' + it.cap.toFixed(2) + '%';
+        return '시총 ' + (it.cap / 1e12).toFixed(2) + '조 엔';
+    }
+
+    (function _wireMmap() {
+        const container = document.getElementById('mmap-container');
+        const tip = document.getElementById('mmap-tooltip');
+        container.addEventListener('pointermove', e => {
+            const tile = e.target.closest('.mmap-tile');
+            if (!tile) { hideMmapTooltip(); return; }
+            const it = mmapTiles[Number(tile.getAttribute('data-i'))];
+            if (!it) { hideMmapTooltip(); return; }
+            const pct = mmapChange(it);
+            const pctHtml = pct == null ? '<span style="color:#57606a;">—</span>'
+                : `<span class="${pct >= 0 ? 'positive' : 'negative'}" style="font-weight:700;">${pct > 0 ? '+' : ''}${pct.toFixed(2)}%</span>`;
+            tip.innerHTML = `<div style="font-weight:700;">${it.n}</div>` +
+                `<div style="color:#57606a;">${it.t} · ${it.s}</div>` +
+                `<div>${_mmapCapText(it)} · ${pctHtml}</div>`;
+            tip.style.display = 'block';
+            tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 280) + 'px';
+            tip.style.top = (e.clientY + 14) + 'px';
+        });
+        container.addEventListener('pointerleave', hideMmapTooltip);
+        container.addEventListener('click', e => {
+            const tile = e.target.closest('.mmap-tile');
+            if (!tile) return;
+            const it = mmapTiles[Number(tile.getAttribute('data-i'))];
+            if (it) openChart(it.t, it.n, mmapChange(it));
+        });
+        window.addEventListener('resize', () => {
+            clearTimeout(_mmapResizeTimer);
+            _mmapResizeTimer = setTimeout(() => { hideMmapTooltip(); renderMarketMap(); }, 250);
+        });
+        // 초기 로드 때 글로벌마켓 탭이 display:none이면 폭 0으로 빈 맵 → 탭 진입 시 재렌더
+        document.querySelectorAll('[data-tab="market"]').forEach(el => el.addEventListener('click', () => {
+            setTimeout(() => {
+                if (mmapData[mmapMarket] && !container.querySelector('.mmap-tile')) renderMarketMap();
+            }, 30);
+        }));
+    })();
+
     // 초기 렌더링
     loadGroups();
     fetchAllData();
     loadTopGainers();
+    loadUsWrap();
+    loadMarketMap('us');
+    loadMarketMap('jp');
 
     // 30초마다 자동 새로고침
     setInterval(fetchAllData, 30000);

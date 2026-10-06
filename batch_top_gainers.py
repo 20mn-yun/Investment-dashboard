@@ -23,7 +23,7 @@ OUTLIER_THRESHOLDS = {
 }
 
 # 티커 유니버스가 이 개수 미만이면 파싱 실패로 간주 (빈/깨진 목록 캐시 방지)
-MIN_UNIVERSE = {"us": 1000, "kr": 200, "jp": 100, "eu": 300}
+MIN_UNIVERSE = {"us": 1000, "kr": 200, "jp": 100, "eu": 300, "us_sp500": 400}
 
 _ISHARES_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -165,6 +165,141 @@ def load_russell3000():
         return _parse_russell_df(df)
 
     return _load_universe(path, "us", fetch, max_age_days=7, save_fn=_save_plain_list(path))
+
+
+def load_sp500():
+    """S&P 500 구성종목 — Top10/히트맵 공용. {ticker, name, sector, weight(%)}.
+
+    1순위 iShares IVV holdings CSV, 실패 시 Wikipedia(이름·섹터) + Slickcharts(지수비중)
+    조합으로 폴백. (iShares가 CSV 대신 HTML을 주는 봇 차단 구간이 있음)
+    """
+    path = os.path.join(TICKERS_DIR, "us_sp500.json")
+
+    def _fetch_ivv():
+        log("Downloading S&P 500 (IVV) holdings from iShares...")
+        url = (
+            "https://www.ishares.com/us/products/239726/"
+            "ishares-core-sp-500-etf/1467271812596.ajax"
+            "?fileType=csv&fileName=IVV_holdings&dataType=fund"
+        )
+        df = _fetch_ishares_csv(url, header_tokens=("Ticker,", '"Ticker"'))
+        if "Asset Class" in df.columns:
+            df = df[df["Asset Class"] == "Equity"]
+        tickers = []
+        for _, row in df.iterrows():
+            t = str(row.get("Ticker", "")).strip()
+            if not t or t == "-" or t == "nan":
+                continue
+            t = t.replace(".", "-")
+            name = str(row.get("Name", "")).strip()
+            sector = str(row.get("Sector", "")).strip()
+            try:
+                weight = float(str(row.get("Weight (%)", "")).replace(",", "").strip())
+            except ValueError:
+                continue
+            if weight <= 0:
+                continue
+            if name == "nan":
+                name = t
+            if sector == "nan":
+                sector = "-"
+            tickers.append({"ticker": t, "name": name, "sector": sector, "weight": weight})
+        return tickers
+
+    def _fetch_wiki_slickcharts():
+        log("Downloading S&P 500 from Wikipedia + Slickcharts (iShares fallback)...")
+        headers = {"User-Agent": _ISHARES_HEADERS["User-Agent"]}
+        wr = req.get("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+                     headers=headers, timeout=30)
+        wr.raise_for_status()
+        wdf = pd.read_html(io.StringIO(wr.text), flavor="lxml")[0]
+        meta = {}
+        for _, row in wdf.iterrows():
+            sym = str(row.get("Symbol", "")).strip().replace(".", "-")
+            if not sym or sym == "nan":
+                continue
+            name = str(row.get("Security", "")).strip()
+            sector = str(row.get("GICS Sector", "")).strip()
+            meta[sym] = {"name": name if name and name != "nan" else sym,
+                         "sector": sector if sector and sector != "nan" else "-"}
+
+        sr = req.get("https://www.slickcharts.com/sp500", headers=headers, timeout=30)
+        sr.raise_for_status()
+        sdf = pd.read_html(io.StringIO(sr.text), flavor="lxml")[0]
+        tickers = []
+        for _, row in sdf.iterrows():
+            sym = str(row.get("Symbol", "")).strip().replace(".", "-")
+            if not sym or sym == "nan":
+                continue
+            try:
+                weight = float(str(row.get("Weight", "")).replace("%", "").replace(",", "").strip())
+            except ValueError:
+                continue
+            if weight <= 0:
+                continue
+            m = meta.get(sym, {})
+            fallback_name = str(row.get("Company", sym)).strip()
+            tickers.append({
+                "ticker": sym,
+                "name": m.get("name", fallback_name or sym),
+                "sector": m.get("sector", "-"),
+                "weight": weight,
+            })
+        return tickers
+
+    def fetch():
+        try:
+            return _fetch_ivv()
+        except Exception as e:
+            print(f"WARNING: IVV CSV fetch failed ({e}); "
+                  f"falling back to Wikipedia+Slickcharts", file=sys.stderr)
+            return _fetch_wiki_slickcharts()
+
+    return _load_universe(path, "us_sp500", fetch, max_age_days=7, save_fn=_save_plain_list(path))
+
+
+def load_jp_market_caps(symbols):
+    """니케이225 종목별 시총(엔) — yfinance fast_info, 7일 캐시, 부실 수집 시 이전 캐시 유지."""
+    path = os.path.join(TICKERS_DIR, "jp_market_caps.json")
+    cached = None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except Exception:
+        pass
+    if cached and isinstance(cached.get("caps"), dict) and len(cached["caps"]) >= 100:
+        age_days = (time.time() - os.path.getmtime(path)) / 86400
+        if age_days < 7:
+            log(f"JP market caps: cached {len(cached['caps'])} symbols (age: {age_days:.1f}d)")
+            return cached["caps"]
+
+    log(f"Collecting JP market caps for {len(symbols)} symbols (0.15s interval)...")
+    caps = {}
+    for i, sym in enumerate(symbols):
+        try:
+            cap = getattr(yf.Ticker(sym).fast_info, "market_cap", None)
+            if cap and cap > 0:
+                caps[sym] = float(cap)
+        except Exception:
+            pass
+        time.sleep(0.15)
+        if (i + 1) % 50 == 0 or i + 1 == len(symbols):
+            log(f"JP caps: {i + 1}/{len(symbols)} ({len(caps)} collected)")
+
+    if len(caps) < 100:
+        prev = cached.get("caps") if cached else None
+        if prev:
+            print(f"WARNING: JP caps collection too small ({len(caps)}); using previous cache "
+                  f"({len(prev)})", file=sys.stderr)
+            return prev
+        print(f"WARNING: JP caps collection too small ({len(caps)}) and no cache", file=sys.stderr)
+        return caps
+
+    os.makedirs(TICKERS_DIR, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"last_updated": datetime.now().isoformat(), "caps": caps}, f, ensure_ascii=False)
+    log(f"Saved {len(caps)} JP market caps")
+    return caps
 
 
 def load_kr_top600(top_n=300):
@@ -490,24 +625,65 @@ def download_prices(ticker_list, chunk_size=50):
     return all_data, all_failed
 
 
+PERIOD_LOOKBACK = {"1d": 1, "1w": 5, "1mo": 21}
+
+
+def _market_last_date(price_data):
+    """시장의 최근 거래일 = 모든 종목 시계열의 마지막 날짜 중 최댓값."""
+    last = None
+    for series in price_data.values():
+        try:
+            d = series.index[-1]
+        except Exception:
+            continue
+        if last is None or d > last:
+            last = d
+    return last
+
+
+def _series_changes(series, market_last):
+    """시장 최근 거래일 기준 기간별 등락률 {1d,1w,1mo} (제외 구간은 None).
+
+    종목 데이터가 시장 기준일보다 1일 이상 밀리면(거래정지 등) 1d 제외,
+    7일 이상 밀리면 모든 기간 제외 — 엉뚱한 날짜 구간 수익률로 랭킹/히트맵에
+    오르는 것을 방지한다. calc_rankings와 build_market_map이 공유.
+    """
+    out = {"1d": None, "1w": None, "1mo": None}
+    if series is None or len(series) < 2:
+        return out
+    lag_days = 0
+    if market_last is not None:
+        try:
+            lag_days = (market_last - series.index[-1]).days
+        except Exception:
+            lag_days = 0
+    if lag_days >= 7:
+        return out
+    cur = float(series.iloc[-1])
+    for period_key, lookback in PERIOD_LOOKBACK.items():
+        if period_key == "1d" and lag_days >= 1:
+            continue
+        if len(series) < lookback + 1:
+            continue
+        prev = float(series.iloc[-(lookback + 1)])
+        if prev <= 0:
+            continue
+        out[period_key] = (cur / prev - 1) * 100
+    return out
+
+
 def calc_rankings(price_data, ticker_meta):
     meta_map = {t["ticker"]: t for t in ticker_meta}
-    periods = {"1d": 1, "1w": 5, "1mo": 21}
     result = {}
     excluded_counts = {}
 
-    for period_key, lookback in periods.items():
-        changes = []
-        for sym, series in price_data.items():
-            if len(series) < lookback + 1:
-                continue
-            cur = float(series.iloc[-1])
-            prev = float(series.iloc[-(lookback + 1)])
-            if prev <= 0:
-                continue
-            pct = (cur / prev - 1) * 100
-            changes.append((sym, pct))
+    market_last = _market_last_date(price_data)
+    all_changes = {sym: _series_changes(series, market_last)
+                   for sym, series in price_data.items()}
 
+    for period_key in PERIOD_LOOKBACK:
+        changes = [(sym, ch[period_key]) for sym, ch in all_changes.items()
+                   if ch[period_key] is not None]
         changes.sort(key=lambda x: x[1], reverse=True)
         threshold = OUTLIER_THRESHOLDS.get(period_key, float("inf"))
         filtered_changes = [(s, p) for s, p in changes if p <= threshold]
@@ -531,6 +707,67 @@ def calc_rankings(price_data, ticker_meta):
         result[period_key] = items
 
     return result, excluded_counts
+
+
+def build_market_map(market, items_meta, price_data, caps, universe_label, cap_kind):
+    """히트맵용 시장 맵 저장: cache/market_map_{market}.json.
+
+    us: cap=IVV weight(%), jp: cap=시총 엔. items 50개 미만이면 기존 캐시 보존을
+    위해 저장하지 않는다.
+    """
+    market_last = _market_last_date(price_data)
+    items = []
+    for t in items_meta:
+        sym = t["ticker"]
+        series = price_data.get(sym)
+        if series is None:
+            continue
+        if cap_kind == "weight":
+            cap = t.get("weight")
+        else:
+            cap = (caps or {}).get(sym)
+        if not cap or cap <= 0:
+            continue
+        ch = _series_changes(series, market_last)
+        items.append({
+            "t": sym,
+            "n": t.get("name", sym),
+            "s": t.get("sector", "-"),
+            "cap": round(float(cap), 4) if cap_kind == "weight" else float(cap),
+            "c1d": round(ch["1d"], 2) if ch["1d"] is not None else None,
+            "c1w": round(ch["1w"], 2) if ch["1w"] is not None else None,
+            "c1mo": round(ch["1mo"], 2) if ch["1mo"] is not None else None,
+        })
+
+    if len(items) < 50:
+        print(f"WARNING: market map {market} has only {len(items)} items — "
+              f"keeping previous cache", file=sys.stderr)
+        return False
+
+    from zoneinfo import ZoneInfo
+    tz_map = {"us": "America/New_York", "jp": "Asia/Tokyo"}
+    now = datetime.now(ZoneInfo(tz_map.get(market, "Asia/Seoul")))
+    base_date = ""
+    if market_last is not None:
+        try:
+            base_date = market_last.strftime("%Y-%m-%d")
+        except Exception:
+            base_date = str(market_last)[:10]
+
+    output = {
+        "market": market,
+        "universe": universe_label,
+        "cap_kind": cap_kind,
+        "base_date": base_date,
+        "last_updated": now.isoformat(),
+        "items": items,
+    }
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    out_path = os.path.join(CACHE_DIR, f"market_map_{market}.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=1)
+    log(f"Saved market map: {out_path} ({len(items)} items, base {base_date})")
+    return True
 
 
 def main():
@@ -601,6 +838,18 @@ def main():
         items = rankings.get(p, [])
         if items:
             log(f"  {p} top: {items[0]['ticker']} ({items[0]['change_pct']:+.2f}%)")
+
+    # 히트맵 맵 생성 (us/jp). 실패해도 Top10 결과에는 영향 없음.
+    try:
+        if market == "us":
+            sp500 = load_sp500()
+            build_market_map("us", sp500, price_data, None, "S&P 500 (IVV)", "weight")
+        elif market == "jp":
+            caps = load_jp_market_caps([t["ticker"] for t in tickers])
+            build_market_map("jp", tickers, price_data, caps, "Nikkei 225", "jpy")
+    except (Exception, SystemExit) as e:
+        print(f"WARNING: market map build failed for {market}: {e}", file=sys.stderr)
+
     log("=== Done ===")
 
 

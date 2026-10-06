@@ -817,6 +817,185 @@ def get_top_gainers():
     })
 
 
+@app.route("/api/market-map", methods=["GET"])
+def get_market_map():
+    """시장 히트맵 데이터 (배치가 만든 cache/market_map_{market}.json). us|jp만."""
+    market = request.args.get("market", "us")
+    if market not in ("us", "jp"):
+        return jsonify({"error": "지원하지 않는 시장입니다"}), 404
+
+    cache_path = os.path.join(_CACHE_DIR, f"market_map_{market}.json")
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        triggered = _spawn_gainers_batch(market)
+        msg = "배치를 방금 시작했습니다. 몇 분 후 새로고침하세요" if triggered \
+            else "배치 실행 중입니다. 잠시 후 새로고침하세요"
+        return jsonify({"error": msg, "refreshing": True}), 503
+
+    refreshing = False
+    try:
+        last_dt = datetime.fromisoformat(cached.get("last_updated", ""))
+        age_h = (datetime.now(last_dt.tzinfo) - last_dt).total_seconds() / 3600
+        if age_h > 26:
+            refreshing = _spawn_gainers_batch(market)
+    except (ValueError, TypeError):
+        refreshing = _spawn_gainers_batch(market)
+
+    cached["refreshing"] = refreshing
+    return jsonify(cached)
+
+
+# --- 전일 미국증시 시황 요약 ---
+_US_WRAP_PATH_NAME = "us_wrap.json"
+_US_WRAP_STALE_HOURS = 20
+_US_WRAP_RETRIGGER_SEC = 3600
+
+
+def _us_wrap_fmt(d):
+    return f"{d.get('price', 0):,.2f} ({d.get('change_pct', 0):+.2f}%)"
+
+
+def _generate_us_wrap():
+    """지수/섹터/특징주/매크로 수치를 모아 anthropic으로 모닝브리프 생성 후 캐시 저장."""
+    lock_path = os.path.join(_CACHE_DIR, f"{_US_WRAP_PATH_NAME}.refreshing")
+    try:
+        indices = fetch_batch_data({
+            "S&P500": "^GSPC", "나스닥": "^IXIC", "다우": "^DJI", "러셀2000": "^RUT",
+        })
+        sectors = fetch_batch_data(SECTOR_TICKERS)
+        macro = fetch_batch_data({
+            "미10년물": "^TNX", "미2년물": "^IRX", "달러인덱스": "DX-Y.NYB",
+            "브렌트유": "BZ=F", "VIX": "^VIX",
+        })
+
+        sec_sorted = sorted(
+            ((k, v["change_pct"]) for k, v in sectors.items() if v.get("price")),
+            key=lambda x: x[1], reverse=True)
+        sec_top = ", ".join(f"{k} {p:+.2f}%" for k, p in sec_sorted[:3])
+        sec_bot = ", ".join(f"{k} {p:+.2f}%" for k, p in sec_sorted[-3:])
+
+        movers = []
+        try:
+            with open(os.path.join(_CACHE_DIR, "top_gainers_us.json"), encoding="utf-8") as f:
+                tg = json.load(f)
+            movers += [f"{it['name']}({it['ticker']}) {it['change_pct']:+.1f}%"
+                       for it in tg.get("data", {}).get("1d", [])[:5]]
+        except Exception:
+            pass
+        base_date = ""
+        try:
+            with open(os.path.join(_CACHE_DIR, "market_map_us.json"), encoding="utf-8") as f:
+                mm = json.load(f)
+            base_date = mm.get("base_date", "")
+            big = sorted(mm.get("items", []), key=lambda x: -(x.get("cap") or 0))[:20]
+            big = [b for b in big if b.get("c1d") is not None]
+            big.sort(key=lambda x: -abs(x["c1d"]))
+            movers += [f"{b['n']}({b['t']}) {b['c1d']:+.1f}%" for b in big[:5]]
+        except Exception:
+            pass
+        if not base_date:
+            from zoneinfo import ZoneInfo
+            base_date = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+
+        idx_line = " / ".join(f"{k} {_us_wrap_fmt(v)}" for k, v in indices.items())
+        macro_line = " / ".join(
+            f"{k} {v.get('price', 0):,.2f} ({v.get('change_pct', 0):+.2f}%)"
+            for k, v in macro.items())
+
+        data_block = (
+            f"[기준일] {base_date} (미국 직전 거래일)\n"
+            f"[지수] {idx_line}\n"
+            f"[섹터 상위] {sec_top}\n[섹터 하위] {sec_bot}\n"
+            f"[특징주] {'; '.join(movers) if movers else '데이터 없음'}\n"
+            f"[매크로] {macro_line}"
+        )
+
+        text = None
+        try:
+            resp = claude_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=800,
+                messages=[{"role": "user", "content": (
+                    "아래 수치를 바탕으로 증권사 모닝브리프 톤의 한국어 5~7문장을 써라. "
+                    "지수 등락과 주요 원인, 특징 섹터와 종목, 금리/달러/유가 순서로. "
+                    "과장 없이 수치 기반으로 쓰고, 불릿 없이 줄글로만. "
+                    "마크다운 문법(#, *, -, 등)을 절대 쓰지 마라.\n\n" + data_block
+                )}],
+            )
+            text = resp.content[0].text.strip()
+        except Exception as e:
+            print(f"[us-wrap] anthropic 호출 실패, 템플릿 폴백: {e}", flush=True)
+        if not text:
+            text = (
+                f"{base_date} 미국증시는 {idx_line}로 마감했습니다. "
+                f"섹터별로는 {sec_top}가 상대적으로 강했고 {sec_bot}가 부진했습니다. "
+                + (f"특징주로는 {', '.join(movers[:5])} 등이 움직였습니다. " if movers else "")
+                + f"매크로 지표는 {macro_line}를 기록했습니다."
+            )
+
+        out = {
+            "date": base_date,
+            "text": text,
+            "indices": indices,
+            "last_updated": datetime.now().astimezone().isoformat(),
+        }
+        path = os.path.join(_CACHE_DIR, _US_WRAP_PATH_NAME)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False)
+        os.replace(tmp, path)
+        print(f"[us-wrap] 생성 완료 ({base_date})", flush=True)
+    except Exception as e:
+        print(f"[us-wrap] 생성 실패: {type(e).__name__}: {e}", flush=True)
+    finally:
+        try:
+            os.remove(lock_path)
+        except OSError:
+            pass
+
+
+def _spawn_us_wrap():
+    """백그라운드 시황 생성 트리거 (잠금 파일로 중복 생성 방지)."""
+    lock_path = os.path.join(_CACHE_DIR, f"{_US_WRAP_PATH_NAME}.refreshing")
+    if os.path.exists(lock_path) and time.time() - os.path.getmtime(lock_path) < _US_WRAP_RETRIGGER_SEC:
+        return False
+    os.makedirs(_CACHE_DIR, exist_ok=True)
+    with open(lock_path, "w") as f:
+        f.write(datetime.now().isoformat())
+    threading.Thread(target=_generate_us_wrap, daemon=True).start()
+    return True
+
+
+@app.route("/api/us-wrap", methods=["GET"])
+def get_us_wrap():
+    """전일 미국증시 시황 요약. 캐시 없으면 생성 트리거 후 503, 20시간 경과 시 백그라운드 재생성."""
+    path = os.path.join(_CACHE_DIR, _US_WRAP_PATH_NAME)
+    cached = None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    stale = True
+    if cached:
+        try:
+            last_dt = datetime.fromisoformat(cached.get("last_updated", ""))
+            stale = (datetime.now(last_dt.tzinfo) - last_dt).total_seconds() > _US_WRAP_STALE_HOURS * 3600
+        except (ValueError, TypeError):
+            stale = True
+
+    refreshing = _spawn_us_wrap() if (cached is None or stale) else False
+
+    if cached is None:
+        return jsonify({"error": "시황 요약을 생성 중입니다. 1~2분 후 새로고침하세요",
+                        "refreshing": True}), 503
+    cached["refreshing"] = refreshing
+    return jsonify(cached)
+
+
 def _is_private_ip(addr):
     import ipaddress
     try:
