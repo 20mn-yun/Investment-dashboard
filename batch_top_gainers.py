@@ -837,10 +837,26 @@ def build_market_map(market, items_meta, price_data, caps, universe_label, cap_k
         "last_updated": local_now.isoformat(),
         "items": items,
     }
+    if _stale_vs_existing(os.path.join(CACHE_DIR, f"market_map_{market}.json"), base_date):
+        return False
     _write_market_map(market, output)
     log(f"Saved market map: market_map_{market}.json ({len(items)} items, base {base_date}, "
         f"ref {output['ref_date']}, mode {output['mode']})")
     return True
+
+
+def _stale_vs_existing(path, new_base):
+    """새 기준일이 기존 캐시 기준일보다 이전이면 True(저장 거부). 같은 날은 덮어쓰기 허용."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            existing = json.load(f).get("base_date")
+    except Exception:
+        return False
+    if existing and new_base and new_base < existing:
+        log(f"WARNING: stale data (new {new_base} < existing {existing}), keeping cache "
+            f"[{os.path.basename(path)}]")
+        return True
+    return False
 
 
 def _write_market_map(market, data):
@@ -1188,10 +1204,17 @@ def main():
     tz_map = {"us": "America/New_York", "kr": "Asia/Seoul", "jp": "Asia/Tokyo", "eu": "Europe/Berlin"}
     now = datetime.now(ZoneInfo(tz_map.get(market, "Asia/Seoul")))
 
+    rank_last = _market_last_date(rank_price_data)
+    try:
+        rank_base = rank_last.strftime("%Y-%m-%d") if rank_last is not None else ""
+    except Exception:
+        rank_base = str(rank_last)[:10]
+
     output = {
         "market": market,
         "universe": universe_label,
         "universe_size": len(rank_tickers),
+        "base_date": rank_base,
         "last_updated": now.isoformat(),
         "failed_tickers": failed[:50],
         "failed_count": len(failed),
@@ -1201,14 +1224,14 @@ def main():
 
     os.makedirs(CACHE_DIR, exist_ok=True)
     out_path = os.path.join(CACHE_DIR, f"top_gainers_{market}.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=1)
-
-    log(f"Saved to {out_path}")
-    for p in ["1d", "1w", "1mo"]:
-        items = rankings.get(p, [])
-        if items:
-            log(f"  {p} top: {items[0]['ticker']} ({items[0]['change_pct']:+.2f}%)")
+    if not _stale_vs_existing(out_path, rank_base):
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(output, f, ensure_ascii=False, indent=1)
+        log(f"Saved to {out_path} (base {rank_base})")
+        for p in ["1d", "1w", "1mo"]:
+            items = rankings.get(p, [])
+            if items:
+                log(f"  {p} top: {items[0]['ticker']} ({items[0]['change_pct']:+.2f}%)")
 
     # 히트맵 맵 생성 (us/jp). 실패해도 Top10 결과에는 영향 없음.
     # us는 tickers가 이미 S&P 500(IVV) 전체이고 가격도 전체를 받았으므로 그대로 재활용.
