@@ -896,18 +896,146 @@ def _chunk_closes(df, chunk):
     return out
 
 
-def refresh_market_map_live(market, now=None):
-    """장중 경량 갱신: market_map의 현재가만 받아 ref 대비 c1d/c1w/c1mo 재계산.
+QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
+QUOTE_BATCH = 150
 
-    - 백오프 중이면 건너뜀, 429 감지 시 30분 백오프 기록 후 중단
-    - 첫 청크의 마지막 봉 날짜가 시장 '오늘'이 아니면 휴장으로 보고 쓰지 않음
-    - 오늘 봉을 받은 종목이 50% 미만이면 쓰지 않음, 못 받은 종목은 기존 값 유지
+
+class _RateLimited(Exception):
+    pass
+
+
+def _fetch_quotes_batch(symbols):
+    """야후 v7 quote 일괄 조회(요청당 최대 150종목). yfinance 내부 YfData 세션의 쿠키/crumb 재사용.
+
+    반환: ({sym: {"price", "prev", "time"(epoch)}}, HTTP 요청 수). 429는 _RateLimited.
+    """
+    from yfinance.data import YfData
+    try:
+        from yfinance.exceptions import YFRateLimitError
+    except Exception:
+        YFRateLimitError = ()
+    yd = YfData()
+    out, n_req = {}, 0
+    for i in range(0, len(symbols), QUOTE_BATCH):
+        batch = symbols[i:i + QUOTE_BATCH]
+        if i:
+            time.sleep(1)
+        try:
+            resp = yd.get(QUOTE_URL, params={
+                "symbols": ",".join(batch),
+                "fields": "regularMarketPrice,regularMarketTime,regularMarketPreviousClose",
+            }, timeout=20)
+        except YFRateLimitError as e:
+            raise _RateLimited(f"YFRateLimitError: {e}")
+        n_req += 1
+        if resp.status_code == 429:
+            raise _RateLimited("HTTP 429 Too Many Requests")
+        resp.raise_for_status()
+        for q in (resp.json().get("quoteResponse") or {}).get("result") or []:
+            sym = q.get("symbol")
+            px = q.get("regularMarketPrice")
+            if sym and px:
+                out[sym] = {"price": float(px), "prev": q.get("regularMarketPreviousClose"),
+                            "time": q.get("regularMarketTime")}
+    return out, n_req
+
+
+def _live_via_quotes(market, syms, items, today, stats):
+    """1순위 경로. ("ok", fresh) | ("holiday", info) | ("fallback", reason)."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(MARKET_TZ[market])
+    try:
+        quotes, n_req = _fetch_quotes_batch(syms)
+    except _RateLimited:
+        raise
+    except Exception as e:
+        return "fallback", f"quote 예외 {type(e).__name__}: {e}"
+    stats["requests"] = n_req
+    if len(quotes) < 0.5 * len(syms):
+        return "fallback", f"quote 성공률 {len(quotes)}/{len(syms)} (<50%)"
+
+    fresh = {}
+    for sym, q in quotes.items():
+        try:
+            d = datetime.fromtimestamp(int(q["time"]), tz).date()
+        except (TypeError, ValueError, KeyError):
+            continue
+        if d == today:
+            fresh[sym] = {"px": q["price"], "prev": q.get("prev"), "k": None}
+    if len(fresh) <= len(quotes) / 2:
+        return "holiday", {"today_quotes": len(fresh), "quotes": len(quotes)}
+
+    # ref 정렬(k) 판정: 야후 전일 종가 == ref 1d 이면 정렬(k=0), 대부분 다르면 밤 배치가
+    # 하루 놓친 것(k=1). 파일 단위 성질이므로 시장 전체 다수결로 정한다.
+    ref1d = {it["t"]: (it.get("ref") or {}).get("1d") for it in items}
+    comparable = [(f["prev"], ref1d.get(s)) for s, f in fresh.items() if f.get("prev") and ref1d.get(s)]
+    aligned = sum(1 for p, r in comparable if abs(p / r - 1) < 5e-4)
+    k = 0 if not comparable or aligned >= len(comparable) / 2 else 1
+    for f in fresh.values():
+        f["k"] = k
+    return "ok", fresh
+
+
+def _live_via_download(market, syms, today, ref_date, stats):
+    """fallback 경로(yf.download, 종목별 요청). ("ok", fresh) | ("holiday", info)."""
+    got = {}
+    for ci in range(0, len(syms), LIVE_CHUNK):
+        chunk = syms[ci:ci + LIVE_CHUNK]
+        try:
+            df = yf.download(
+                tickers=chunk, period="5d", interval="1d", group_by="ticker",
+                auto_adjust=True, progress=False, threads=False,
+            )
+        except Exception as e:
+            stats["chunks"] += 1
+            stats["requests"] += len(chunk)
+            if any(m in str(e).lower() for m in _RATE_LIMIT_MARKERS) or "RateLimit" in type(e).__name__:
+                raise _RateLimited(f"{type(e).__name__}: {e}")
+            log(f"[live {market}] chunk {ci // LIVE_CHUNK + 1} 실패: {type(e).__name__}: {e}")
+            continue
+        stats["chunks"] += 1
+        stats["requests"] += len(chunk)
+        errs = dict(getattr(yf.shared, "_ERRORS", {}) or {})
+        rl = [f"{k}: {v}" for k, v in errs.items()
+              if any(m in str(v).lower() for m in _RATE_LIMIT_MARKERS)]
+        if rl:
+            raise _RateLimited("; ".join(rl[:3]))
+
+        part = _chunk_closes(df, chunk)
+        got.update(part)
+        if ci == 0:
+            last_dates = [bars[-1][0] for bars in part.values() if bars]
+            latest = max(last_dates) if last_dates else None
+            if latest != today:
+                return "holiday", {"latest_bar": str(latest)}
+        if ci + LIVE_CHUNK < len(syms):
+            time.sleep(2)
+
+    fresh = {}
+    for sym, bars in got.items():
+        if not bars or bars[-1][0] != today:
+            continue
+        prev = [b for b in bars if b[0] < today]
+        k = sum(1 for d, _ in prev if ref_date is not None and d > ref_date) if prev else 0
+        fresh[sym] = {"px": bars[-1][1], "prev": prev[-1][1] if prev else None, "k": k}
+    return "ok", fresh
+
+
+def refresh_market_map_live(market, now=None):
+    """장중 경량 갱신: market_map의 현재가만 받아 c1d/c1w/c1mo 재계산.
+
+    - 1순위 야후 quote 일괄 조회(요청당 150종목 → 미장 4건), 예외·성공률 50% 미만이면
+      yf.download(종목별 요청)로 자동 전환. 결과 dict의 path/requests에 경로·요청 수 기록
+    - 백오프 중이면 건너뜀, 429 감지 시 30분 백오프 기록 후 중단(fallback하지 않음)
+    - 오늘 시세가 과반이 아니면 휴장(또는 개장 전)으로 보고 쓰지 않음
+    - 1d는 야후 전일 종가 기준, 1w/1mo는 ref 기준(ref가 하루 밀렸으면 *_s1로 보정)
+    - 오늘 시세를 받은 종목이 50% 미만이면 쓰지 않음, 못 받은 종목은 기존 값 유지
     - mode는 정규장 중이면 live, 장 마감 후(마감 확정 실행)면 close
     now(aware datetime)를 주면 '오늘'·장중 판정에만 사용한다(테스트용).
     """
     from datetime import timezone
     t0 = time.time()
-    stats = {"market": market, "chunks": 0, "requested": 0, "updated": 0}
+    stats = {"market": market, "path": None, "requests": 0, "chunks": 0, "requested": 0, "updated": 0}
 
     wall_now = now or datetime.now(timezone.utc)
     until = _yahoo_backoff_until()
@@ -932,80 +1060,54 @@ def refresh_market_map_live(market, now=None):
     today = local_now.date()
     if data.get("ref_date") == today.isoformat():
         log(f"[live {market}] ref 기준일이 오늘({today}) — 장 마감 후 배치가 이미 다음 세션용 ref를 "
-            f"만든 상태이므로 갱신하지 않음 (덮어쓰면 등락률이 0이 됨)")
+            f"만든 상태이므로 갱신하지 않음 (덮어쓰면 1주/1개월 등락이 틀어짐)")
         return {**stats, "status": "ref_is_today"}
     syms = [it["t"] for it in items]
     stats["requested"] = len(syms)
-
-    got = {}
-    for ci in range(0, len(syms), LIVE_CHUNK):
-        chunk = syms[ci:ci + LIVE_CHUNK]
-        try:
-            df = yf.download(
-                tickers=chunk, period="5d", interval="1d", group_by="ticker",
-                auto_adjust=True, progress=False, threads=False,
-            )
-        except Exception as e:
-            stats["chunks"] += 1
-            if any(m in str(e).lower() for m in _RATE_LIMIT_MARKERS) or "RateLimit" in type(e).__name__:
-                _set_yahoo_backoff(market, f"{type(e).__name__}: {e}")
-                return {**stats, "status": "rate_limited", "elapsed_sec": round(time.time() - t0, 1)}
-            log(f"[live {market}] chunk {ci // LIVE_CHUNK + 1} 실패: {type(e).__name__}: {e}")
-            continue
-        stats["chunks"] += 1
-        errs = dict(getattr(yf.shared, "_ERRORS", {}) or {})
-        rl = [f"{k}: {v}" for k, v in errs.items()
-              if any(m in str(v).lower() for m in _RATE_LIMIT_MARKERS)]
-        if rl:
-            _set_yahoo_backoff(market, "; ".join(rl[:3]))
-            return {**stats, "status": "rate_limited", "elapsed_sec": round(time.time() - t0, 1)}
-
-        part = _chunk_closes(df, chunk)
-        got.update(part)
-
-        if ci == 0:
-            last_dates = [bars[-1][0] for bars in part.values() if bars]
-            latest = max(last_dates) if last_dates else None
-            if latest != today:
-                log(f"[live {market}] 오늘 봉 없음: 최신 봉 {latest} ≠ 오늘 {today} "
-                    f"(휴장, 개장 전, 또는 장 마감 후 야후 일봉 종가 미확정) — 파일 쓰지 않음")
-                return {**stats, "status": "holiday", "latest_bar": str(latest),
-                        "today": str(today), "elapsed_sec": round(time.time() - t0, 1)}
-
-        if ci + LIVE_CHUNK < len(syms):
-            time.sleep(2)
-
     ref_date = None
     try:
         ref_date = datetime.strptime(data.get("ref_date", ""), "%Y-%m-%d").date()
     except (ValueError, TypeError):
         pass
 
-    fresh = {sym: bars for sym, bars in got.items() if bars and bars[-1][0] == today}
+    def _done(status, **extra):
+        stats["elapsed_sec"] = round(time.time() - t0, 1)
+        return {**stats, "status": status, **extra}
+
+    try:
+        stats["path"] = "quote"
+        kind, payload = _live_via_quotes(market, syms, items, today, stats)
+        if kind == "fallback":
+            log(f"[live {market}] quote 경로 실패 → yf.download fallback ({payload})")
+            stats["path"] = "download_fallback"
+            stats["fallback_reason"] = payload
+            kind, payload = _live_via_download(market, syms, today, ref_date, stats)
+    except _RateLimited as e:
+        _set_yahoo_backoff(market, str(e))
+        return _done("rate_limited")
+
+    if kind == "holiday":
+        log(f"[live {market}] 오늘 시세 없음 ({stats['path']}: {payload}) — 휴장/개장 전으로 보고 파일 쓰지 않음")
+        return _done("holiday", today=str(today), detail=payload)
+
+    fresh = payload
     stats["updated"] = len(fresh)
-    stats["elapsed_sec"] = round(time.time() - t0, 1)
     if len(fresh) < 0.5 * len(items):
-        print(f"WARNING: [live {market}] 오늘 봉 수신 {len(fresh)}/{len(items)} (<50%) — "
+        print(f"WARNING: [live {market}] 오늘 시세 수신 {len(fresh)}/{len(items)} (<50%, {stats['path']}) — "
               f"차단 의심, 파일 쓰지 않음", file=sys.stderr)
-        return {**stats, "status": "too_few"}
+        return _done("too_few")
 
     shifted = 0
     for it in items:
-        bars = fresh.get(it["t"])
-        if bars is None:
+        f = fresh.get(it["t"])
+        if f is None:
             continue
-        px = bars[-1][1]
+        px = f["px"]
         ref = it.get("ref") or {}
-        prev = [b for b in bars if b[0] < today]
-        # 1d: 다운로드한 직전 봉 종가가 가장 정확(밤 배치 ref가 하루 밀려도 영향 없음)
-        base_1d = prev[-1][1] if prev else ref.get("1d")
-        # ref 기준일과 오늘 사이에 낀 거래일 수 k: 0=정상, 1=밤 배치가 당일 봉을 놓침
-        k = 0
-        if ref_date is not None and prev:
-            k = sum(1 for d, _ in prev if d > ref_date)
-        if k == 0:
+        base_1d = f.get("prev") or ref.get("1d")
+        if f["k"] == 0:
             base_1w, base_1mo = ref.get("1w"), ref.get("1mo")
-        elif k == 1:
+        elif f["k"] == 1:
             base_1w, base_1mo = ref.get("1w_s1"), ref.get("1mo_s1")
             shifted += 1
         else:
@@ -1018,11 +1120,13 @@ def refresh_market_map_live(market, now=None):
     data["mode"] = "live" if in_market_session(market, local_now) else "close"
     data["base_date"] = today.isoformat()
     data["last_updated"] = market_local_now(market).isoformat()
-    data["live_stats"] = {k: stats[k] for k in ("chunks", "requested", "updated", "elapsed_sec", "ref_shifted")}
+    result = _done("ok", mode=data["mode"])
+    data["live_stats"] = {k: result.get(k) for k in
+                          ("path", "requests", "requested", "updated", "elapsed_sec", "ref_shifted")}
     _write_market_map(market, data)
-    log(f"[live {market}] 갱신 완료: {len(fresh)}/{len(items)}종목, {stats['chunks']}청크, "
-        f"{stats['elapsed_sec']}s, mode {data['mode']}")
-    return {**stats, "status": "ok", "mode": data["mode"]}
+    log(f"[live {market}] 갱신 완료({stats['path']}): {len(fresh)}/{len(items)}종목, "
+        f"HTTP {stats['requests']}건, {result['elapsed_sec']}s, mode {data['mode']}")
+    return result
 
 
 def main():
