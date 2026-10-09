@@ -1512,6 +1512,11 @@
             #tab-indicators .ind-chart-box { height: 180px; }
         }
 
+        /* ===== 미국시황 배지 ===== */
+        .uswrap-badge { margin-left: 8px; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 9px; vertical-align: middle; }
+        .uswrap-badge.live { color: var(--up); background: rgba(207,34,46,0.12); }
+        .uswrap-badge.close { color: var(--text-muted); background: var(--bg-panel); }
+
         /* ===== 시장 히트맵 ===== */
         .mmap-tile {
             position: absolute; box-sizing: border-box;
@@ -1720,7 +1725,7 @@
 
     <!-- 전일 미국증시 시황 -->
     <div style="margin-bottom: 24px;">
-        <div class="section-title">🇺🇸 전일 미국증시 시황</div>
+        <div class="section-title"><span id="uswrap-title">🇺🇸 전일 미국증시 시황</span><span id="uswrap-badge" class="uswrap-badge" style="display:none;"></span></div>
         <div id="uswrap-meta" style="font-size:12px; color:#57606a; margin-bottom:8px;"></div>
         <div class="data-table">
             <div id="uswrap-body" style="font-size:14px; line-height:1.75; color:var(--text);">
@@ -4450,13 +4455,14 @@
                `<span style="color:var(--text-muted);"> — ${usWrapEsc(reason || '사유 불분명')}</span></div>`;
     }
 
-    async function loadUsWrap() {
+    async function loadUsWrap(silent) {
         const body = document.getElementById('uswrap-body');
         const meta = document.getElementById('uswrap-meta');
         try {
             const res = await fetch(API_BASE + '/api/us-wrap');
             const data = await res.json();
             if (res.status === 503 || (!data.market_line && !data.raw && !data.text)) {
+                if (silent) return;   // 자동 재로딩 중 일시 실패는 기존 내용 유지
                 body.innerHTML = '<div class="loading">시황 요약을 생성 중입니다. 1~2분 후 새로고침해주세요.</div>';
                 meta.textContent = '';
                 return;
@@ -4476,7 +4482,16 @@
                 // raw 폴백(JSON 파싱 실패) 또는 구버전 캐시(text): 줄글 표시
                 body.innerHTML = usWrapColorNums(data.raw || data.text);
             }
-            let metaTxt = data.date ? `기준일: ${data.date} (미국 직전 거래일)` : '';
+            const intraday = data.mode === 'intraday';
+            const badge = document.getElementById('uswrap-badge');
+            const etHm = (data.as_of || '').slice(11, 16);
+            badge.textContent = intraday ? `장중 시황 (ET ${etHm || '10:30'})` : '마감 시황';
+            badge.className = 'uswrap-badge ' + (intraday ? 'live' : 'close');
+            badge.style.display = 'inline-block';
+            document.getElementById('uswrap-title').textContent = intraday ? '🇺🇸 미국증시 시황' : '🇺🇸 전일 미국증시 시황';
+            let metaTxt = intraday
+                ? `기준: ${data.as_of || ''} 장중 (전일 종가 대비)`
+                : (data.date ? `기준일: ${data.date} (미국 직전 거래일 마감)` : '');
             if (data.last_updated) {
                 const d = new Date(data.last_updated);
                 metaTxt += (metaTxt ? ' · ' : '') + '갱신: ' +
@@ -4486,7 +4501,7 @@
             if (data.refreshing) metaTxt += ' · 백그라운드 갱신 중...';
             meta.textContent = metaTxt;
         } catch (e) {
-            body.innerHTML = '<div class="loading">시황 요약을 불러오지 못했습니다</div>';
+            if (!silent) body.innerHTML = '<div class="loading">시황 요약을 불러오지 못했습니다</div>';
         }
     }
 
@@ -4514,26 +4529,28 @@
         renderMarketMap();
     }
 
-    async function loadMarketMap(market) {
+    async function loadMarketMap(market, silent) {
         const container = document.getElementById('mmap-container');
+        const showErr = msg => { if (!silent && market === mmapMarket) container.innerHTML = msg; };
         try {
             const res = await fetch(API_BASE + '/api/market-map?market=' + market);
             const data = await res.json();
             if (res.status === 503) {
-                if (market === mmapMarket)
-                    container.innerHTML = '<div class="loading">데이터가 없어 배치를 자동 실행했습니다. 몇 분 후 다시 확인해주세요.</div>';
+                showErr('<div class="loading">데이터가 없어 배치를 자동 실행했습니다. 몇 분 후 다시 확인해주세요.</div>');
                 return;
             }
             if (!data.items || !data.items.length) {
-                if (market === mmapMarket) container.innerHTML = '<div class="loading">데이터 없음</div>';
+                showErr('<div class="loading">데이터 없음</div>');
                 return;
             }
             data.items.sort((a, b) => b.cap - a.cap);
             mmapData[market] = data;
-            if (market === mmapMarket) renderMarketMap();
+            if (market === mmapMarket) {
+                if (silent) hideMmapTooltip();
+                renderMarketMap();
+            }
         } catch (e) {
-            if (market === mmapMarket)
-                container.innerHTML = '<div class="loading">히트맵 데이터를 불러오지 못했습니다</div>';
+            showErr('<div class="loading">히트맵 데이터를 불러오지 못했습니다</div>');
         }
     }
 
@@ -4644,10 +4661,15 @@
             `<span style="display:inline-block;width:90px;height:10px;border-radius:2px;background:linear-gradient(90deg, rgb(9,105,218), #d8dbe0, rgb(207,34,46));"></span>` +
             `<span>+${range}%</span>`;
         const mLabel = { us: 'S&P 500', jp: '니케이 225' }[data.market] || data.market;
-        let metaTxt = `${mLabel} · 기준일 ${data.base_date || '-'} · 크기 = ${data.cap_kind === 'weight' ? '지수 비중' : '시가총액'}`;
-        if (data.last_updated) {
-            const d = new Date(data.last_updated);
-            metaTxt += ` · 갱신 ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const sizeTxt = `크기 = ${data.cap_kind === 'weight' ? '지수 비중' : '시가총액'}`;
+        const d = data.last_updated ? new Date(data.last_updated) : null;
+        const hm = d ? `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '';
+        let metaTxt;
+        if (data.mode === 'live') {
+            metaTxt = `${mLabel} · 장중 · ${hm} 갱신(15분 간격) · ${sizeTxt}`;
+        } else {
+            metaTxt = `${mLabel} · 마감 기준 (${data.base_date || '-'}) · ${sizeTxt}`;
+            if (d) metaTxt += ` · 갱신 ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${hm}`;
         }
         if (data.refreshing) metaTxt += ' · 백그라운드 갱신 중...';
         document.getElementById('mmap-meta').textContent = metaTxt;
@@ -4699,6 +4721,33 @@
             }, 30);
         }));
     })();
+
+    // 글로벌마켓 탭이 보이는 동안만 히트맵 5분·시황 10분 주기 재로딩 (서버 캐시 파일만 읽음)
+    const MKT_MAP_RELOAD_MS = 5 * 60 * 1000;
+    const MKT_WRAP_RELOAD_MS = 10 * 60 * 1000;
+    let _mmapLastLoad = Date.now();
+    let _uswrapLastLoad = Date.now();
+    function _marketTabVisible() {
+        const el = document.getElementById('tab-market');
+        return !!el && el.classList.contains('active') && !document.hidden;
+    }
+    function _marketAutoRefreshTick() {
+        if (!_marketTabVisible()) return;
+        const now = Date.now();
+        if (now - _mmapLastLoad >= MKT_MAP_RELOAD_MS) {
+            _mmapLastLoad = now;
+            loadMarketMap('us', true);
+            loadMarketMap('jp', true);
+        }
+        if (now - _uswrapLastLoad >= MKT_WRAP_RELOAD_MS) {
+            _uswrapLastLoad = now;
+            loadUsWrap(true);
+        }
+    }
+    setInterval(_marketAutoRefreshTick, 30 * 1000);
+    document.addEventListener('visibilitychange', _marketAutoRefreshTick);
+    document.querySelectorAll('[data-tab="market"]').forEach(el =>
+        el.addEventListener('click', () => setTimeout(_marketAutoRefreshTick, 50)));
 
     // 초기 렌더링
     loadGroups();

@@ -843,6 +843,8 @@ def get_market_map():
     except (ValueError, TypeError):
         refreshing = _spawn_gainers_batch(market)
 
+    for it in cached.get("items", []):
+        it.pop("ref", None)
     cached["refreshing"] = refreshing
     return jsonify(cached)
 
@@ -907,6 +909,10 @@ def _us_wrap_select():
     try:
         with open(os.path.join(_CACHE_DIR, "top_gainers_us.json"), encoding="utf-8") as f:
             tg = json.load(f)
+        # TOP10은 밤 배치 산출물 — 기준일이 맵과 다르면(장중 시황, 다음날 16:30 마감 시황)
+        # 전날 종목이 섞이므로 보충하지 않는다.
+        if base_date and str(tg.get("last_updated", ""))[:10] != base_date:
+            raise ValueError("top_gainers 기준일 불일치")
         seen = {m["ticker"] for m in movers}
         for it in tg.get("data", {}).get("1d", []):
             if len(movers) >= 6:
@@ -937,10 +943,30 @@ def _us_wrap_select():
     return indices, spx, movers, sel_sectors, rate, oil, base_date
 
 
-def _generate_us_wrap():
-    """특이 움직임 선별 → 관련 뉴스 수집 → anthropic 1회 호출로 원인 분석 브리프 생성."""
+_us_wrap_run_lock = threading.Lock()
+
+
+def _us_wrap_auto_mode():
+    """정규장 중이면 intraday, 아니면 close (자가 치유 재생성용)."""
+    import batch_top_gainers as btg
+    return "intraday" if btg.in_market_session("us", btg.market_local_now("us")) else "close"
+
+
+def _generate_us_wrap(mode=None):
+    """특이 움직임 선별 → 관련 뉴스 수집 → anthropic 1회 호출로 원인 분석 브리프 생성.
+
+    mode: "intraday"(장중, 마감 전 표현) | "close"(마감 기준) | None(현재 시각으로 자동).
+    스케줄러와 자가 치유가 동시에 돌지 않게 프로세스 내 락으로 직렬화한다.
+    """
     lock_path = os.path.join(_CACHE_DIR, f"{_US_WRAP_PATH_NAME}.refreshing")
+    if not _us_wrap_run_lock.acquire(blocking=False):
+        print("[us-wrap] 다른 생성이 진행 중 — 건너뜀", flush=True)
+        return False
     try:
+        if mode not in ("intraday", "close"):
+            mode = _us_wrap_auto_mode()
+        from zoneinfo import ZoneInfo
+        as_of = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M ET")
         indices, spx, movers, sel_sectors, rate, oil, base_date = _us_wrap_select()
 
         news = {}
@@ -962,7 +988,9 @@ def _generate_us_wrap():
             return "\n".join(f"  - {h['title']} ({h['source']}, {h['published'][:16]})" for h in items)
 
         idx_line = " / ".join(f"{k} {v.get('change_pct', 0):+.2f}%" for k, v in indices.items())
-        lines = [f"[기준일] {base_date} (미국 직전 거래일)", f"[지수] {idx_line}", ""]
+        when = (f"{as_of} 장중 (아직 마감 전, 전일 종가 대비 현재 등락)" if mode == "intraday"
+                else f"{base_date} (미국 직전 거래일 마감)")
+        lines = [f"[기준] {when}", f"[지수] {idx_line}", ""]
         lines.append("[특징 종목 (S&P500 시총 상위 100 중 지수 대비 ±1.5%p 이상)]")
         if movers:
             for m in movers:
@@ -982,7 +1010,15 @@ def _generate_us_wrap():
         lines.append(_news_block("유가"))
         data_block = "\n".join(lines)
 
+        mode_rule = (
+            "이것은 장중 시황(ET 10:30 기준)이며 아직 장 마감 전이다. '마감했다', '마감', "
+            "'장을 마쳤다', '종가' 같은 마감 표현을 절대 쓰지 말고 '~하고 있다', '장중' 표현을 써라. "
+            "등락률은 전일 종가 대비 현재 수준이다.\n"
+            if mode == "intraday" else
+            "이것은 마감 시황(직전 거래일 종가 기준)이다.\n"
+        )
         prompt = (
+            mode_rule +
             "너는 증권사 모닝브리프 작성자다. 아래 수치와 뉴스 헤드라인을 근거로, "
             "'왜 움직였는지'를 한국어로 정리하라. 규칙:\n"
             "(1) 수치 나열 금지 — 모든 항목은 반드시 '사유'가 중심.\n"
@@ -1015,7 +1051,7 @@ def _generate_us_wrap():
         except Exception as e:
             print(f"[us-wrap] anthropic 호출/파싱 실패: {e}", flush=True)
 
-        out = {"date": base_date, "indices": indices,
+        out = {"date": base_date, "indices": indices, "mode": mode, "as_of": as_of,
                "last_updated": datetime.now().astimezone().isoformat()}
         if isinstance(parsed, dict) and parsed.get("market_line"):
             out.update({k: parsed.get(k) for k in ("market_line", "movers", "sectors", "rates", "oil")})
@@ -1033,11 +1069,14 @@ def _generate_us_wrap():
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False)
         os.replace(tmp, path)
-        print(f"[us-wrap] 생성 완료 ({base_date}, movers {len(movers)}개, "
+        print(f"[us-wrap] 생성 완료 ({mode}, {as_of}, movers {len(movers)}개, "
               f"{'JSON' if 'market_line' in out else 'raw 폴백'})", flush=True)
+        return True
     except Exception as e:
         print(f"[us-wrap] 생성 실패: {type(e).__name__}: {e}", flush=True)
+        return False
     finally:
+        _us_wrap_run_lock.release()
         try:
             os.remove(lock_path)
         except OSError:
@@ -2882,6 +2921,104 @@ def _earnings_tracker_loop():
 
 
 threading.Thread(target=_earnings_tracker_loop, daemon=True).start()
+
+
+# --- 장중 스케줄러: 히트맵 15분 갱신(us/jp) + 미국시황 장중/마감 2회 ---
+# 야후 차단 회피가 최우선: 히트맵 갱신 간격을 15분보다 짧게 하지 말 것.
+_LIVE_SCHED_LOG = os.path.join(_CACHE_DIR, "live_scheduler.log")
+_live_task_locks = {"us_map": threading.Lock(), "jp_map": threading.Lock(), "us_wrap": threading.Lock()}
+
+
+def _live_log(msg):
+    try:
+        os.makedirs(_CACHE_DIR, exist_ok=True)
+        with open(_LIVE_SCHED_LOG, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+    except Exception:
+        pass
+
+
+def _live_due_tasks(now_utc):
+    """주어진 시각(aware)에 실행할 작업 목록 [(task, arg)]. 시각 주입으로 테스트 가능.
+
+    us 히트맵: 평일 ET 09:30~16:00 매 15분 + 16:20(마감 확정)
+    jp 히트맵: 평일 JST 09:00~15:30 매 15분 + 15:50(마감 확정), 점심 휴장 11:45~12:15 생략
+    시황: 평일 ET 10:30(장중), 16:30(마감)
+    """
+    from zoneinfo import ZoneInfo
+    tasks = []
+    et = now_utc.astimezone(ZoneInfo("America/New_York"))
+    if et.weekday() < 5:
+        m = et.hour * 60 + et.minute
+        if (9 * 60 + 30 <= m <= 16 * 60 and et.minute % 15 == 0) or (et.hour, et.minute) == (16, 20):
+            tasks.append(("us_map", None))
+        if (et.hour, et.minute) == (10, 30):
+            tasks.append(("us_wrap", "intraday"))
+        if (et.hour, et.minute) == (16, 30):
+            tasks.append(("us_wrap", "close"))
+    jst = now_utc.astimezone(ZoneInfo("Asia/Tokyo"))
+    if jst.weekday() < 5:
+        m = jst.hour * 60 + jst.minute
+        lunch = 11 * 60 + 30 < m < 12 * 60 + 30
+        if ((9 * 60 <= m <= 15 * 60 + 30 and jst.minute % 15 == 0 and not lunch)
+                or (jst.hour, jst.minute) == (15, 50)):
+            tasks.append(("jp_map", None))
+    return tasks
+
+
+def _run_live_task(task, arg):
+    lock = _live_task_locks[task]
+    if not lock.acquire(blocking=False):
+        _live_log(f"{task}({arg}) 이전 실행이 아직 진행 중 — 이번 회차 건너뜀")
+        return
+    t0 = time.time()
+    try:
+        if task in ("us_map", "jp_map"):
+            import batch_top_gainers as btg
+            res = btg.refresh_market_map_live(task[:2])
+            _live_log(f"{task} {res.get('status')} ({time.time() - t0:.1f}s): {res}")
+        elif task == "us_wrap":
+            if arg == "intraday":
+                from zoneinfo import ZoneInfo
+                today_et = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+                try:
+                    with open(os.path.join(_CACHE_DIR, "market_map_us.json"), encoding="utf-8") as f:
+                        mm = json.load(f)
+                except Exception:
+                    mm = {}
+                if mm.get("mode") != "live" or mm.get("base_date") != today_et:
+                    _live_log(f"us_wrap(intraday) 건너뜀: 히트맵이 오늘 장중 데이터 아님 "
+                              f"(mode={mm.get('mode')}, base={mm.get('base_date')}) — 휴장 추정")
+                    return
+            ok = _generate_us_wrap(arg)
+            _live_log(f"us_wrap({arg}) {'완료' if ok else '실패/건너뜀'} ({time.time() - t0:.1f}s)")
+    except Exception as e:
+        _live_log(f"{task}({arg}) 예외: {type(e).__name__}: {e}")
+    finally:
+        lock.release()
+
+
+def _live_scheduler_loop():
+    time.sleep(30)
+    _live_log("스케줄러 시작")
+    fired = {}
+    while True:
+        try:
+            now = datetime.now().astimezone().replace(second=0, microsecond=0)
+            for task, arg in _live_due_tasks(now):
+                key = f"{task}:{arg}:{now.isoformat()}"
+                if key in fired:
+                    continue
+                fired[key] = now
+                threading.Thread(target=_run_live_task, args=(task, arg), daemon=True).start()
+            cutoff = now - timedelta(minutes=10)
+            fired = {k: v for k, v in fired.items() if v >= cutoff}
+        except Exception as e:
+            _live_log(f"스케줄러 루프 예외: {type(e).__name__}: {e}")
+        time.sleep(62 - datetime.now().second)
+
+
+threading.Thread(target=_live_scheduler_loop, daemon=True).start()
 
 try:
     _migrate_cross_tab_sync()

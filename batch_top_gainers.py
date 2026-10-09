@@ -710,13 +710,85 @@ def calc_rankings(price_data, ticker_meta):
     return result, excluded_counts
 
 
+MARKET_TZ = {"us": "America/New_York", "jp": "Asia/Tokyo"}
+MARKET_SESSION = {"us": ((9, 30), (16, 0)), "jp": ((9, 0), (15, 30))}
+YAHOO_BACKOFF_PATH = os.path.join(CACHE_DIR, "yahoo_backoff.json")
+YAHOO_BACKOFF_MIN = 30
+LIVE_CHUNK = 50
+_RATE_LIMIT_MARKERS = ("too many requests", "rate limit", "ratelimit", "429")
+
+
+def market_local_now(market, now=None):
+    """시장 현지 시각(zoneinfo — 서머타임 자동). now(aware)를 주면 그 시각을 변환."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(MARKET_TZ[market])
+    return now.astimezone(tz) if now is not None else datetime.now(tz)
+
+
+def in_market_session(market, local_now):
+    """평일 정규장 시간(개장 이상, 마감 미만)인지. 거래소 공휴일은 판정 안 함."""
+    if local_now.weekday() >= 5:
+        return False
+    (oh, om), (ch, cm) = MARKET_SESSION[market]
+    t = local_now.hour * 60 + local_now.minute
+    return oh * 60 + om <= t < ch * 60 + cm
+
+
+def _series_refs(series, ref_last):
+    """다음(또는 진행 중인) 세션용 기준 종가 {1d,1w,1mo}.
+
+    1d=마지막 완결 종가, 1w=5거래일 전, 1mo=21거래일 전 기준이 되도록 [-1],[-5],[-21].
+    _series_changes와 같은 규칙으로, 기준일보다 1일 이상 밀린 종목은 1d 제외,
+    7일 이상 밀리면 전부 제외.
+    """
+    out = {"1d": None, "1w": None, "1mo": None, "1w_s1": None, "1mo_s1": None}
+    if series is None or len(series) < 1:
+        return out
+    lag_days = 0
+    if ref_last is not None:
+        try:
+            lag_days = (ref_last - series.index[-1]).days
+        except Exception:
+            lag_days = 0
+    if lag_days >= 7:
+        return out
+    # *_s1: ref 기준일이 장중 갱신일보다 2거래일 앞선 경우(밤 배치가 야후의 장 마감 후
+    # 일봉 NaN 구간에 걸려 당일 봉을 놓친 경우)를 보정하기 위한 한 칸 뒤 기준가.
+    for key, pos in (("1d", 1), ("1w", 5), ("1mo", 21), ("1w_s1", 4), ("1mo_s1", 20)):
+        if key == "1d" and lag_days >= 1:
+            continue
+        if len(series) >= pos:
+            v = float(series.iloc[-pos])
+            if v > 0:
+                out[key] = round(v, 4)
+    return out
+
+
 def build_market_map(market, items_meta, price_data, caps, universe_label, cap_kind):
     """히트맵용 시장 맵 저장: cache/market_map_{market}.json.
 
     us: cap=IVV weight(%), jp: cap=시총 엔. items 50개 미만이면 기존 캐시 보존을
-    위해 저장하지 않는다.
+    위해 저장하지 않는다. 각 item에 장중 갱신용 기준 종가 ref를 함께 저장한다.
     """
     market_last = _market_last_date(price_data)
+
+    local_now = market_local_now(market)
+    partial = False
+    if market_last is not None:
+        try:
+            partial = (market_last.date() == local_now.date()
+                       and in_market_session(market, local_now))
+        except Exception:
+            partial = False
+
+    ref_series = {}
+    for sym, series in price_data.items():
+        s = series
+        if partial and len(s) and s.index[-1].date() == local_now.date():
+            s = s.iloc[:-1]
+        ref_series[sym] = s
+    ref_last = _market_last_date({k: v for k, v in ref_series.items() if len(v)})
+
     items = []
     for t in items_meta:
         sym = t["ticker"]
@@ -738,6 +810,7 @@ def build_market_map(market, items_meta, price_data, caps, universe_label, cap_k
             "c1d": round(ch["1d"], 2) if ch["1d"] is not None else None,
             "c1w": round(ch["1w"], 2) if ch["1w"] is not None else None,
             "c1mo": round(ch["1mo"], 2) if ch["1mo"] is not None else None,
+            "ref": _series_refs(ref_series.get(sym), ref_last),
         })
 
     if len(items) < 50:
@@ -745,30 +818,211 @@ def build_market_map(market, items_meta, price_data, caps, universe_label, cap_k
               f"keeping previous cache", file=sys.stderr)
         return False
 
-    from zoneinfo import ZoneInfo
-    tz_map = {"us": "America/New_York", "jp": "Asia/Tokyo"}
-    now = datetime.now(ZoneInfo(tz_map.get(market, "Asia/Seoul")))
-    base_date = ""
-    if market_last is not None:
+    def _d(x):
+        if x is None:
+            return ""
         try:
-            base_date = market_last.strftime("%Y-%m-%d")
+            return x.strftime("%Y-%m-%d")
         except Exception:
-            base_date = str(market_last)[:10]
+            return str(x)[:10]
 
+    base_date = _d(market_last)
     output = {
         "market": market,
         "universe": universe_label,
         "cap_kind": cap_kind,
         "base_date": base_date,
-        "last_updated": now.isoformat(),
+        "ref_date": _d(ref_last),
+        "mode": "live" if partial else "close",
+        "last_updated": local_now.isoformat(),
         "items": items,
     }
+    _write_market_map(market, output)
+    log(f"Saved market map: market_map_{market}.json ({len(items)} items, base {base_date}, "
+        f"ref {output['ref_date']}, mode {output['mode']})")
+    return True
+
+
+def _write_market_map(market, data):
     os.makedirs(CACHE_DIR, exist_ok=True)
     out_path = os.path.join(CACHE_DIR, f"market_map_{market}.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=1)
-    log(f"Saved market map: {out_path} ({len(items)} items, base {base_date})")
-    return True
+    tmp = out_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, out_path)
+
+
+def _yahoo_backoff_until():
+    """백오프 해제 시각(aware datetime) 또는 None."""
+    try:
+        with open(YAHOO_BACKOFF_PATH, "r", encoding="utf-8") as f:
+            until = datetime.fromisoformat(json.load(f).get("until", ""))
+        return until if until.tzinfo else None
+    except Exception:
+        return None
+
+
+def _set_yahoo_backoff(market, reason):
+    from datetime import timedelta, timezone
+    until = datetime.now(timezone.utc) + timedelta(minutes=YAHOO_BACKOFF_MIN)
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(YAHOO_BACKOFF_PATH, "w", encoding="utf-8") as f:
+        json.dump({"until": until.isoformat(), "market": market, "reason": reason[:300],
+                   "set_at": datetime.now(timezone.utc).isoformat()}, f, ensure_ascii=False)
+    log(f"Yahoo rate limit 감지 → {YAHOO_BACKOFF_MIN}분 백오프 (until {until.isoformat()}): {reason[:120]}")
+
+
+def _chunk_closes(df, chunk):
+    """yf.download 결과에서 {sym: [(봉 날짜, 종가), ...]} (NaN 종가 제외, 날짜 오름차순)."""
+    out = {}
+    if df is None or df.empty:
+        return out
+    for sym in chunk:
+        try:
+            closes = df[sym]["Close"].dropna()
+        except (KeyError, TypeError):
+            if len(chunk) != 1:
+                continue
+            try:
+                closes = df["Close"].dropna()
+            except (KeyError, TypeError):
+                continue
+        if len(closes) == 0:
+            continue
+        try:
+            out[sym] = [(i.date(), float(v)) for i, v in closes.items()]
+        except Exception:
+            continue
+    return out
+
+
+def refresh_market_map_live(market, now=None):
+    """장중 경량 갱신: market_map의 현재가만 받아 ref 대비 c1d/c1w/c1mo 재계산.
+
+    - 백오프 중이면 건너뜀, 429 감지 시 30분 백오프 기록 후 중단
+    - 첫 청크의 마지막 봉 날짜가 시장 '오늘'이 아니면 휴장으로 보고 쓰지 않음
+    - 오늘 봉을 받은 종목이 50% 미만이면 쓰지 않음, 못 받은 종목은 기존 값 유지
+    - mode는 정규장 중이면 live, 장 마감 후(마감 확정 실행)면 close
+    now(aware datetime)를 주면 '오늘'·장중 판정에만 사용한다(테스트용).
+    """
+    from datetime import timezone
+    t0 = time.time()
+    stats = {"market": market, "chunks": 0, "requested": 0, "updated": 0}
+
+    wall_now = now or datetime.now(timezone.utc)
+    until = _yahoo_backoff_until()
+    if until is not None and wall_now < until:
+        log(f"[live {market}] Yahoo 백오프 중 (until {until.isoformat()}) — 건너뜀")
+        return {**stats, "status": "backoff", "until": until.isoformat()}
+
+    path = os.path.join(CACHE_DIR, f"market_map_{market}.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        log(f"[live {market}] market map 없음/파싱 실패 — 건너뜀 ({e})")
+        return {**stats, "status": "no_map"}
+
+    items = data.get("items") or []
+    if not items or not any(it.get("ref") for it in items):
+        log(f"[live {market}] ref 없음 — 밤 배치로 ref가 생성된 뒤부터 갱신 가능")
+        return {**stats, "status": "no_ref"}
+
+    local_now = market_local_now(market, now)
+    today = local_now.date()
+    if data.get("ref_date") == today.isoformat():
+        log(f"[live {market}] ref 기준일이 오늘({today}) — 장 마감 후 배치가 이미 다음 세션용 ref를 "
+            f"만든 상태이므로 갱신하지 않음 (덮어쓰면 등락률이 0이 됨)")
+        return {**stats, "status": "ref_is_today"}
+    syms = [it["t"] for it in items]
+    stats["requested"] = len(syms)
+
+    got = {}
+    for ci in range(0, len(syms), LIVE_CHUNK):
+        chunk = syms[ci:ci + LIVE_CHUNK]
+        try:
+            df = yf.download(
+                tickers=chunk, period="5d", interval="1d", group_by="ticker",
+                auto_adjust=True, progress=False, threads=False,
+            )
+        except Exception as e:
+            stats["chunks"] += 1
+            if any(m in str(e).lower() for m in _RATE_LIMIT_MARKERS) or "RateLimit" in type(e).__name__:
+                _set_yahoo_backoff(market, f"{type(e).__name__}: {e}")
+                return {**stats, "status": "rate_limited", "elapsed_sec": round(time.time() - t0, 1)}
+            log(f"[live {market}] chunk {ci // LIVE_CHUNK + 1} 실패: {type(e).__name__}: {e}")
+            continue
+        stats["chunks"] += 1
+        errs = dict(getattr(yf.shared, "_ERRORS", {}) or {})
+        rl = [f"{k}: {v}" for k, v in errs.items()
+              if any(m in str(v).lower() for m in _RATE_LIMIT_MARKERS)]
+        if rl:
+            _set_yahoo_backoff(market, "; ".join(rl[:3]))
+            return {**stats, "status": "rate_limited", "elapsed_sec": round(time.time() - t0, 1)}
+
+        part = _chunk_closes(df, chunk)
+        got.update(part)
+
+        if ci == 0:
+            last_dates = [bars[-1][0] for bars in part.values() if bars]
+            latest = max(last_dates) if last_dates else None
+            if latest != today:
+                log(f"[live {market}] 오늘 봉 없음: 최신 봉 {latest} ≠ 오늘 {today} "
+                    f"(휴장, 개장 전, 또는 장 마감 후 야후 일봉 종가 미확정) — 파일 쓰지 않음")
+                return {**stats, "status": "holiday", "latest_bar": str(latest),
+                        "today": str(today), "elapsed_sec": round(time.time() - t0, 1)}
+
+        if ci + LIVE_CHUNK < len(syms):
+            time.sleep(2)
+
+    ref_date = None
+    try:
+        ref_date = datetime.strptime(data.get("ref_date", ""), "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        pass
+
+    fresh = {sym: bars for sym, bars in got.items() if bars and bars[-1][0] == today}
+    stats["updated"] = len(fresh)
+    stats["elapsed_sec"] = round(time.time() - t0, 1)
+    if len(fresh) < 0.5 * len(items):
+        print(f"WARNING: [live {market}] 오늘 봉 수신 {len(fresh)}/{len(items)} (<50%) — "
+              f"차단 의심, 파일 쓰지 않음", file=sys.stderr)
+        return {**stats, "status": "too_few"}
+
+    shifted = 0
+    for it in items:
+        bars = fresh.get(it["t"])
+        if bars is None:
+            continue
+        px = bars[-1][1]
+        ref = it.get("ref") or {}
+        prev = [b for b in bars if b[0] < today]
+        # 1d: 다운로드한 직전 봉 종가가 가장 정확(밤 배치 ref가 하루 밀려도 영향 없음)
+        base_1d = prev[-1][1] if prev else ref.get("1d")
+        # ref 기준일과 오늘 사이에 낀 거래일 수 k: 0=정상, 1=밤 배치가 당일 봉을 놓침
+        k = 0
+        if ref_date is not None and prev:
+            k = sum(1 for d, _ in prev if d > ref_date)
+        if k == 0:
+            base_1w, base_1mo = ref.get("1w"), ref.get("1mo")
+        elif k == 1:
+            base_1w, base_1mo = ref.get("1w_s1"), ref.get("1mo_s1")
+            shifted += 1
+        else:
+            base_1w = base_1mo = None
+        for key, base in (("1d", base_1d), ("1w", base_1w), ("1mo", base_1mo)):
+            it["c" + key] = round((px / base - 1) * 100, 2) if base else None
+    stats["ref_shifted"] = shifted
+
+    data["items"] = items
+    data["mode"] = "live" if in_market_session(market, local_now) else "close"
+    data["base_date"] = today.isoformat()
+    data["last_updated"] = market_local_now(market).isoformat()
+    data["live_stats"] = {k: stats[k] for k in ("chunks", "requested", "updated", "elapsed_sec", "ref_shifted")}
+    _write_market_map(market, data)
+    log(f"[live {market}] 갱신 완료: {len(fresh)}/{len(items)}종목, {stats['chunks']}청크, "
+        f"{stats['elapsed_sec']}s, mode {data['mode']}")
+    return {**stats, "status": "ok", "mode": data["mode"]}
 
 
 def main():
