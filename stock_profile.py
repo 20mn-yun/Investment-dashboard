@@ -133,6 +133,7 @@ def kr_summary(code, name, corp_code):
         "shares": shares,                      # 현재 상장주식수 (과거 시가총액 근사용)
         "per": per, "pbr": pbr, "valuation_basis": val_basis,
         "roe": roe,
+        **_forward("KR", code, price, (fin or {}).get("fiscal_month") or master.get("acc_mt") or 12),
         "fiscal_month": (fin or {}).get("fiscal_month") or master.get("acc_mt"),
         "fs_div": (fin or {}).get("fs_div"),
         "fs_div_label": (fin or {}).get("fs_div_label"),
@@ -140,6 +141,16 @@ def kr_summary(code, name, corp_code):
         "in_watchlist": watchlist_store.is_in_watchlist("KR", code),
         "as_of": datetime.now().isoformat(timespec="seconds"),
     }
+
+
+def _forward(market, code, price, acc_mt=12):
+    """fPER·fPBR·목표주가 평균·투자의견 평균·추정 기관 수 (forward_estimates). 실패해도 요약은 돌려준다"""
+    try:
+        import forward_estimates
+        return forward_estimates.summary_fields(market, code, price, acc_mt)
+    except Exception as e:
+        print(f"[stock_profile] {code} 컨센서스 실패: {type(e).__name__}", flush=True)
+        return {"fper": None, "fpbr": None, "fsource": None}
 
 
 # ===== 미국 =====

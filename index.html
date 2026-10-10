@@ -1660,6 +1660,45 @@
         .sv-disc-item a { color: var(--text); text-decoration: none; flex: 1; }
         .sv-disc-item a:hover { color: var(--accent); text-decoration: underline; }
         .sv-disc-filer { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+        .sv-rp-row { display: grid; grid-template-columns: 84px 150px 1fr 70px 110px 70px; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--bg-panel); font-size: 13px; cursor: pointer; align-items: baseline; }
+        .sv-rp-row:hover { background: var(--bg-hover); }
+        .sv-rp-row.sv-rp-notext { color: var(--text-dim); }
+        .sv-rp-row .sv-rp-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sv-rp-detail { padding: 6px 0 10px 94px; font-size: 13px; border-bottom: 1px solid var(--bg-panel); }
+        .sv-rp-detail ul { margin: 4px 0 6px; padding-left: 18px; }
+        .sv-rp-detail table { font-size: 12px; border-collapse: collapse; margin: 4px 0; }
+        .sv-rp-detail td, .sv-rp-detail th { padding: 2px 8px; text-align: right; border-bottom: 1px solid var(--bg-panel); }
+        .sv-rp-detail th:first-child, .sv-rp-detail td:first-child { text-align: left; }
+        @media (max-width: 768px) { .sv-rp-row { grid-template-columns: 84px 1fr 90px; } .sv-rp-row .sv-rp-hide { display: none; } .sv-rp-detail { padding-left: 0; } }
+        .sv-call-q { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+        .sv-call-q .period-btn.sv-call-dim { opacity: 0.45; }
+        .sv-call-sum h4 { margin: 10px 0 4px; font-size: 13px; color: var(--text-dim); font-weight: 600; }
+        .sv-call-sum ul { margin: 2px 0 4px; padding-left: 18px; font-size: 13px; }
+        .sv-call-sum li { margin: 2px 0; }
+        .sv-call-tone { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; border: 1px solid var(--border); }
+        .sv-call-tone.pos { color: var(--up, #d33); border-color: currentColor; } .sv-call-tone.neg { color: var(--down, #36c); border-color: currentColor; }
+        .sv-call-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 6px; }
+        .sv-call-full { max-height: 520px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.55; }
+        .sv-call-seg { margin: 0 0 10px; } .sv-call-seg b { display: block; margin-bottom: 2px; } .sv-call-seg.sv-call-an b { color: var(--accent); }
+        .sv-call-item { padding: 7px 0; border-bottom: 1px solid var(--bg-panel); font-size: 13px; cursor: pointer; }
+        .sv-call-item .sv-call-meta { color: var(--text-dim); font-size: 12px; margin-right: 8px; }
+        .sv-call-item ul { margin: 4px 0 2px; padding-left: 18px; color: var(--text-dim); }
+        .sv-pr-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 8px; }
+        .sv-pr-chips .period-btn .sv-pr-x { margin-left: 6px; color: var(--text-dim); } .sv-pr-chips .period-btn .sv-pr-x:hover { color: var(--down, #c33); }
+        .sv-pr-add { position: relative; } .sv-pr-add input { padding: 4px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-panel); color: var(--text); width: 160px; }
+        .sv-pr-add-list { position: absolute; top: 28px; left: 0; z-index: 20; background: var(--bg-card, var(--bg-panel)); border: 1px solid var(--border); border-radius: 6px; min-width: 260px; max-height: 260px; overflow: auto; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+        .sv-pr-add-list div { padding: 6px 10px; font-size: 13px; cursor: pointer; } .sv-pr-add-list div:hover { background: var(--bg-hover); }
+        .sv-pr-sug { border: 1px dashed var(--border); border-radius: 6px; padding: 8px 10px; margin: 6px 0 10px; }
+        .sv-pr-sug-row { display: grid; grid-template-columns: 150px 90px 1fr 60px 110px; gap: 10px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--bg-panel); font-size: 13px; }
+        .sv-pr-sug-row .period-btn { padding: 2px 8px; font-size: 12px; }
+        .sv-pr-table th { cursor: pointer; white-space: nowrap; } .sv-pr-table th.sv-sorted::after { content: ' ▾'; color: var(--accent); } .sv-pr-table th.sv-sorted.asc::after { content: ' ▴'; }
+        .sv-pr-table tr.sv-pr-base td { font-weight: 700; } .sv-pr-table tr.sv-pr-avg td { color: var(--text-dim); border-top: 2px solid var(--border); }
+        .sv-pr-table td.sv-pr-name { text-align: left; cursor: pointer; } .sv-pr-table td.sv-pr-name:hover { color: var(--accent); }
+        .sv-pr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 6px 0 10px; }
+        .sv-pr-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; } .sv-pr-card.sv-pr-base { border-color: var(--accent); }
+        .sv-pr-card h5 { margin: 0 0 4px; font-size: 13px; } .sv-pr-card ul { margin: 0; padding-left: 16px; } .sv-pr-card li { margin: 2px 0; }
+        .sv-pr-call { border-bottom: 1px solid var(--bg-panel); padding: 7px 0; font-size: 13px; } .sv-pr-call .sv-pr-call-head { cursor: pointer; }
+        @media (max-width: 768px) { .sv-pr-sug-row { grid-template-columns: 1fr 80px; } .sv-pr-sug-row .sv-pr-hide { display: none; } }
         .sv-disc-form { color: var(--text-muted); font-size: 11px; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; white-space: nowrap; align-self: center; }
         @media (max-width: 1024px) {
             .sv-chart-grid { grid-template-columns: 1fr; }
@@ -2330,6 +2369,56 @@
             <div class="section-title">공시 (최근 1년)</div>
             <div id="sv-disc"></div>
             <div style="text-align:center; margin-top:10px;"><span class="period-btn" id="sv-disc-more" style="display:none;">20개 더 보기</span></div>
+        </div>
+
+        <div class="data-table sv-section">
+            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <span>리포트 (최근 3개월)</span>
+                <span class="period-btn" id="sv-rp-refresh" style="font-weight:normal;">새 리포트 확인</span>
+            </div>
+            <div id="sv-rp-status" class="sv-note"></div>
+            <div id="sv-rp-body" style="display:none;">
+                <div class="sv-stats" id="sv-rp-cards" style="margin-bottom:10px;"></div>
+                <div class="sv-chart-card"><div class="sv-chart-wrap"><canvas id="sv-rp-chart"></canvas></div></div>
+                <div id="sv-rp-chart-note" class="sv-note"></div>
+                <div class="section-title" style="margin-top:12px;">추정 실적 (억원, EPS 원)</div>
+                <div class="sv-scroll"><table class="sv-table" id="sv-rp-est"></table></div>
+                <div class="section-title" style="margin-top:12px;">리포트 목록</div>
+                <div id="sv-rp-list"></div>
+            </div>
+        </div>
+
+        <div class="data-table sv-section">
+            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <span id="sv-call-title">컨콜</span>
+                <span id="sv-call-counters" class="sv-note" style="margin:0;"></span>
+            </div>
+            <div id="sv-call-status" class="sv-note"></div>
+            <div id="sv-call-us" style="display:none;">
+                <div class="sv-call-q" id="sv-call-q"></div>
+                <div id="sv-call-sum" class="sv-call-sum"></div>
+                <div class="sv-call-tools" id="sv-call-tools"></div>
+                <div id="sv-call-progress" class="sv-note"></div>
+                <div id="sv-call-full" class="sv-call-full" style="display:none;"></div>
+            </div>
+            <div id="sv-call-kr" style="display:none;"></div>
+        </div>
+
+        <div class="data-table sv-section">
+            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <span>관련 기업</span>
+                <span id="sv-pr-counters" class="sv-note" style="margin:0;"></span>
+            </div>
+            <div class="sv-pr-chips" id="sv-pr-chips"></div>
+            <div id="sv-pr-status" class="sv-note"></div>
+            <div id="sv-pr-sug" class="sv-pr-sug" style="display:none;"></div>
+            <div class="section-title" style="margin-top:10px;">밸류에이션 비교 (PER·PBR 4분기누적, fPER·fPBR 올해 예상)</div>
+            <div class="sv-scroll"><table class="sv-table sv-pr-table" id="sv-pr-table"></table></div>
+            <div id="sv-pr-table-note" class="sv-note"></div>
+            <div class="section-title" style="margin-top:12px;">업황 종합 (컨콜 요약의 "전망" 발췌)</div>
+            <div class="sv-pr-cards" id="sv-pr-outlook"></div>
+            <div class="section-title" style="margin-top:12px;">관련 기업 컨콜</div>
+            <div id="sv-pr-calls"></div>
         </div>
     </div>
 </div>
@@ -8198,6 +8287,9 @@
                  prices: null, selLb: null, charts: [], summary: null, token: 0, pollTimer: null, disc: [], discShown: 0,
                  searchTimer: null, results: [],
                  unit: 'eok', unitMax: 0,
+                 rp: null, rpTimer: null, rpOpen: {},
+                 peers: null, peersTimer: null, prSort: { col: null, asc: true }, prOpen: {}, prAddTimer: null,
+                 calls: null, callsTimer: null, callQ: null, callLang: 'ko', callFull: { en: null, ko: null }, callShow: false, callOpen: {},
                  notes: null, notesBase: null, notesDirty: false, notesToken: 0, pendingOpen: null, notesList: [], memoConfirm: null };
     const SV_NOTE_FIELDS = [['idea', '투자아이디어'], ['assumptions', '핵심가정'], ['followup', 'Follow-up 포인트'], ['risks', 'Risk 포인트']];
 
@@ -8274,6 +8366,9 @@
         document.getElementById('sv-copy').addEventListener('click', svCopyTable);
         document.getElementById('sv-disc-more').addEventListener('click', () => { sv.discShown += 20; svRenderDisc(); });
         svInitNotes();
+        svRpInit();
+        svCallInit();
+        svPeersInit();
         document.getElementById('sv-wl-chips').addEventListener('click', e => {
             const b = e.target.closest('.period-btn[data-c]');
             if (b) svOpen(b.dataset.m, b.dataset.c, b.dataset.n);
@@ -8337,6 +8432,12 @@
         svHideGuard();
         sv.token += 1;
         clearTimeout(sv.pollTimer);
+        clearTimeout(sv.rpTimer);
+        clearTimeout(sv.callsTimer);
+        clearTimeout(sv.peersTimer);
+        sv.peers = null; sv.prOpen = {}; sv.prSort = { col: null, asc: true };
+        sv.rp = null; sv.rpOpen = {};
+        sv.calls = null; sv.callQ = null; sv.callLang = 'ko'; sv.callFull = { en: null, ko: null }; sv.callShow = false; sv.callOpen = {};
         (sv.charts || []).forEach(c => c.destroy());
         Object.assign(sv, { market, code, name, fin: null, flat: {}, prices: null, selLb: null, charts: [], summary: null, disc: [], discShown: 0 });
         svStore('sv_last', JSON.stringify({ market, code, name }));
@@ -8357,6 +8458,9 @@
         svLoadPrices();
         svLoadDisc();
         svLoadBand();          // 한국: 배치 밴드, 미국: 종목을 열 때 저장본으로 계산
+        svLoadReports();
+        svLoadCalls();
+        svLoadPeers();
     }
 
     // --- 종목 요약 ---
@@ -8393,6 +8497,9 @@
                        usd && s.shares ? `${s.market_cap_basis || ''} · 주식수 ${svShares(s.shares)}` : s.market_cap_basis)}
                 ${stat('PER', s.per == null ? '-' : s.per.toFixed(1) + '배', s.valuation_basis)}
                 ${stat('PBR', s.pbr == null ? '-' : s.pbr.toFixed(2) + '배', s.valuation_basis)}
+                ${stat('fPER', s.fper == null ? '-' : s.fper.toFixed(1) + '배', s.fsource ? `현재가 / ${s.f_year || '올해'} 예상 EPS ${s.f_eps != null ? Number(s.f_eps).toLocaleString() : '-'} (출처 ${s.fsource}${s.f_asof ? ', ' + s.f_asof : ''})` : '컨센서스 없음')}
+                ${stat('fPBR', s.fpbr == null ? '-' : s.fpbr.toFixed(2) + '배', s.fsource ? `현재가 / ${s.f_year || '올해'} 예상 BPS ${s.f_bps != null ? Number(s.f_bps).toLocaleString() : '-'} (출처 ${s.fsource})` : '컨센서스 없음')}
+                ${stat('목표주가 평균', s.target_price_mean == null ? '-' : (sv.market === 'US' ? '$' + Number(s.target_price_mean).toFixed(0) : Number(s.target_price_mean).toLocaleString() + '원'), `투자의견 평균 ${s.opinion_mean ?? '-'} (${s.opinion_scale || ''})${s.analysts_n ? ' · 추정 기관 ' + s.analysts_n : ''}`)}
                 ${stat('ROE', s.roe == null ? '-' : s.roe.toFixed(1) + '%', sv.market === 'KR' || s.financials_ready ? '4분기누적 지배주주순이익 / 평균 지배주주지분' : 'yfinance')}
                 ${stat('결산월', s.fiscal_month ? s.fiscal_month + '월' : '-')}
                 ${stat('연결/별도', s.fs_div_label || '-')}
@@ -9345,6 +9452,505 @@
             <div class="sv-hist-item"><span class="sv-hist-when">${svDt(h.at)}</span> · <b>${svEsc(h.label || h.field)}</b>
                 <pre>이전: ${svEsc(h.before || '(비어 있음)')}\n이후: ${svEsc(h.after || '(비어 있음)')}</pre></div>`).join('')
             : '<div class="sv-note">변경 이력이 없습니다.</div>';
+    }
+
+    // --- 리포트 (텔레그램 리포트 DB → PDF → AI 정리) ---
+    function svRpInit() {
+        document.getElementById('sv-rp-refresh').addEventListener('click', async () => {
+            if (!sv.code) return;
+            document.getElementById('sv-rp-status').textContent = '새 리포트를 확인하는 중...';
+            try {
+                await fetch(API_BASE + '/api/stock/reports/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                     body: JSON.stringify({ market: sv.market, code: sv.code }) });
+            } catch (e) {}
+            svLoadReports();
+        });
+        document.getElementById('sv-rp-list').addEventListener('click', e => {
+            const row = e.target.closest('.sv-rp-row');
+            if (!row || e.target.closest('a')) return;
+            sv.rpOpen[row.dataset.id] = !sv.rpOpen[row.dataset.id];
+            svRpRenderList();
+        });
+    }
+    async function svLoadReports() {
+        const t = sv.token;
+        clearTimeout(sv.rpTimer);
+        try {
+            const res = await fetch(API_BASE + `/api/stock/reports?market=${sv.market}&code=${encodeURIComponent(sv.code)}`);
+            const d = await res.json();
+            if (t !== sv.token) return;
+            if (!res.ok) { document.getElementById('sv-rp-status').textContent = '리포트를 불러오지 못했습니다: ' + (d.message || d.error || res.status); return; }
+            sv.rp = d;
+        } catch (e) {
+            if (t === sv.token) document.getElementById('sv-rp-status').textContent = '리포트를 불러오지 못했습니다';
+            return;
+        }
+        svRpRender();
+        const j = sv.rp.job;
+        if (j && !['done', 'failed'].includes(j.stage)) sv.rpTimer = setTimeout(svLoadReports, 3000);
+    }
+
+    // --- 컨콜 (미국: Alpha Vantage 녹취록 요약·번역, 한국: 실적발표·컨콜 관련 자료) ---
+    function svCallInit() {
+        document.getElementById('sv-call-q').addEventListener('click', e => {
+            const b = e.target.closest('.period-btn[data-q]');
+            if (!b) return;
+            sv.callQ = b.dataset.q; sv.callShow = false; sv.callFull = { en: null, ko: null };
+            svCallRender();
+        });
+        document.getElementById('sv-call-tools').addEventListener('click', e => {
+            const b = e.target.closest('[data-act]');
+            if (!b) return;
+            const act = b.dataset.act;
+            if (act === 'summarize') svCallSummarize();
+            else if (act === 'full') svCallToggleFull();
+            else if (act === 'lang') { sv.callLang = sv.callLang === 'ko' ? 'en' : 'ko'; svCallRenderFull(); }
+            else if (act === 'copy') svCallCopy(b);
+        });
+        document.getElementById('sv-call-kr').addEventListener('click', e => {
+            const row = e.target.closest('.sv-call-item');
+            if (!row || e.target.closest('a')) return;
+            sv.callOpen[row.dataset.id] = !sv.callOpen[row.dataset.id];
+            svCallRenderKr();
+        });
+    }
+    async function svLoadCalls(start) {
+        const t = sv.token;
+        clearTimeout(sv.callsTimer);
+        try {
+            const res = await fetch(API_BASE + `/api/stock/calls?market=${sv.market}&code=${encodeURIComponent(sv.code)}${start === false ? '&start=0' : ''}`);
+            const d = await res.json();
+            if (t !== sv.token) return;
+            if (!res.ok) { document.getElementById('sv-call-status').textContent = '컨콜 자료를 불러오지 못했습니다: ' + (d.message || d.error || res.status); return; }
+            sv.calls = d;
+        } catch (e) {
+            if (t === sv.token) document.getElementById('sv-call-status').textContent = '컨콜 자료를 불러오지 못했습니다';
+            return;
+        }
+        svCallRender();
+        // 녹취록 받는 중(최근 2개 분기 missing)이거나 번역 진행 중이면 3초마다 갱신
+        const qs = (sv.calls.quarters || []);
+        const busy = qs.some(q => q.translate_job && !['done', 'failed'].includes(q.translate_job.stage)) ||
+                     (start !== false && qs.slice(0, 2).some(q => q.transcript === 'missing'));
+        if (busy) sv.callsTimer = setTimeout(() => svLoadCalls(busy && !qs.some(q => q.translate_job && !['done', 'failed'].includes(q.translate_job.stage)) ? undefined : false), 3000);
+    }
+    function svCallQ() { return (sv.calls.quarters || []).find(q => q.quarter === sv.callQ); }
+    function svCallRender() {
+        const d = sv.calls, status = document.getElementById('sv-call-status');
+        const us = document.getElementById('sv-call-us'), kr = document.getElementById('sv-call-kr');
+        document.getElementById('sv-call-title').textContent = d.market === 'US' ? '컨콜 (실적발표 전화회의)' : '실적발표·컨콜 관련 자료';
+        if (d.market !== 'US') { us.style.display = 'none'; kr.style.display = ''; document.getElementById('sv-call-counters').textContent = ''; svCallRenderKr(); return; }
+        kr.style.display = 'none'; us.style.display = '';
+        const qs = d.quarters || [];
+        document.getElementById('sv-call-counters').textContent = `녹취록 호출 오늘 ${d.av.day_count}/${d.av.day_limit} · 요약 ${d.ai.summary_used}/${d.ai.summary_limit} · 번역 ${d.ai.translate_used}/${d.ai.translate_limit}`;
+        if (!qs.length) { status.textContent = '분기 목록 없음 (재무정보를 먼저 불러온 뒤 다시 열어 주세요)'; us.style.display = 'none'; return; }
+        if (!sv.callQ || !svCallQ()) sv.callQ = (qs.find(q => q.transcript === 'ok') || qs[0]).quarter;
+        const nOk = qs.filter(q => q.transcript === 'ok').length, nMiss = qs.slice(0, 2).filter(q => q.transcript === 'missing').length;
+        status.textContent = `최근 ${qs.length}개 분기 중 녹취록 ${nOk}개` + (nMiss ? ' · 최근 분기 녹취록을 받는 중…' : '');
+        document.getElementById('sv-call-q').innerHTML = qs.map(q =>
+            `<span class="period-btn ${q.quarter === sv.callQ ? 'active' : ''} ${q.transcript === 'ok' ? '' : 'sv-call-dim'}" data-q="${q.quarter}" title="분기 말 ${q.label}${q.filed ? ' · 공시 ' + q.filed : ''}${q.transcript === 'ok' ? ' · 발언 ' + q.segments_n + '개' : q.transcript === 'none' ? ' · 녹취록 없음' : ' · 아직 안 받음'}">${q.quarter}${q.summary ? ' ✓' : ''}</span>`).join('');
+        svCallRenderSummary();
+        svCallRenderTools();
+        svCallRenderFull();
+    }
+    function svCallRenderSummary() {
+        const q = svCallQ(), box = document.getElementById('sv-call-sum');
+        if (!q) { box.innerHTML = ''; return; }
+        if (q.transcript !== 'ok') {
+            box.innerHTML = `<div class="sv-note">${q.transcript === 'none' ? '이 분기 녹취록이 제공되지 않습니다' : '녹취록을 아직 받지 않았습니다 (하루 25건 한도 안에서 순서대로 받습니다)'}</div>`;
+            return;
+        }
+        const s = q.summary;
+        if (!s) {
+            box.innerHTML = `<div class="sv-note">요약이 아직 없습니다${q.summary_status && q.summary_status !== 'ok' ? ' (지난 시도: ' + svEsc(q.summary_status) + ')' : ''}. 발언 ${q.segments_n}개, ${q.chars.toLocaleString()}자.</div>`;
+            return;
+        }
+        const ul = arr => arr && arr.length ? '<ul>' + arr.map(x => `<li>${svEsc(x)}</li>`).join('') + '</ul>' : '<div class="sv-note">없음</div>';
+        const tone = s.톤 || {};
+        const tcls = tone.판정 === '긍정' ? 'pos' : tone.판정 === '부정' ? 'neg' : '';
+        box.innerHTML =
+            `<h4>분기 실적 핵심</h4>${ul(s.실적핵심)}` +
+            `<h4>가이던스</h4><div class="sv-note" style="margin:2px 0;">다음 분기</div>${ul((s.가이던스 || {}).다음분기)}<div class="sv-note" style="margin:2px 0;">연간</div>${ul((s.가이던스 || {}).연간)}` +
+            `<h4>섹터·수요 전망</h4>${ul(s.전망)}` +
+            `<h4>주요 리스크·우려</h4>${ul(s.리스크)}` +
+            `<h4>질의응답 핵심</h4>` + ((s.질의응답 || []).length ? '<ul>' + s.질의응답.map(x => `<li><b>Q.</b> ${svEsc(x.질문)}<br><b>A.</b> ${svEsc(x.답)}</li>`).join('') + '</ul>' : '<div class="sv-note">없음</div>') +
+            `<h4>톤</h4><span class="sv-call-tone ${tcls}">${svEsc(tone.판정 || '-')}</span> <span style="font-size:13px;">${svEsc(tone.근거 || '')}</span>` +
+            `<div class="sv-note">AI 요약 (Haiku) · 토큰 ${q.summary_tokens ? (q.summary_tokens.input || 0).toLocaleString() + '+' + (q.summary_tokens.output || 0).toLocaleString() : '-'} · 숫자는 원문 대조 전 참고용</div>`;
+    }
+    function svCallRenderTools() {
+        const q = svCallQ(), box = document.getElementById('sv-call-tools'), prog = document.getElementById('sv-call-progress');
+        if (!q || q.transcript !== 'ok') { box.innerHTML = ''; prog.textContent = ''; return; }
+        const tj = q.translate_job, running = tj && !['done', 'failed'].includes(tj.stage);
+        box.innerHTML =
+            (!q.summary ? `<span class="period-btn" data-act="summarize">요약 만들기</span>` : '') +
+            `<span class="period-btn ${sv.callShow ? 'active' : ''}" data-act="full">${sv.callShow ? '전문 닫기' : '전문 보기(국문)'}</span>` +
+            (sv.callShow ? `<span class="period-btn" data-act="lang">${sv.callLang === 'ko' ? '원문 보기' : '국문 보기'}</span><span class="period-btn" data-act="copy">전문 복사</span>` : '') +
+            (q.translation ? `<span class="sv-note" style="margin:0;">국문 번역 있음</span>` : '');
+        prog.textContent = running ? `번역 중 ${tj.done} / ${tj.total} (호출 ${tj.calls}회) … 3초마다 갱신` : (tj && tj.stage === 'failed' ? '번역 실패: ' + (tj.error || '') : '');
+    }
+    async function svCallSummarize() {
+        const q = svCallQ(); if (!q) return;
+        document.getElementById('sv-call-progress').textContent = '요약을 만드는 중… (30초 안팎)';
+        try {
+            const res = await fetch(API_BASE + '/api/stock/calls/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                             body: JSON.stringify({ market: sv.market, code: sv.code, quarter: q.quarter }) });
+            const d = await res.json();
+            if (d.status === 'ai_limit') document.getElementById('sv-call-progress').textContent = `요약 일일 한도 도달 (오늘 ${d.used}건)`;
+            else if (d.status && d.status.startsWith('ai_error')) document.getElementById('sv-call-progress').textContent = '요약 실패: ' + d.status;
+            else document.getElementById('sv-call-progress').textContent = '';
+        } catch (e) { document.getElementById('sv-call-progress').textContent = '요약 요청 실패'; }
+        svLoadCalls(false);
+    }
+    async function svCallToggleFull() {
+        const q = svCallQ(); if (!q) return;
+        sv.callShow = !sv.callShow;
+        if (!sv.callShow) { svCallRenderTools(); svCallRenderFull(); return; }
+        sv.callLang = 'ko';
+        if (!q.translation) {
+            const tj = q.translate_job;
+            if (!tj || ['done', 'failed'].includes(tj.stage)) {
+                document.getElementById('sv-call-progress').textContent = '번역을 시작합니다…';
+                try {
+                    const res = await fetch(API_BASE + '/api/stock/calls/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                                     body: JSON.stringify({ market: sv.market, code: sv.code, quarter: q.quarter }) });
+                    const d = await res.json();
+                    if (d.job && d.job.stage === 'failed') { document.getElementById('sv-call-progress').textContent = '번역 불가: ' + (d.job.error || ''); sv.callLang = 'en'; }
+                } catch (e) { document.getElementById('sv-call-progress').textContent = '번역 요청 실패'; sv.callLang = 'en'; }
+            }
+            svLoadCalls(false);
+        }
+        svCallRenderTools();
+        svCallRenderFull();
+    }
+    async function svCallRenderFull() {
+        const q = svCallQ(), box = document.getElementById('sv-call-full');
+        if (!q || !sv.callShow || q.transcript !== 'ok') { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const lang = sv.callLang === 'ko' && !q.translation ? 'en' : sv.callLang;
+        box.style.display = '';
+        if (!sv.callFull[lang]) {
+            box.innerHTML = '<div class="sv-note">전문을 불러오는 중…</div>';
+            try {
+                const res = await fetch(API_BASE + `/api/stock/calls/transcript?market=US&code=${encodeURIComponent(sv.code)}&quarter=${q.quarter}&lang=${lang}`);
+                const d = await res.json();
+                if (!res.ok) { box.innerHTML = `<div class="sv-note">${svEsc(d.message || '전문 없음')}</div>`; return; }
+                sv.callFull[lang] = d.segments || [];
+            } catch (e) { box.innerHTML = '<div class="sv-note">전문을 불러오지 못했습니다</div>'; return; }
+        }
+        const segs = sv.callFull[lang];
+        box.innerHTML = `<div class="sv-note" style="margin-top:0;">${lang === 'ko' ? '국문 (AI 번역, Haiku)' : '원문 (영어)'}${lang === 'ko' && !q.translation ? '' : ''} · 발언 ${segs.length}개${sv.callLang === 'ko' && lang === 'en' ? ' · 국문 번역이 아직 없어 원문을 표시합니다' : ''}</div>` +
+            segs.map(s => `<div class="sv-call-seg ${/analyst/i.test(s.title || '') ? 'sv-call-an' : ''}"><b>${svEsc(s.speaker || '')}${s.title ? ' (' + svEsc(s.title) + ')' : ''}</b>${svEsc(s.content || '').replace(/\n/g, '<br>')}${s.untranslated ? ' <span class="sv-note">(원문)</span>' : ''}</div>`).join('');
+    }
+    function svCallCopyText(segs) { return segs.map(s => `${s.speaker || ''}(${s.title || ''}): ${s.content || ''}`).join('\n'); }
+    async function svCallCopy(btn) {
+        const q = svCallQ(); if (!q) return;
+        const lang = sv.callLang === 'ko' && !q.translation ? 'en' : sv.callLang;
+        let segs = sv.callFull[lang];
+        if (!segs) {
+            try {
+                const res = await fetch(API_BASE + `/api/stock/calls/transcript?market=US&code=${encodeURIComponent(sv.code)}&quarter=${q.quarter}&lang=${lang}`);
+                segs = (await res.json()).segments || [];
+            } catch (e) { segs = []; }
+        }
+        const text = svCallCopyText(segs);
+        try { await navigator.clipboard.writeText(text); }
+        catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+        const old = btn.textContent; btn.textContent = '복사됨';
+        setTimeout(() => { btn.textContent = old; }, 2000);
+    }
+    function svCallRenderKr() {
+        const d = sv.calls, box = document.getElementById('sv-call-kr');
+        const items = d.items || [];
+        document.getElementById('sv-call-status').textContent = items.length ? `관련 자료 ${items.length}건 (리포트 제목 키워드: 컨콜·실적발표·Review·리뷰·NDR·기업설명회 / 텔레인박스 최근 6개월)` : '';
+        if (!items.length) { box.innerHTML = '<div class="sv-note">관련 자료 없음</div>'; return; }
+        box.innerHTML = items.map((it, i) => {
+            const id = `${it.source}-${it.channel}-${it.message_id}`;
+            const open = sv.callOpen[id];
+            return `<div class="sv-call-item" data-id="${svEsc(id)}">` +
+                `<span class="sv-call-meta">${svEsc(it.date || '')}</span><span class="sv-call-meta">${svEsc(it.source)}</span><span class="sv-call-meta">${svEsc(it.broker || '')}</span>${svEsc(it.title || '')}` +
+                (it.opinion || it.target ? `<span class="sv-call-meta" style="margin-left:8px;">${svEsc(it.opinion || '')}${it.target ? ' ' + Number(it.target).toLocaleString() + '원' : ''}</span>` : '') +
+                (open ? ((it.summary || []).length ? '<ul>' + it.summary.map(x => `<li>${svEsc(x)}</li>`).join('') + '</ul>' : `<div class="sv-note">${it.source === '리포트' ? '요약 없음 (' + svEsc(it.ai_status || '') + ')' : '본문 없음'}</div>`) : '') +
+                `</div>`;
+        }).join('');
+    }
+
+    // --- 관련 기업 (AI 제안 → 사용자 확정, 비교표, 컨콜 모음) ---
+    function svPeersInit() {
+        document.getElementById('sv-pr-chips').addEventListener('click', async e => {
+            const x = e.target.closest('.sv-pr-x');
+            if (x) { e.stopPropagation(); await svPeersDelete(x.dataset.m, x.dataset.c); return; }
+            const b = e.target.closest('.period-btn[data-act]');
+            if (!b) { const chip = e.target.closest('.period-btn[data-c]'); if (chip) svOpen(chip.dataset.m, chip.dataset.c, chip.dataset.n); return; }
+            if (b.dataset.act === 'suggest') svPeersSuggest();
+            else if (b.dataset.act === 'add') svPeersAddToggle();
+        });
+        document.getElementById('sv-pr-sug').addEventListener('click', async e => {
+            const b = e.target.closest('.period-btn[data-act]'); if (!b) return;
+            const body = { market: sv.market, code: sv.code, peer_market: b.dataset.m, peer_code: b.dataset.c };
+            if (b.dataset.act === 'confirm') await svPeersPost('/api/stock/peers/confirm', body);
+            else if (b.dataset.act === 'reject') await svPeersPost('/api/stock/peers', body, 'DELETE');
+            svLoadPeers(false);
+        });
+        document.getElementById('sv-pr-table').addEventListener('click', e => {
+            const th = e.target.closest('th[data-col]');
+            if (th) { const c = th.dataset.col; sv.prSort = { col: c, asc: sv.prSort.col === c ? !sv.prSort.asc : (c === 'name' || c === 'market') }; svPeersTable(); return; }
+            const td = e.target.closest('td.sv-pr-name[data-c]');
+            if (td) svOpen(td.dataset.m, td.dataset.c, td.dataset.n);
+        });
+        document.getElementById('sv-pr-calls').addEventListener('click', async e => {
+            const b = e.target.closest('.period-btn[data-act="summarize"]');
+            if (b) { e.stopPropagation(); await svPeersSummarize(b.dataset.c, b.dataset.q, b); return; }
+            const name = e.target.closest('td.sv-pr-name, .sv-pr-go'); if (name && name.dataset.c) { svOpen(name.dataset.m, name.dataset.c, name.dataset.n); return; }
+            const h = e.target.closest('.sv-pr-call-head'); if (!h) return;
+            sv.prOpen[h.dataset.id] = !sv.prOpen[h.dataset.id]; svPeersCalls();
+        });
+    }
+    async function svPeersPost(path, body, method) {
+        try {
+            const res = await fetch(API_BASE + path, { method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const d = await res.json();
+            if (!res.ok) document.getElementById('sv-pr-status').textContent = d.message || d.error || ('오류 ' + res.status);
+            return d;
+        } catch (e) { document.getElementById('sv-pr-status').textContent = '요청 실패'; return null; }
+    }
+    async function svLoadPeers(suggest) {
+        const t = sv.token;
+        clearTimeout(sv.peersTimer);
+        try {
+            const res = await fetch(API_BASE + `/api/stock/peers?market=${sv.market}&code=${encodeURIComponent(sv.code)}${suggest === false ? '&suggest=0' : ''}`);
+            const d = await res.json();
+            if (t !== sv.token) return;
+            if (!res.ok) { document.getElementById('sv-pr-status').textContent = '관련 기업을 불러오지 못했습니다: ' + (d.message || d.error || res.status); return; }
+            sv.peers = d;
+        } catch (e) { if (t === sv.token) document.getElementById('sv-pr-status').textContent = '관련 기업을 불러오지 못했습니다'; return; }
+        svPeersRender();
+        const d = sv.peers;
+        // 받는 중인 행이 있거나, 목록이 비어 AI 제안이 뒤에서 도는 중이면 4초 뒤 갱신
+        const waitingAi = suggest !== false && !d.confirmed.length && !d.suggested.length && (d.ai_called_at || '').slice(0, 10) !== new Date().toISOString().slice(0, 10);
+        if ((d.compare.fetching || []).length || waitingAi) sv.peersTimer = setTimeout(() => svLoadPeers(false), 4000);
+    }
+    function svPeersRender() {
+        const d = sv.peers;
+        document.getElementById('sv-pr-counters').textContent = `AI 제안 오늘 ${d.ai.used}/${d.ai.limit}`;
+        const chips = d.confirmed.map(c => `<span class="period-btn" data-m="${c.market}" data-c="${svEsc(c.code)}" data-n="${svEsc(c.name || '')}" title="${svEsc((c.relation || '') + ' ' + (c.reason || ''))}">${svEsc(svPeersShort(c))}<span class="sv-pr-x" data-m="${c.market}" data-c="${svEsc(c.code)}" title="제거">×</span></span>`).join('');
+        document.getElementById('sv-pr-chips').innerHTML = chips +
+            `<span class="sv-pr-add"><span class="period-btn" data-act="add">+ 추가</span><input id="sv-pr-add-input" placeholder="종목명·코드 검색" style="display:none;"><div class="sv-pr-add-list" id="sv-pr-add-list" style="display:none;"></div></span>` +
+            `<span class="period-btn" data-act="suggest">${d.suggested.length || d.confirmed.length ? 'AI 다시 제안' : 'AI 제안 받기'}</span>`;
+        const inp = document.getElementById('sv-pr-add-input');
+        inp.addEventListener('input', () => { clearTimeout(sv.prAddTimer); sv.prAddTimer = setTimeout(svPeersAddSearch, 250); });
+        inp.addEventListener('keydown', e => { if (e.key === 'Escape') svPeersAddToggle(false); });
+        const log = d.ai_log && d.ai_log[0];
+        let st = '';
+        if (!d.confirmed.length && !d.suggested.length) st = (d.ai_called_at || '').slice(0, 10) === new Date().toISOString().slice(0, 10) ? '제안된 기업이 없습니다. "AI 제안 받기" 또는 "+ 추가"로 넣어 주세요' : 'AI가 관련 기업을 고르는 중… (4초마다 갱신)';
+        else if (log && log.status === 'ok') st = `마지막 AI 제안 ${svDt(log.at)} · 후보 풀 ${log.pool || ''}${log.dropped && log.dropped.length ? ' · 코드 불명 ' + log.dropped.length + '건 제외' : ''}`;
+        document.getElementById('sv-pr-status').textContent = st;
+        const sug = document.getElementById('sv-pr-sug');
+        if (d.suggested.length) {
+            sug.style.display = '';
+            sug.innerHTML = `<div class="sv-note" style="margin:0 0 4px;">AI 제안 (확정 전) — 확정하면 비교표·컨콜 모음에 들어갑니다</div>` + d.suggested.map(x =>
+                `<div class="sv-pr-sug-row"><span><b>${svEsc(x.name || x.code)}</b> <small class="sv-note" style="margin:0;">${x.market}:${svEsc(x.code)}${x.in_pool === false ? ' · 풀 밖' : ''}</small></span>` +
+                `<span class="sv-pr-hide">${svEsc(x.relation || '')}</span><span class="sv-pr-hide">${svEsc(x.reason || '')}</span><span class="sv-pr-hide">${x.confidence != null ? Math.round(x.confidence * 100) + '%' : '-'}</span>` +
+                `<span><span class="period-btn" data-act="confirm" data-m="${x.market}" data-c="${svEsc(x.code)}">확정</span> <span class="period-btn" data-act="reject" data-m="${x.market}" data-c="${svEsc(x.code)}">제외</span></span></div>`).join('');
+        } else { sug.style.display = 'none'; sug.innerHTML = ''; }
+        svPeersTable();
+        svPeersOutlook();
+        svPeersCalls();
+    }
+    function svPeersShort(c) { const n = c.name || c.code; return c.market === 'US' ? c.code : (n.length > 10 ? n.slice(0, 10) + '…' : n); }
+    function svPeersAddToggle(show) {
+        const inp = document.getElementById('sv-pr-add-input'), list = document.getElementById('sv-pr-add-list');
+        const on = show == null ? inp.style.display === 'none' : show;
+        inp.style.display = on ? '' : 'none'; list.style.display = 'none';
+        if (on) { inp.value = ''; inp.focus(); }
+    }
+    async function svPeersAddSearch() {
+        const inp = document.getElementById('sv-pr-add-input'), list = document.getElementById('sv-pr-add-list');
+        const q = inp.value.trim(); if (!q) { list.style.display = 'none'; return; }
+        try {
+            const res = await fetch(API_BASE + '/api/stock/search?q=' + encodeURIComponent(q));
+            const items = (await res.json()).filter(x => x.wl_market);
+            list.innerHTML = items.length ? items.map(x => `<div data-m="${x.wl_market}" data-c="${svEsc(x.wl_code)}">${svEsc(x.name)} <small class="sv-note" style="margin:0;">${x.wl_market}:${svEsc(x.wl_code)}</small></div>`).join('') : '<div class="sv-note">검색 결과 없음</div>';
+            list.style.display = '';
+            list.onclick = async e => {
+                const row = e.target.closest('div[data-c]'); if (!row) return;
+                await svPeersPost('/api/stock/peers/add', { market: sv.market, code: sv.code, peer_market: row.dataset.m, peer_code: row.dataset.c });
+                svPeersAddToggle(false); svLoadPeers(false);
+            };
+        } catch (e) { list.style.display = 'none'; }
+    }
+    async function svPeersSuggest() {
+        document.getElementById('sv-pr-status').textContent = 'AI가 관련 기업을 고르는 중… (20초 안팎)';
+        const d = await svPeersPost('/api/stock/peers/suggest', { market: sv.market, code: sv.code });
+        if (d && d.status === 'ai_limit') document.getElementById('sv-pr-status').textContent = `AI 제안 일일 한도 도달 (오늘 ${d.used}건)`;
+        else if (d && d.status && d.status.startsWith('ai_error')) document.getElementById('sv-pr-status').textContent = 'AI 제안 실패: ' + d.status;
+        svLoadPeers(false);
+    }
+    async function svPeersDelete(m, c) {
+        await svPeersPost('/api/stock/peers', { market: sv.market, code: sv.code, peer_market: m, peer_code: c }, 'DELETE');
+        svLoadPeers(false);
+    }
+    function svPeersFmtCap(r) {
+        if (r.market_cap == null) return '-';
+        const v = r.market_cap;
+        let s = r.market === 'US' ? '$' + (v >= 1e12 ? (v / 1e12).toFixed(2) + 'T' : (v / 1e9).toFixed(1) + 'B') : (v >= 1e12 ? (v / 1e12).toFixed(1) + '조원' : Math.round(v / 1e8).toLocaleString() + '억원');
+        if (sv.peers.compare.mixed && r.market === 'KR' && r.market_cap_usd) s += ` <small class="sv-note" style="margin:0;">($${(r.market_cap_usd / 1e9).toFixed(1)}B)</small>`;
+        return s;
+    }
+    function svPeersTable() {
+        const cmp = sv.peers.compare, tbl = document.getElementById('sv-pr-table');
+        const cols = [['name', '종목'], ['market', '시장'], ['price', '현재가'], ['market_cap', '시가총액'], ['per', 'PER'], ['fper', 'fPER'], ['pbr', 'PBR'], ['fpbr', 'fPBR'], ['roe', 'ROE'], ['revenue_yoy', '매출 성장률'], ['operating_margin', '영업이익률']];
+        let rows = cmp.rows.slice();
+        const base = rows.find(r => r.is_base), others = rows.filter(r => !r.is_base);
+        if (sv.prSort.col) {
+            const c = sv.prSort.col, asc = sv.prSort.asc;
+            others.sort((a, b) => { const x = a[c], y = b[c]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * (asc ? 1 : -1); });
+        }
+        rows = base ? [base, ...others] : others;
+        const num = (v, d, suf) => v == null ? '-' : Number(v).toFixed(d) + (suf || '');
+        const price = r => r.price == null ? '-' : (r.market === 'US' ? '$' + Number(r.price).toFixed(2) : Math.round(r.price).toLocaleString() + '원');
+        const stTag = r => r.status === 'fetching' ? ' <small class="sv-note" style="margin:0;">(받는 중)</small>' : (r.status === 'unknown' ? ' <small class="sv-note" style="margin:0;">(종목 불명)</small>' : '');
+        tbl.innerHTML = '<thead><tr>' + cols.map(([k, l]) => `<th data-col="${k}" class="${sv.prSort.col === k ? 'sv-sorted' + (sv.prSort.asc ? ' asc' : '') : ''}">${l}</th>`).join('') + '</tr></thead><tbody>' +
+            rows.map(r => `<tr class="${r.is_base ? 'sv-pr-base' : ''}"><td class="sv-pr-name" data-m="${r.market}" data-c="${svEsc(r.code)}" data-n="${svEsc(r.name || '')}">${svEsc(r.name || r.code)}${stTag(r)}</td><td>${r.market}</td><td>${price(r)}</td><td>${svPeersFmtCap(r)}</td>` +
+                `<td>${num(r.per, 1, '배')}</td><td>${num(r.fper, 1, '배')}</td><td>${num(r.pbr, 2, '배')}</td><td>${num(r.fpbr, 2, '배')}</td><td>${num(r.roe, 1, '%')}</td><td>${num(r.revenue_yoy, 1, '%')}</td><td>${num(r.operating_margin, 1, '%')}</td></tr>`).join('') +
+            `<tr class="sv-pr-avg"><td class="sv-pr-name" style="cursor:default;">평균 (${rows.length}종목)</td><td></td><td></td><td></td><td>${num(cmp.avg.per, 1, '배')}</td><td>${num(cmp.avg.fper, 1, '배')}</td><td>${num(cmp.avg.pbr, 2, '배')}</td><td>${num(cmp.avg.fpbr, 2, '배')}</td><td>${num(cmp.avg.roe, 1, '%')}</td><td>${num(cmp.avg.revenue_yoy, 1, '%')}</td><td>${num(cmp.avg.operating_margin, 1, '%')}</td></tr></tbody>`;
+        document.getElementById('sv-pr-table-note').textContent = (cmp.mixed && cmp.fx_usdkrw ? `USD/KRW ${Number(cmp.fx_usdkrw).toFixed(1)} (글로벌 마켓 탭 환율) · ` : '') + 'ROE·매출 성장률(YoY)·영업이익률은 최근 4분기누적 기준 · 평균은 값이 있는 종목만 · 열 머리를 누르면 정렬' + (cmp.fetching.length ? ` · 받는 중 ${cmp.fetching.length}종목 (4초마다 갱신)` : '');
+    }
+    function svPeersOutlook() {
+        const box = document.getElementById('sv-pr-outlook'), ol = sv.peers.calls.outlook || [];
+        if (!ol.length) { box.innerHTML = '<div class="sv-note">저장된 컨콜 요약이 없습니다 (미국 기업은 아래에서 "요약 만들기")</div>'; return; }
+        box.innerHTML = ol.map(o => `<div class="sv-pr-card ${o.is_base ? 'sv-pr-base' : ''}"><h5>${svEsc(o.name || o.code)} <small class="sv-note" style="margin:0;">${o.market}:${svEsc(o.code)} · ${svEsc(o.quarter || '')}${o.tone ? ' · ' + svEsc(o.tone) : ''}${o.from_report ? ' · 리포트 요약' : ''}</small></h5><ul>${(o.lines || []).map(l => `<li>${svEsc(l)}</li>`).join('')}</ul></div>`).join('');
+    }
+    function svPeersCalls() {
+        const box = document.getElementById('sv-pr-calls'), cs = (sv.peers.calls.calls || []).filter(c => !c.is_base);
+        if (!cs.length) { box.innerHTML = '<div class="sv-note">확정된 관련 기업이 없습니다</div>'; return; }
+        box.innerHTML = cs.map(c => {
+            const id = c.market + ':' + c.code, open = sv.prOpen[id];
+            const head = `<span class="sv-pr-go" data-m="${c.market}" data-c="${svEsc(c.code)}" data-n="${svEsc(c.name || '')}" style="cursor:pointer;"><b>${svEsc(c.name || c.code)}</b></span> <small class="sv-note" style="margin:0;">${c.market}:${svEsc(c.code)}</small>`;
+            if (c.market === 'KR') {
+                const its = c.kr_items || [];
+                return `<div class="sv-pr-call"><div class="sv-pr-call-head" data-id="${svEsc(id)}">${head} · 실적발표·컨콜 관련 자료 ${its.length}건</div>` +
+                    (open ? its.map(it => `<div style="padding:4px 0 0 12px;"><span class="sv-note" style="margin:0;">${svEsc(it.date || '')} ${svEsc(it.source)} ${svEsc(it.broker || '')}</span> ${svEsc(it.title || '')}${(it.summary || []).length ? '<ul style="margin:2px 0 4px;padding-left:18px;">' + it.summary.map(x => `<li>${svEsc(x)}</li>`).join('') + '</ul>' : ''}</div>`).join('') || '<div class="sv-note" style="padding-left:12px;">관련 자료 없음</div>' : '') + '</div>';
+            }
+            const s = c.summary;
+            if (!s) return `<div class="sv-pr-call"><div class="sv-pr-call-head" data-id="${svEsc(id)}">${head} · ${c.quarter ? svEsc(c.quarter) + ' ' : ''}요약 없음 ${c.has_transcript ? `<span class="period-btn" data-act="summarize" data-c="${svEsc(c.code)}" data-q="${svEsc(c.quarter)}" style="padding:2px 8px;font-size:12px;">요약 만들기</span>` : '<small class="sv-note" style="margin:0;">(녹취록 없음 — 종목을 열면 받습니다)</small>'}</div></div>`;
+            const tone = (s.톤 || {}).판정 || '';
+            const ul = arr => (arr || []).length ? '<ul style="margin:2px 0 4px;padding-left:18px;">' + arr.map(x => `<li>${svEsc(x)}</li>`).join('') + '</ul>' : '<div class="sv-note">없음</div>';
+            return `<div class="sv-pr-call"><div class="sv-pr-call-head" data-id="${svEsc(id)}">${head} · ${svEsc(c.quarter)} · <span class="sv-call-tone ${tone === '긍정' ? 'pos' : tone === '부정' ? 'neg' : ''}">${svEsc(tone || '-')}</span>${ul((s.실적핵심 || []).slice(0, 3))}</div>` +
+                (open ? `<div class="sv-call-sum" style="padding-left:12px;"><h4>가이던스</h4>${ul([...(s.가이던스 || {}).다음분기 || [], ...(s.가이던스 || {}).연간 || []])}<h4>섹터·수요 전망</h4>${ul(s.전망)}<h4>리스크</h4>${ul(s.리스크)}<h4>질의응답</h4>${(s.질의응답 || []).length ? '<ul style="margin:2px 0 4px;padding-left:18px;">' + s.질의응답.map(x => `<li><b>Q.</b> ${svEsc(x.질문)}<br><b>A.</b> ${svEsc(x.답)}</li>`).join('') + '</ul>' : '<div class="sv-note">없음</div>'}<h4>톤</h4><div>${svEsc(tone)}: ${svEsc((s.톤 || {}).근거 || '')}</div></div>` : '') + '</div>';
+        }).join('');
+    }
+    async function svPeersSummarize(code, quarter, btn) {
+        btn.textContent = '요약 중…';
+        const d = await svPeersPost('/api/stock/calls/summarize', { market: 'US', code, quarter });
+        if (d && d.status === 'ai_limit') document.getElementById('sv-pr-status').textContent = `컨콜 요약 일일 한도 도달 (오늘 ${d.used}건)`;
+        svLoadPeers(false);
+    }
+    function svRpPrice(v) { return v == null ? '-' : (svIsUsd() ? '$' + Number(v).toFixed(0) : Math.round(v).toLocaleString() + '원'); }
+    function svRpRender() {
+        const d = sv.rp, status = document.getElementById('sv-rp-status'), body = document.getElementById('sv-rp-body');
+        const j = d.job || {};
+        const stageName = { queued: '대기', searching: '검색 중', downloading: '받는 중', summarizing: 'AI 정리 중', done: '완료', failed: '실패' }[j.stage] || '';
+        let st = '';
+        if (j.stage && !['done', 'failed'].includes(j.stage)) st = `${stageName}${j.total ? ` ${j.done} / ${j.total}` : ''} … 3초마다 갱신`;
+        else if (j.stage === 'failed') st = '작업 실패: ' + (j.error || '');
+        else st = `${d.period.from} ~ ${d.period.to} · 리포트 ${d.count}건 · AI 정리 ${d.aggregate.reports_ok}건${d.last_search ? ' · 마지막 검색 ' + svDt(d.last_search) : ''}`;
+        status.textContent = st;
+        if (!d.count) {
+            body.style.display = 'none';
+            status.textContent = (j.stage && !['done', 'failed'].includes(j.stage)) ? st : '리포트 없음 (' + d.period.from + ' ~ ' + d.period.to + ')';
+            return;
+        }
+        body.style.display = '';
+        const a = d.aggregate, s = sv.summary && !sv.summary.error ? sv.summary : {};
+        const price = s.price;
+        const card = (label, value, title) => `<div title="${svEsc(title || '')}"><div class="sv-stat-label">${label}</div><div class="sv-stat-value">${value}</div></div>`;
+        const up = a.target_mean && price ? ((a.target_mean / price - 1) * 100) : null;
+        document.getElementById('sv-rp-cards').innerHTML =
+            card('목표주가 평균', a.target_mean ? `${svRpPrice(a.target_mean)} <small class="${up > 0 ? 'sv-up' : up < 0 ? 'sv-down' : ''}">${up == null ? '' : (up > 0 ? '+' : '') + up.toFixed(1) + '%'}</small>` : '-', '증권사별 최신 목표주가 평균, 현재가 대비') +
+            card('최고 · 최저', a.target_max ? `${svRpPrice(a.target_max)} · ${svRpPrice(a.target_min)}` : '-') +
+            card('투자의견', `매수 ${a.opinion_dist.buy} · 중립 ${a.opinion_dist.hold} · 매도 ${a.opinion_dist.sell}`) +
+            card('증권사 수', a.brokers_n) + card('기준 기간', `${d.period.from.slice(2)} ~ ${d.period.to.slice(2)}`);
+        svRpChart(a.trajectory || []);
+        svRpEstTable(a.estimates || {}, s.f_years || {}, s.fsource);
+        svRpRenderList();
+    }
+    function svRpChart(traj) {
+        const old = Chart.getChart('sv-rp-chart'); if (old) old.destroy();
+        const C = svColors();
+        const since = new Date(); since.setFullYear(since.getFullYear() - 1);
+        const sinceS = since.toISOString().slice(0, 10);
+        const pts = traj.filter(x => x.date && x.date >= sinceS && x.target);
+        const brokers = [...new Set(pts.map(x => x.broker || '기타'))];
+        const palette = [C.c1, C.c2, C.c3, C.c4, C.c5, C.c6, '#c58fbf', '#7fb0a8', '#b7a57a', '#9aa3c9'];
+        const datasets = brokers.map((b, i) => ({
+            label: b, data: pts.filter(x => (x.broker || '기타') === b).map(x => ({ x: x.date, y: x.target })),
+            borderColor: palette[i % palette.length], backgroundColor: palette[i % palette.length], showLine: true, pointRadius: 3, borderWidth: 1.5, tension: 0, stepped: 'before',
+        }));
+        if (sv.prices) {
+            const pp = Object.entries(sv.prices).filter(([lb]) => lb.replace('.', '-') + '-01' >= sinceS.slice(0, 7) + '-01')
+                .map(([lb, v]) => ({ x: lb.replace('.', '-') + '-28', y: v }));
+            datasets.push({ label: '주가(월말)', data: pp, borderColor: C.text, borderDash: [4, 3], pointRadius: 0, borderWidth: 1.5, showLine: true, tension: 0.1 });
+        }
+        const note = document.getElementById('sv-rp-chart-note');
+        if (!pts.length) { note.textContent = '최근 1년 목표주가 자료가 없습니다.'; document.getElementById('sv-rp-chart').parentNode.parentNode.style.display = 'none'; return; }
+        document.getElementById('sv-rp-chart').parentNode.parentNode.style.display = '';
+        note.textContent = '증권사별 목표주가(계단선)와 월말 주가(점선), 최근 1년';
+        const labels = [...new Set(datasets.flatMap(ds => ds.data.map(p => p.x)))].sort();
+        new Chart(document.getElementById('sv-rp-chart'), {
+            type: 'line',
+            data: { labels, datasets: datasets.map(ds => ({ ...ds, data: labels.map(l => { const p = ds.data.find(q => q.x === l); return p ? p.y : null; }), spanGaps: true })) },
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                       plugins: { title: { display: true, text: '목표주가 추이', font: { weight: 'bold', size: 13 }, color: C.text },
+                                  legend: { position: 'bottom', labels: { color: C.muted, font: { size: 11 }, boxWidth: 12 } },
+                                  tooltip: { callbacks: { label: c => `${c.dataset.label}: ${svRpPrice(c.parsed.y)}` } } },
+                       scales: { x: { ticks: { color: C.text, font: { size: 10 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 12, callback: (v, i) => (labels[i] || '').slice(2, 7) }, grid: { display: false } },
+                                 y: { ticks: { color: C.muted, font: { size: 10 }, callback: v => svRpPrice(v) } } } },
+        });
+    }
+    function svRpEstTable(est, fyears, fsource) {
+        const periods = Object.keys(est).sort();
+        const metrics = [['revenue', '매출액'], ['operating_income', '영업이익'], ['net_income', '순이익'], ['eps', 'EPS']];
+        const fmt = (k, v) => v == null ? '-' : (k === 'eps' ? Math.round(v).toLocaleString() : Math.round(v).toLocaleString());
+        let h = '<thead><tr><th>구분</th>' + periods.map(p => `<th>${p}</th>`).join('') + '</tr></thead><tbody>';
+        metrics.forEach(([k, label]) => {
+            h += `<tr><td>${label} <small>증권사 평균</small></td>` + periods.map(p => {
+                const c = est[p] && est[p][k];
+                return `<td>${c ? `${fmt(k, c.mean)}<small style="display:block;color:var(--text-dim)">(${fmt(k, c.min)}~${fmt(k, c.max)}, n=${c.n})</small>` : '-'}</td>`;
+            }).join('') + '</tr>';
+            const frow = periods.map(p => {
+                const y = fyears[p.replace(/F$/, 'E')] || fyears[p];
+                if (!y) return '<td>-</td>';
+                const v = k === 'eps' ? y.eps : y[k] != null ? y[k] / 1e8 : null;
+                return `<td>${v == null ? '-' : fmt(k, v)}</td>`;
+            });
+            if (fsource && Object.keys(fyears).length) h += `<tr><td style="color:var(--text-muted)">${label} <small>${svEsc(fsource === 'fnguide' ? 'FnGuide' : fsource === 'naver' ? '네이버 컨센서스' : fsource)}</small></td>${frow.join('')}</tr>`;
+        });
+        document.getElementById('sv-rp-est').innerHTML = periods.length ? h + '</tbody>' : '<tbody><tr><td class="sv-note">추정 실적이 없습니다.</td></tr></tbody>';
+    }
+    function svRpRenderList() {
+        const items = (sv.rp && sv.rp.items) || [];
+        document.getElementById('sv-rp-list').innerHTML = items.map(it => {
+            const chg = it.target && it.prev_target ? (it.target > it.prev_target ? '<span class="sv-up">▲</span>' : it.target < it.prev_target ? '<span class="sv-down">▼</span>' : '') : '';
+            const notext = it.text_ok === false;
+            const stateTxt = notext ? '텍스트 추출 불가' : it.ai_status === 'ok' ? (it.type || '') : it.ai_status === 'pending' ? '받기 대기' : it.ai_status === 'downloaded' ? '정리 대기' : it.ai_status === 'ai_limit' ? 'AI 한도' : (it.ai_status || '');
+            const open = sv.rpOpen[it.message_id];
+            let row = `<div class="sv-rp-row${notext ? ' sv-rp-notext' : ''}" data-id="${it.message_id}">
+                <span class="sv-disc-date">${svEsc((it.date || '').slice(0, 10))}</span>
+                <span class="sv-rp-hide">${svEsc(it.broker || '-')}${it.analyst ? ' · ' + svEsc(it.analyst) : ''}</span>
+                <span class="sv-rp-title" title="${svEsc(it.title)}">${svEsc(it.title)}</span>
+                <span class="sv-rp-hide">${svEsc(it.opinion || '-')}</span>
+                <span>${it.target ? svRpPrice(it.target) + ' ' + chg : '-'}</span>
+                <span class="sv-rp-hide" style="color:var(--text-muted)">${svEsc(stateTxt)}</span></div>`;
+            if (open) {
+                const est = (it.estimates || []).filter(e => e.period);
+                row += `<div class="sv-rp-detail">
+                    ${it.flags && it.flags.length ? `<div class="sv-warn">⚠ ${svEsc(it.flags.join(' · '))}</div>` : ''}
+                    ${it.summary && it.summary.length ? '<ul>' + it.summary.map(l => `<li>${svEsc(l)}</li>`).join('') + '</ul>' : `<div class="sv-note">${notext ? '이미지 PDF 라 텍스트를 뽑지 못했습니다.' : '요약이 아직 없습니다.'}</div>`}
+                    ${est.length ? '<table><tr><th>기간</th><th>매출액</th><th>영업이익</th><th>순이익</th><th>EPS</th></tr>' + est.map(e => `<tr><td>${svEsc(e.period)}</td><td>${e.revenue == null ? '-' : Math.round(e.revenue).toLocaleString()}</td><td>${e.operating_income == null ? '-' : Math.round(e.operating_income).toLocaleString()}</td><td>${e.net_income == null ? '-' : Math.round(e.net_income).toLocaleString()}</td><td>${e.eps == null ? '-' : Math.round(e.eps).toLocaleString()}</td></tr>`).join('') + '</table><div class="sv-note">억원, EPS 원</div>' : ''}
+                    <div class="sv-note">${it.prev_target ? `이전 목표주가 ${svRpPrice(it.prev_target)} · ` : ''}${it.target_change ? svEsc(it.target_change) + ' · ' : ''}${it.drive ? 'Drive: ' + svEsc(it.drive.split('/').slice(-2).join('/')) : (it.downloaded ? '로컬 저장됨' : (it.download_error ? '받기 실패: ' + svEsc(it.download_error) : '받기 대기'))}</div>
+                </div>`;
+            }
+            return row;
+        }).join('') || '<div class="sv-note">리포트가 없습니다.</div>';
     }
 
     // --- 밸류에이션 ---

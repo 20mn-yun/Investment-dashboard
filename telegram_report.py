@@ -486,6 +486,26 @@ def start_search_job(channel_username, keyword, date_from, date_to,
     return job_id
 
 
+async def download_message(channel_username, message_id, dest_path):
+    """(채널, message_id) 메시지 1건의 첨부 문서를 dest_path 에 저장 (종목 리포트 수집용, stock_reports 가 _shared_loop 에서 호출).
+    기존 _search_and_download 의 get_messages/download_media 흐름을 그대로 쓴다. 반환: (원본 파일명, 크기 bytes) / 첨부 없으면 (None, 0)"""
+    client = _shared_client
+    channel = await client.get_entity(channel_username)
+    msg = await client.get_messages(channel, ids=message_id)
+    if not msg or not getattr(msg, "media", None) or not getattr(msg.media, "document", None):
+        return None, 0
+    filename = None
+    for attr in msg.media.document.attributes:
+        if isinstance(attr, DocumentAttributeFilename):
+            filename = attr.file_name
+            break
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    tmp = dest_path + ".part"
+    await client.download_media(msg, file=tmp)
+    os.replace(tmp, dest_path)
+    return filename, os.path.getsize(dest_path)
+
+
 def _unique_path(directory, filename):
     base, ext = os.path.splitext(filename)
     path = os.path.join(directory, filename)

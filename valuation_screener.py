@@ -187,6 +187,17 @@ def _shares_map():
     return m
 
 
+def _acc_mt_map(rows):
+    """결산월(kr_financials 저장본) — "올해E" 라벨용. 없으면 12"""
+    import kr_financials
+    out = {}
+    for u in rows:
+        c = kr_financials._load_cache(u["code"])
+        if c and c.get("acc_mt"):
+            out[u["code"]] = c["acc_mt"]
+    return out
+
+
 def _corp_map():
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dart_corp_map.json"), "r", encoding="utf-8") as f:
         return json.load(f)
@@ -255,14 +266,17 @@ def collect_valuations(universe, bands, wics, sleep=0.3, limit=None, fetch_statu
     shares_map = shares_map if shares_map is not None else _shares_map()
     fetch_status = fetch_status or {}
     today = _date.today()
+    acc_mt_map = _acc_mt_map(rows)
     items, per_missing = [], {}
     for i, u in enumerate(rows):
         code = u["code"]
         price = _safe_price(code)
-        nav = _safe_naver(code)
-        fwd = (nav or {}).get("forward") or {}
-        feps = fwd.get("eps")
-        fdps = fwd.get("dps") or 0
+        # 컨센서스: forward_estimates (FnGuide → 실패 시 네이버 모바일 API). 기존 fetch_naver_valuation 은 사이트 개편으로 깨짐
+        import forward_estimates
+        est = forward_estimates.kr_consensus(code, acc_mt_map.get(code, 12))
+        feps = est.get("eps_this")
+        fbps_est = est.get("bps_this")
+        fsource = est.get("source")
 
         v = valuation_ttm.valuation_asof(code, today)
         shares_now = shares_map.get(code)
@@ -276,10 +290,7 @@ def collect_valuations(universe, bands, wics, sleep=0.3, limit=None, fetch_statu
         latest_bps = (v["equity"] / shares_now) if v.get("equity") and shares_now else None
         fper = _ratio(price, feps)
 
-        fbps_dart = None
-        if latest_bps is not None and feps is not None:
-            fbps_dart = latest_bps + feps - fdps        # 출발점: 최근 분기 말 BPS
-        fpbr = _ratio(price, fbps_dart)
+        fpbr = _ratio(price, fbps_est)                 # fPBR = 현재 주가 / 올해E BPS (추정 BPS 없으면 빈 값)
 
         band = bands.get(code)
         per_vals = [s["per"] for s in band["series"] if s["per"] is not None] if band else []
@@ -305,6 +316,8 @@ def collect_valuations(universe, bands, wics, sleep=0.3, limit=None, fetch_statu
             "fpbr_position": _position(fpbr, pbr_vals),
             "sector": wics.get(code, {}).get("wics_mcls_nm") or "미분류",
             "sector_code": wics.get(code, {}).get("wics_mcls_cd") or "",
+            "fsource": fsource,                        # fPER/fPBR 출처: fnguide | naver | None
+            "f_year": est.get("this_year"),
         })
         if (i + 1) % 50 == 0:
             print(f"  진행 {i+1}/{total}", flush=True)

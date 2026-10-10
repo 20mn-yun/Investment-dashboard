@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta
 
 import requests
 
+import ai_budget
 import concept_map
 
 _BD = os.path.dirname(os.path.abspath(__file__))
@@ -1431,6 +1432,15 @@ _summary_lock = threading.Lock()
 SUMMARY_TTL = 60
 
 
+def _forward_fields(code, price):
+    try:
+        import forward_estimates
+        return forward_estimates.summary_fields("US", code, price)
+    except Exception as e:
+        print(f"[us_financials] {code} 컨센서스 실패: {type(e).__name__}", flush=True)
+        return {"fper": None, "fpbr": None, "fsource": None}
+
+
 def get_summary(code, name):
     """미국 종목 요약. 현재가 등은 stock_profile.us_summary(yfinance) 를 쓰고,
     시가총액·PER·PBR·ROE·결산월은 재무 3표 저장본으로 계산한다 (저장본이 없으면 yfinance 값 그대로)."""
@@ -1468,6 +1478,7 @@ def get_summary(code, name):
         "valuation_basis": (f"현재 시가총액 / {v['ttm_end']} 기준 4분기누적 지배주주순이익, 현재 시가총액 / {v['equity_end']} 말 지배주주지분 "
                             f"(SEC filed 기준, basis=ttm)" if v.get("equity_end") else None),
         "roe": roe if roe is not None else base.get("roe"),
+        **_forward_fields(code, price),
         "fiscal_month": fin["fiscal_month"],
         "fs_div": "CFS", "fs_div_label": "연결",
         "financials_ready": True,
@@ -1718,7 +1729,7 @@ def monthly_prices(code):
 
 # ===== AI 계정 대응: 규칙이 못 잡은 핵심 항목만 Claude Haiku 에 묻고, 검증을 통과한 답을 대응표(source ai)에 저장 =====
 AI_MODEL = "claude-haiku-4-5-20251001"
-DAILY_AI_LIMIT = 200                                   # 하루 호출 한도 (earnings_tracker.DAILY_HAIKU_LIMIT 와 같은 방식)
+DAILY_AI_LIMIT = ai_budget.DEFAULT_LIMITS["concept_map"]                                   # 하루 호출 한도 (earnings_tracker.DAILY_HAIKU_LIMIT 와 같은 방식)
 AI_STATE_PATH = os.path.join(concept_map.DIR, "_ai_state.json")
 AI_MAX_CONCEPTS = 400                                  # 이보다 많으면 값이 0·빈 계정을 빼고 보낸다
 # 빈 항목이 있으면 AI 에 묻는 핵심 항목
@@ -1805,17 +1816,7 @@ def _ai_state():
 
 def _ai_allowed():
     """일일 한도 확인 + 카운터 증가 (earnings_tracker._check_and_increment_haiku_counter 와 같은 방식). 반환 (허용 여부, 오늘 호출 수)"""
-    with _ai_state_lock:
-        st = _ai_state()
-        today = date.today().isoformat()
-        if st.get("counter_date") != today:
-            st["counter_date"], st["counter_value"] = today, 0
-        if st.get("counter_value", 0) >= DAILY_AI_LIMIT:
-            return False, st["counter_value"]
-        st["counter_value"] = st.get("counter_value", 0) + 1
-        os.makedirs(concept_map.DIR, exist_ok=True)
-        _atomic_write_json(AI_STATE_PATH, st)
-        return True, st["counter_value"]
+    return ai_budget.take("concept_map")          # 공통 한도 모듈 (KR·US 계정 대응이 같은 카운터를 씀)
 
 
 AI_SYSTEM = """당신은 미국 SEC XBRL(us-gaap) 재무제표 계정 대응 전문가입니다.
@@ -1847,11 +1848,12 @@ def _ai_user_message(cache, keys, catalog):
             f"회사가 쓰는 계정 목록 ({len(catalog)}개; 계정 | 단위 | 최근 기간 말 | 최근 연간 값)\n{rows}")
 
 
-def _call_ai(system, user):
-    """Claude Haiku 호출 (earnings_tracker 의 클라이언트 재사용). 반환 (본문 텍스트, 입력 토큰, 출력 토큰). 키는 로그에 남기지 않는다."""
+def _call_ai(system, user, max_tokens=2000):
+    """Claude Haiku 호출 (earnings_tracker 의 클라이언트 재사용). 반환 (본문 텍스트, 입력 토큰, 출력 토큰). 키는 로그에 남기지 않는다.
+    max_tokens 는 긴 출력(컨콜 요약·번역)용. 기본 2000."""
     from earnings_tracker import _get_anthropic_client
     client = _get_anthropic_client()
-    res = client.messages.create(model=AI_MODEL, max_tokens=2000, system=system, messages=[{"role": "user", "content": user}])
+    res = client.messages.create(model=AI_MODEL, max_tokens=max_tokens, system=system, messages=[{"role": "user", "content": user}])
     text = "".join(getattr(b, "text", "") for b in res.content).strip()
     usage = getattr(res, "usage", None)
     return text, getattr(usage, "input_tokens", None), getattr(usage, "output_tokens", None)

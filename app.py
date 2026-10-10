@@ -22,6 +22,10 @@ import kr_financials
 import us_financials
 import stock_profile
 import stock_notes
+import stock_reports
+import ai_budget
+import earnings_calls
+import stock_peers
 import tg_inbox
 import dart_report
 import earnings_tracker
@@ -117,10 +121,35 @@ def fetch_batch_data(ticker_map):
 def index():
     return send_from_directory(".", "index.html")
 
+_main_market_cache = {"time": 0, "data": None}
+_main_market_lock = threading.Lock()
+
+
+def get_main_market_cached(ttl=60):
+    """핵심 지표 6개를 60초 캐시 (글로벌 마켓 탭과 관련 기업 비교표의 USD/KRW 가 같은 값을 쓰도록)"""
+    with _main_market_lock:
+        if _main_market_cache["data"] is not None and time.time() - _main_market_cache["time"] < ttl:
+            return _main_market_cache["data"]
+    data = fetch_batch_data(MAIN_TICKERS)
+    with _main_market_lock:
+        if data.get("usdkrw", {}).get("price"):
+            _main_market_cache.update(time=time.time(), data=data)
+    return data
+
+
+def usdkrw_rate():
+    """글로벌 마켓 탭이 받는 USD/KRW 재사용. 없으면 None"""
+    try:
+        p = get_main_market_cached().get("usdkrw", {}).get("price")
+        return p if p else None
+    except Exception:
+        return None
+
+
 @app.route("/api/market", methods=["GET"])
 def get_market_data():
     """핵심 지표 6개 (S&P500, NASDAQ, VIX, USD/KRW, WTI, Gold)"""
-    return jsonify(fetch_batch_data(MAIN_TICKERS))
+    return jsonify(get_main_market_cached())
 
 
 @app.route("/api/extra", methods=["GET"])
@@ -2196,6 +2225,185 @@ def stock_notes_list():
     return jsonify({"count": len(items), "items": items})
 
 
+@app.route("/api/stock/reports", methods=["GET"])
+def stock_reports_api():
+    """종목 리포트(텔레그램 리포트 DB, 최근 3개월): 상태·목록·집계. 처음 열면 뒤에서 검색·받기·AI 정리를 시작한다."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    try:
+        ai_limit = ai_budget.parse_limit_param(request.args.get("ai_limit"))   # "0" = AI 호출 없음, 빈 값 = 기본값
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
+    return jsonify(stock_reports.status(market, code, name, start=request.args.get("start", "1") != "0", ai_limit=ai_limit))
+
+
+@app.route("/api/stock/reports/refresh", methods=["POST"])
+def stock_reports_refresh_api():
+    """다시 검색·받기·정리 (새 리포트만). body: {market, code, ai_limit?}"""
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "KR"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    try:
+        ai_limit = ai_budget.parse_limit_param(body.get("ai_limit"))   # 0 = AI 호출 없음, 빈 값 = 기본값
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
+    job = stock_reports.start_job(market, code, name, ai_limit, refresh_search=True)
+    return jsonify({"ok": True, "job": job})
+
+
+@app.route("/api/stock/calls", methods=["GET"])
+def stock_calls_api():
+    """컨콜: 미국은 분기별 녹취록·요약·번역 상태(+요약 내용), 한국은 실적발표·컨콜 관련 리포트·텔레그램 목록.
+    미국은 start=1(기본)이면 최근 2개 분기 녹취록을 뒤에서 받는다(요약은 하지 않음. 요약은 summarize 로)."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    if market == "US":
+        if request.args.get("start", "1") != "0":
+            threading.Thread(target=earnings_calls.ensure_recent, args=(code, name, 2, False), daemon=True).start()
+        return jsonify(earnings_calls.status_us(code, name))
+    return jsonify(earnings_calls.status_kr(code, name))
+
+
+@app.route("/api/stock/calls/summarize", methods=["POST"])
+def stock_calls_summarize_api():
+    """요약 생성(한도 kind=call_summary). body: {market, code, quarter, limit?}  limit 0 = 호출 금지"""
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "US"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    if market != "US" or not body.get("quarter"):
+        return jsonify({"error": "bad_request", "message": "미국 종목과 quarter 가 필요합니다"}), 400
+    try:
+        limit = ai_budget.parse_limit_param(body.get("limit"))
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
+    if earnings_calls.transcript_state(code, body["quarter"])[0] != "ok":
+        f = earnings_calls.fetch_transcript(code, body["quarter"])
+        if f.get("status") != "ok":
+            return jsonify({"status": "no_transcript", "fetch": f})
+    res = earnings_calls.summarize(code, body["quarter"], name, limit=limit)
+    return jsonify(res)
+
+
+@app.route("/api/stock/calls/translate", methods=["POST"])
+def stock_calls_translate_api():
+    """전문 번역 시작(뒤에서, 진행률은 GET /api/stock/calls 의 translate_job). body: {market, code, quarter, limit?}"""
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "US"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    if market != "US" or not body.get("quarter"):
+        return jsonify({"error": "bad_request", "message": "미국 종목과 quarter 가 필요합니다"}), 400
+    try:
+        limit = ai_budget.parse_limit_param(body.get("limit"))
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
+    return jsonify({"job": earnings_calls.start_translate(code, body["quarter"], name, limit=limit)})
+
+
+@app.route("/api/stock/calls/transcript", methods=["GET"])
+def stock_calls_transcript_api():
+    """전문(세그먼트 배열). lang=en|ko"""
+    r, err = _resolve_stock(request.args.get("market", "US"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    q = request.args.get("quarter", "")
+    lang = request.args.get("lang", "en")
+    if market != "US" or not q:
+        return jsonify({"error": "bad_request", "message": "미국 종목과 quarter 가 필요합니다"}), 400
+    t = earnings_calls.transcript(code, q, lang)
+    if not t:
+        return jsonify({"error": "not_found", "message": "녹취록 없음" if lang == "en" else "번역 없음"}), 404
+    t["name"] = name
+    return jsonify(t)
+
+
+@app.route("/api/stock/peers", methods=["GET"])
+def stock_peers_api():
+    """관련 기업: confirmed·suggested·비교표(행 상태 포함)·컨콜 모음. 처음 열어 목록이 비어 있으면 AI 제안을 뒤에서 1회 (한도 kind=peers)."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    if request.args.get("suggest", "1") != "0":
+        st = stock_peers.load(market, code)
+        if not st["confirmed"] and not st["suggested"] and (st.get("ai_called_at") or "")[:10] != date.today().isoformat():
+            threading.Thread(target=stock_peers.suggest, args=(market, code, name), daemon=True).start()
+    return jsonify(stock_peers.status(market, code, name, corp_code, usdkrw_rate()))
+
+
+@app.route("/api/stock/peers/suggest", methods=["POST"])
+def stock_peers_suggest_api():
+    """AI 제안 (다시 제안 포함). body: {market, code, limit?}  limit 0 = 호출 금지"""
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "KR"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    try:
+        limit = ai_budget.parse_limit_param(body.get("limit"))
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
+    return jsonify(stock_peers.suggest(market, code, name, limit=limit, force=True))
+
+
+def _peer_args(body):
+    pm = (body.get("peer_market") or "").strip().upper()
+    pc = watchlist_store.normalize_code(pm, body.get("peer_code") or "")
+    return pm, pc
+
+
+@app.route("/api/stock/peers/confirm", methods=["POST"])
+def stock_peers_confirm_api():
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "KR"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    pm, pc = _peer_args(body)
+    st, e = stock_peers.confirm(market, code, pm, pc)
+    if e:
+        return jsonify({"error": "bad_request", "message": e}), 400
+    return jsonify({"ok": True, "confirmed": st["confirmed"], "suggested": st["suggested"]})
+
+
+@app.route("/api/stock/peers/add", methods=["POST"])
+def stock_peers_add_api():
+    """사용자가 직접 추가 (검색은 기존 /api/stock/search 재사용). body: {market, code, peer_market, peer_code, reason?}"""
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "KR"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    pm, pc = _peer_args(body)
+    st, e = stock_peers.add(market, code, pm, pc, body.get("reason") or "")
+    if e:
+        return jsonify({"error": "bad_request", "message": e}), 400
+    return jsonify({"ok": True, "confirmed": st["confirmed"]})
+
+
+@app.route("/api/stock/peers", methods=["DELETE"])
+def stock_peers_delete_api():
+    """confirmed 또는 suggested 에서 제거 + rejected 기록. body: {market, code, peer_market, peer_code}"""
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "KR"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    pm, pc = _peer_args(body)
+    st, removed = stock_peers.remove(market, code, pm, pc)
+    return jsonify({"ok": True, "removed": removed, "confirmed": st["confirmed"], "suggested": st["suggested"], "rejected": st["rejected"]})
+
+
 @app.route("/api/stock/prices", methods=["GET"])
 def stock_prices_api():
     """월말 종가 10년 (재무정보 차트의 주가·주가수익률 선). KR: stock_profile, US: us_financials (yfinance 월봉)"""
@@ -3280,6 +3488,7 @@ def _krfin_prefetch_run(reason):
     items = watchlist_store.load_watchlist()
     codes = [i["code"] for i in items if i["market"] == "KR"]
     us_codes = [i["code"] for i in items if i["market"] == "US"]
+    items_name = {i["code"]: i.get("name", "") for i in items if i["market"] == "US"}
     results = {}
     t0 = time.time()
     for code in codes:
@@ -3294,6 +3503,11 @@ def _krfin_prefetch_run(reason):
             results[code] += f", 공시 {disc['count']}건"
         except Exception as e:
             results[code] += f", 공시 실패({type(e).__name__})"
+        try:   # 증권사 리포트: 새 리포트 검색·받기·AI 정리
+            rj = stock_reports.run_blocking("KR", code, info.get("name", ""))
+            results[code] += f", 리포트 {rj.get('stage')}"
+        except Exception as e:
+            results[code] += f", 리포트 실패({type(e).__name__})"
     # 미국 종목: SEC companyfacts (하루 한 번) + 공시 목록
     for code in us_codes:
         key = f"US:{code}"
@@ -3312,6 +3526,19 @@ def _krfin_prefetch_run(reason):
             results[key] += f", 공시 {disc['count']}건"
         except Exception as e:
             results[key] += f", 공시 실패({type(e).__name__})"
+        try:   # 컨콜: 최근 2개 분기 녹취록 받기 + 요약 (Alpha Vantage 하루 25건·AI 요약 20건 한도 안에서, 넘으면 대기)
+            calls = earnings_calls.ensure_recent(code, items_name.get(code, ""), 2, True)
+            results[key] += ", 컨콜 " + " ".join(f"{c['quarter']}:{c.get('transcript')}/{c.get('summary', '-')}" for c in calls)
+        except Exception as e:
+            results[key] += f", 컨콜 실패({type(e).__name__})"
+    # 관련 기업(확정)의 재무 저장본·최근 컨콜 요약 (한도 안에서)
+    for it in items:
+        try:
+            got = stock_peers.prefetch_confirmed(it["market"], it["code"], it.get("name", ""))
+            if got:
+                results[f"peers:{it['market']}:{it['code']}"] = ", ".join(got)
+        except Exception as e:
+            results[f"peers:{it['market']}:{it['code']}"] = f"실패({type(e).__name__})"
     st = _krfin_prefetch_state()
     st.update(last_run_date=date.today().isoformat(), last_run_at=datetime.now().isoformat(timespec="seconds"),
               last_results=results)
