@@ -19,6 +19,7 @@ import pandas as pd
 import telegram_report
 import watchlist as watchlist_store
 import kr_financials
+import us_financials
 import stock_profile
 import stock_notes
 import tg_inbox
@@ -2021,15 +2022,21 @@ def delete_watchlist_api():
 
 @app.route("/api/stock/financials", methods=["GET"])
 def stock_financials_api():
-    """재무 3표 (KR: DART fnlttSinglAcntAll). 기다리지 않음: 저장본이 없으면 뒤에서 받아오며
+    """재무 3표 (KR: DART fnlttSinglAcntAll, US: SEC XBRL companyfacts). 기다리지 않음: 저장본이 없으면 뒤에서 받아오며
     status=fetching + progress 를 바로 돌려준다 (status: ready | fetching | failed)."""
     market = request.args.get("market", "KR").strip().upper()
     code = request.args.get("code", "").strip().upper().replace(".KS", "").replace(".KQ", "")
     years = request.args.get("years", "5")
-    if market != "KR":
-        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
     if years not in ("5", "10"):
         return jsonify({"error": "years 는 5 또는 10"}), 400
+    if market == "US":
+        r, err = _resolve_us_sec(code)
+        if err:
+            return err
+        code, name, cik10 = r
+        return jsonify(us_financials.get_financials_nowait(code, cik10, name, int(years)))
+    if market != "KR":
+        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
     info = load_dart_corp_map().get(code)
     if not info:
         return jsonify({"error": "not_found", "message": f"종목코드를 찾을 수 없음: {code}"}), 404
@@ -2055,13 +2062,28 @@ def _resolve_stock(market, code):
     return (market, c, info.get("name", ""), None), None
 
 
+def _resolve_us_sec(code):
+    """미국 티커 → (정규화 코드, 이름, 10자리 CIK) 또는 오류 응답. us_stock_map 또는 SEC 티커 목록에 있으면 된다."""
+    c = watchlist_store.normalize_code("US", code)
+    if not c:
+        return None, (jsonify({"error": "code 형식 오류"}), 400)
+    info = load_us_stock_map().get(c) or {}
+    cik10, title = us_financials.resolve_cik(c)
+    if not cik10:
+        return None, (jsonify({"error": "not_found", "message": f"SEC CIK 를 찾을 수 없음: {c}"}), 404)
+    return (c, info.get("name") or title or "", cik10), None
+
+
 @app.route("/api/stock/summary", methods=["GET"])
 def stock_summary_api():
-    """종목 요약: 현재가·등락률·시가총액·PER·PBR·ROE·결산월·연결/별도·워치리스트 여부"""
+    """종목 요약: 현재가·등락률·시가총액·PER·PBR·ROE·결산월·연결/별도·워치리스트 여부
+    (US 는 재무 3표 저장본으로 시가총액·PER·PBR·ROE·결산월 계산, 없으면 yfinance 값)"""
     r, err = _resolve_stock(request.args.get("market", ""), request.args.get("code", ""))
     if err:
         return err
     market, code, name, corp_code = r
+    if market == "US":
+        return jsonify(us_financials.get_summary(code, name))
     return jsonify(stock_profile.get_summary(market, code, name, corp_code))
 
 
@@ -2162,31 +2184,69 @@ def stock_notes_list():
 
 @app.route("/api/stock/prices", methods=["GET"])
 def stock_prices_api():
-    """월말 종가 10년 (KR, 재무정보 차트의 주가·주가수익률 선)"""
+    """월말 종가 10년 (재무정보 차트의 주가·주가수익률 선). KR: stock_profile, US: us_financials (yfinance 월봉)"""
     r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
     if err:
         return err
     market, code, name, corp_code = r
-    if market != "KR":
-        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
+    if market == "US":
+        return jsonify(us_financials.monthly_prices(code))
     return jsonify(stock_profile.kr_monthly_prices(code))
 
 
 @app.route("/api/stock/disclosures", methods=["GET"])
 def stock_disclosures_api():
-    """최근 1년 공시 목록 (KR). AI 요약 없음."""
+    """최근 1년 공시 목록 (KR: DART list.json, US: SEC submissions 10-K·10-Q·8-K·DEF 14A). AI 요약 없음."""
     r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
     if err:
         return err
     market, code, name, corp_code = r
-    if market != "KR":
-        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
+    if market == "US":
+        r2, err = _resolve_us_sec(code)
+        if err:
+            return err
+        code, name, cik10 = r2
+        try:
+            out = us_financials.disclosures(code, cik10)
+        except (us_financials.TransientError, us_financials.NoDataError) as e:
+            return jsonify({"error": "unavailable", "message": str(e)}), 503
+        out["name"] = name
+        return jsonify(out)
     try:
         out = stock_profile.kr_disclosures(code, corp_code)
     except kr_financials.TransientError as e:
         return jsonify({"error": "unavailable", "message": str(e)}), 503
     out["name"] = name
     return jsonify(out)
+
+
+@app.route("/api/stock/concept-map", methods=["GET", "PUT", "DELETE"])
+def stock_concept_map_api():
+    """미국 종목 계정 대응표. GET: 대응표 + 회사 계정 목록. PUT {market, code, item, concept|null}: 사용자 지정 뒤 재계산 응답.
+    DELETE {market, code, item}: 사용자 지정 삭제(AI 또는 규칙으로 되돌림) 뒤 재계산 응답. 한국은 다음 단계."""
+    body = request.get_json(silent=True) or {}
+    market = (body.get("market") or request.args.get("market") or "US").strip().upper()
+    code = body.get("code") or request.args.get("code") or ""
+    if market != "US":
+        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
+    r, err = _resolve_us_sec(code)
+    if err:
+        return err
+    code, name, cik10 = r
+    years = int(body.get("years") or request.args.get("years") or 5)
+    if request.method == "GET":
+        return jsonify(us_financials.concept_map_view(code))
+    item = (body.get("item") or "").strip()
+    if not item:
+        return jsonify({"error": "item 이 필요합니다"}), 400
+    try:
+        if request.method == "PUT":
+            concept = body.get("concept")
+            concept = concept.strip() if isinstance(concept, str) and concept.strip() else None
+            return jsonify(us_financials.set_user_concept(code, item, concept, years, name))
+        return jsonify(us_financials.delete_user_concept(code, item, years, name))
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
 
 
 @app.route("/api/dart/company", methods=["GET"])
@@ -3195,7 +3255,9 @@ def _krfin_prefetch_run(reason):
     st.update(last_start=datetime.now().isoformat(timespec="seconds"), last_reason=reason)
     watchlist_store.atomic_write_json(_KRFIN_PREFETCH_STATE, st)
     cmap = load_dart_corp_map()
-    codes = [i["code"] for i in watchlist_store.load_watchlist() if i["market"] == "KR"]
+    items = watchlist_store.load_watchlist()
+    codes = [i["code"] for i in items if i["market"] == "KR"]
+    us_codes = [i["code"] for i in items if i["market"] == "US"]
     results = {}
     t0 = time.time()
     for code in codes:
@@ -3210,11 +3272,29 @@ def _krfin_prefetch_run(reason):
             results[code] += f", 공시 {disc['count']}건"
         except Exception as e:
             results[code] += f", 공시 실패({type(e).__name__})"
+    # 미국 종목: SEC companyfacts (하루 한 번) + 공시 목록
+    for code in us_codes:
+        key = f"US:{code}"
+        if not us_financials.needs_fetch(code):
+            results[key] = "done (오늘 확인함)"
+        else:
+            job = us_financials.fetch_blocking(code)
+            results[key] = job["state"] + (f" ({job['error']})" if job.get("error") else "") + f" {job.get('done', 0)}/{job.get('total')}"
+        try:   # 규칙이 못 잡은 핵심 항목이 있으면 AI 대응 (조건을 만족할 때만 호출되므로 대부분 0건)
+            ai = us_financials.ai_fill(code)
+            results[key] += f", AI {'호출' if ai.get('called') else '없음'}" + (f"(저장 {len(ai.get('accepted') or {})})" if ai.get("called") else "")
+        except Exception as e:
+            results[key] += f", AI 실패({type(e).__name__})"
+        try:
+            disc = us_financials.disclosures(code, refresh=True)
+            results[key] += f", 공시 {disc['count']}건"
+        except Exception as e:
+            results[key] += f", 공시 실패({type(e).__name__})"
     st = _krfin_prefetch_state()
     st.update(last_run_date=date.today().isoformat(), last_run_at=datetime.now().isoformat(timespec="seconds"),
               last_results=results)
     watchlist_store.atomic_write_json(_KRFIN_PREFETCH_STATE, st)
-    print(f"[kr_financials] 미리 받기 완료({reason}): {len(codes)}종목 {time.time() - t0:.0f}s "
+    print(f"[kr_financials] 미리 받기 완료({reason}): 한국 {len(codes)}종목, 미국 {len(us_codes)}종목 {time.time() - t0:.0f}s "
           f"실패 {sum(1 for v in results.values() if not v.startswith('done') or '공시 실패' in v)}건", flush=True)
 
 
@@ -3256,10 +3336,15 @@ threading.Thread(target=_krfin_prefetch_loop, daemon=True).start()
 
 
 def _krfin_prefetch_new():
-    """워치리스트 한국 종목 중 저장본이 없는 종목을 뒤에서 받기 시작 (추가 직후)."""
+    """워치리스트 종목 중 저장본이 없는 종목을 뒤에서 받기 시작 (추가 직후). 한국은 DART, 미국은 SEC companyfacts."""
     try:
         cmap = load_dart_corp_map()
         for i in watchlist_store.load_watchlist():
+            if i["market"] == "US":
+                if not os.path.exists(us_financials._cache_path(i["code"])):
+                    us_financials.start_fetch(i["code"])
+                    print(f"[us_financials] 워치리스트 추가 종목 받기 시작: {i['code']}", flush=True)
+                continue
             if i["market"] != "KR":
                 continue
             if os.path.exists(kr_financials._cache_path(i["code"])) or os.path.exists(kr_financials._legacy_path(i["code"])):

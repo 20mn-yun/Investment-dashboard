@@ -112,17 +112,17 @@ def kr_summary(code, name, corp_code):
             fin = kr_financials.compute(cache, 5, name)
         except Exception as e:
             print(f"[stock_profile] {code} 재무 계산 실패: {type(e).__name__}: {e}", flush=True)
-    roe = ni_owner = eq_owner = last = None
+    roe = last = None
     if fin and fin["periods"]["ttm"]:
         last = fin["periods"]["ttm"][-1]
         roe = fin["metrics"]["ttm"].get(last, {}).get("roe")
-        ni_owner = fin["statements"]["IS"]["items"]["net_income_owner"]["ttm"].get(last)
-        eq_owner = fin["statements"]["BS"]["items"]["equity_owner"]["ttm"].get(last)
 
-    per = round(mcap / ni_owner, 2) if mcap and ni_owner and ni_owner > 0 else None
-    pbr = round(mcap / eq_owner, 2) if mcap and eq_owner and eq_owner > 0 else None
-    val_basis = (f"현재 시가총액 / {last} 4분기누적 지배주주순이익, 현재 시가총액 / {last} 말 지배주주지분"
-                 if fin and fin["periods"]["ttm"] else None)
+    # PER/PBR: 스크리너·밴드와 같은 공통 함수 (오늘 기준 공시된 보고서만, TTM 지배주주순이익 / 최근 분기 말 지배주주지분)
+    import valuation_ttm
+    v = valuation_ttm.valuation_asof(code) if fin else {"ttm_ni": None, "equity": None, "ttm_end": None, "equity_end": None}
+    per, pbr = valuation_ttm.per_pbr(mcap, v)
+    val_basis = (f"현재 시가총액 / {v['ttm_end']} 기준 4분기누적 지배주주순이익, 현재 시가총액 / {v['equity_end']} 말 지배주주지분 (공시 시점 기준, basis=ttm)"
+                 if fin and v.get("equity_end") else None)
 
     return {
         "market": "KR", "code": code, "name": name,

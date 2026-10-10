@@ -172,10 +172,90 @@ def _position(value, vals):
     count = sum(1 for v in vals if v <= value)
     return round(count / len(vals) * 100, 1)
 
-def collect_valuations(universe, bands, wics, sleep=0.3, limit=None):
+def _shares_map():
+    """현재 상장주식수(주) — KIS 종목마스터 (stock_profile 요약과 같은 출처)"""
+    m = {}
+    for market, col in (("KOSPI", "상장주수"), ("KOSDAQ", "상장 주수(천)")):
+        df = download_kr_stock_master(market)
+        for _, row in df.iterrows():
+            try:
+                n = float(str(row.get(col, "")).replace(",", "").strip())
+            except ValueError:
+                continue
+            if n > 0:
+                m[str(row["단축코드"]).strip()] = int(n * 1000)
+    return m
+
+
+def _corp_map():
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dart_corp_map.json"), "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _is_quota(err):
+    return "status 020" in (err or "")
+
+
+def ensure_financials(code, corp_code, years=1):
+    """kr_financials 저장본이 없거나 모자라면 받아온다(호출 간격·재시도는 kr_financials 규칙). 반환: ok | quota | failed:<이유>"""
+    import kr_financials
+    if not kr_financials.needs_fetch(code, years):
+        return "ok"
+    job = kr_financials.fetch_blocking(code, corp_code, years)
+    if job["state"] == "done":
+        return "ok"
+    err = job.get("error") or "unknown"
+    return "quota" if _is_quota(err) else f"failed:{err}"
+
+
+def prefetch_financials(universe, years=1, workers=3, log=print):
+    """저장본 없는 종목을 미리 받는다. 한도 초과(020)를 만나면 남은 종목은 건너뛴다. 반환: {code: 상태}"""
+    import kr_financials
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    corp = _corp_map()
+    todo = [u["code"] for u in universe if kr_financials.needs_fetch(u["code"], years)]
+    log(f"[screener] 저장본 받기: {len(todo)}종목 (종목당 약 19회 호출, {workers}개 동시) 예상 {len(todo) * 19 * 0.9 / workers / 60:.0f}분")
+    status, quota_hit = {}, False
+    t0 = time.time()
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {}
+        for code in todo:
+            info = corp.get(code)
+            if not info:
+                status[code] = "failed:corp_code 없음"
+                continue
+            futs[ex.submit(ensure_financials, code, info["corp_code"], years)] = code
+        for n, fut in enumerate(as_completed(futs), 1):
+            code = futs[fut]
+            try:
+                status[code] = fut.result()
+            except Exception as e:
+                status[code] = f"failed:{type(e).__name__}"
+            if status[code] == "quota" and not quota_hit:
+                quota_hit = True
+                log(f"[screener] DART 일일 한도 초과 감지 ({code}) — 남은 종목은 이번 실행에서 빈 값")
+                for f in futs:
+                    f.cancel()
+            if n % 25 == 0:
+                log(f"[screener] 받기 진행 {n}/{len(futs)} ({time.time() - t0:.0f}s)")
+    for f, code in futs.items():
+        if code not in status:
+            status[code] = "quota" if quota_hit else "failed:cancelled"
+    log(f"[screener] 받기 완료: ok {sum(1 for v in status.values() if v == 'ok')}, "
+        f"quota {sum(1 for v in status.values() if v == 'quota')}, 실패 {sum(1 for v in status.values() if v.startswith('failed'))} ({time.time() - t0:.0f}s)")
+    return status
+
+
+def collect_valuations(universe, bands, wics, sleep=0.3, limit=None, fetch_status=None, shares_map=None):
+    """PER = 현재 시가총액 / 오늘 기준 TTM 지배주주순이익, PBR = 현재 시가총액 / 최근 분기 말 지배주주지분 (valuation_ttm)."""
+    import valuation_ttm
+    from datetime import date as _date
     rows = universe if limit is None else universe[:limit]
     total = len(rows)
-    items = []
+    shares_map = shares_map if shares_map is not None else _shares_map()
+    fetch_status = fetch_status or {}
+    today = _date.today()
+    items, per_missing = [], {}
     for i, u in enumerate(rows):
         code = u["code"]
         price = _safe_price(code)
@@ -184,22 +264,26 @@ def collect_valuations(universe, bands, wics, sleep=0.3, limit=None):
         feps = fwd.get("eps")
         fdps = fwd.get("dps") or 0
 
-        band = bands.get(code)
-        latest_eps = band["latest_eps"] if band else None
-        latest_bps = band["latest_bps"] if band else None
-
-        trailing_per = _ratio(price, latest_eps)
-        trailing_pbr = _ratio(price, latest_bps)
+        v = valuation_ttm.valuation_asof(code, today)
+        shares_now = shares_map.get(code)
+        mcap = price * shares_now if price and shares_now else None
+        trailing_per, trailing_pbr = valuation_ttm.per_pbr(mcap, v)
+        if trailing_per is None:
+            st = fetch_status.get(code, "")
+            per_missing[code] = ("no_cache_quota" if st == "quota" else "no_cache_failed" if st.startswith("failed") else "no_cache") \
+                if v["reason"] == "no_cache" else (v["reason"] or ("loss" if v["ttm_ni"] is not None and v["ttm_ni"] <= 0 else
+                                                   "no_price" if not price else "no_shares" if not shares_now else "unknown"))
+        latest_bps = (v["equity"] / shares_now) if v.get("equity") and shares_now else None
         fper = _ratio(price, feps)
 
         fbps_dart = None
         if latest_bps is not None and feps is not None:
-            fbps_dart = latest_bps + feps - fdps
+            fbps_dart = latest_bps + feps - fdps        # 출발점: 최근 분기 말 BPS
         fpbr = _ratio(price, fbps_dart)
 
+        band = bands.get(code)
         per_vals = [s["per"] for s in band["series"] if s["per"] is not None] if band else []
         pbr_vals = [s["pbr"] for s in band["series"] if s["pbr"] is not None] if band else []
-
         per_band = band["per_band"] if band else None
         pbr_band = band["pbr_band"] if band else None
 
@@ -225,23 +309,41 @@ def collect_valuations(universe, bands, wics, sleep=0.3, limit=None):
         if (i + 1) % 50 == 0:
             print(f"  진행 {i+1}/{total}", flush=True)
         time.sleep(sleep)
-    return items
+    return items, per_missing
 
-def build_and_save(min_cap_eok=3000, sleep=0.3, limit=None):
+
+def build_and_save(min_cap_eok=3000, sleep=0.3, limit=None, prefetch=True):
     universe = get_universe(min_cap_eok)
+    rows = universe if limit is None else universe[:limit]
+    fetch_status = prefetch_financials(rows, years=1) if prefetch else {}
     bands = load_bands()
     wics = _load_wics_cache()
-    items = collect_valuations(universe, bands, wics, sleep=sleep, limit=limit)
+    shares_map = _shares_map()
+    items, per_missing = collect_valuations(rows, bands, wics, sleep=sleep, limit=None, fetch_status=fetch_status, shares_map=shares_map)
+    failed = sorted(c for c, st in fetch_status.items() if st != "ok")
+    if failed:
+        print(f"[screener] 저장본 받기 실패 {len(failed)}종목: {failed[:30]}{' ...' if len(failed) > 30 else ''}", flush=True)
     payload = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "min_cap_eok": min_cap_eok,
         "count": len(items),
         "items": items,
+        "basis": "ttm",                       # PER/PBR 기준: 최근 4개 분기 합계(공시 시점 기준), PBR 은 최근 분기 말 지배주주지분
+        "bands_generated_at": None,
+        "fetch_failed": {c: fetch_status[c] for c in failed},
+        "per_missing": per_missing,           # PER 빈 값 이유: no_cache(_quota/_failed) | loss | insufficient_quarters | not_yet_filed | ...
     }
+    try:
+        with open(os.path.join("cache", "valuation_bands.json"), "r", encoding="utf-8") as f:
+            payload["bands_generated_at"] = json.load(f).get("generated_at")
+    except Exception:
+        pass
     os.makedirs("cache", exist_ok=True)
     path = os.path.join("cache", "valuation_screener.json")
-    with open(path, "w", encoding="utf-8") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
     return payload, path
 
 if __name__ == "__main__":
@@ -249,6 +351,8 @@ if __name__ == "__main__":
     if limit <= 0:
         limit = None
     payload, path = build_and_save(3000, sleep=0.3, limit=limit)
-    print("저장:", path, "/ 수집:", payload["count"], "종목")
-    for it in payload["items"]:
+    print("저장:", path, "/ 수집:", payload["count"], "종목 / basis:", payload["basis"],
+          "/ PER 있음:", sum(1 for it in payload["items"] if it["per"] is not None),
+          "/ PER 빈 값 이유:", json.dumps({k: sum(1 for v in payload["per_missing"].values() if v == k) for k in set(payload["per_missing"].values())}, ensure_ascii=False))
+    for it in payload["items"][:5]:
         print(json.dumps(it, ensure_ascii=False))

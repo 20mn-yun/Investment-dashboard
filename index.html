@@ -1581,6 +1581,28 @@
             border-right: 1px solid var(--border); min-width: 130px;
         }
         .sv-table td.sv-calc { font-style: italic; color: var(--text-muted); }
+        /* 계정 대응 표시 (미국 종목): AI·수동 배지, 확인 필요(low)는 눈에 띄는 색 */
+        .sv-cm-name { cursor: pointer; }
+        .sv-cm-name:hover { text-decoration: underline dotted; }
+        .sv-cm-badge { display: inline-block; margin-left: 5px; padding: 0 4px; border-radius: 3px; font-size: 10px; font-weight: 600; line-height: 15px; vertical-align: 1px; }
+        .sv-cm-ai { background: #e3ecfa; color: #2b5fb3; }
+        .sv-cm-user { background: #e6f4ea; color: #1e7b3a; }
+        .sv-cm-low { background: #ffe8b3; color: #9a5b00; }
+        .sv-cm-none { background: #eee; color: #777; font-weight: 400; }
+        .sv-cm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .sv-cm-box { background: var(--bg-panel, #fff); color: var(--text); border-radius: 10px; width: min(680px, 94vw); max-height: 86vh; display: flex; flex-direction: column; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
+        .sv-cm-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .sv-cm-head b { font-size: 14px; }
+        .sv-cm-cur { padding: 8px 16px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+        .sv-cm-tools { padding: 8px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .sv-cm-tools input { flex: 1; min-width: 180px; }
+        .sv-cm-list { overflow: auto; padding: 0 8px 10px; font-size: 12px; }
+        .sv-cm-row { display: grid; grid-template-columns: 1fr 70px 90px 130px; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; align-items: center; }
+        .sv-cm-row:hover { background: var(--bg-hover, rgba(0,0,0,0.05)); }
+        .sv-cm-row.sv-cm-sel { background: #e3ecfa; }
+        .sv-cm-row .c { word-break: break-all; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+        .sv-cm-row .v { text-align: right; font-variant-numeric: tabular-nums; }
+        .sv-cm-close { cursor: pointer; font-size: 18px; line-height: 1; color: var(--text-muted); }
         .sv-table tr.sv-key td { font-weight: bold; }
         .sv-table tr.sv-lv1 td:first-child { padding-left: 22px; }
         .sv-table tr.sv-lv2 td:first-child { padding-left: 36px; color: var(--text-muted); }
@@ -1638,6 +1660,7 @@
         .sv-disc-item a { color: var(--text); text-decoration: none; flex: 1; }
         .sv-disc-item a:hover { color: var(--accent); text-decoration: underline; }
         .sv-disc-filer { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+        .sv-disc-form { color: var(--text-muted); font-size: 11px; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; white-space: nowrap; align-self: center; }
         @media (max-width: 1024px) {
             .sv-chart-grid { grid-template-columns: 1fr; }
             .sv-band-grid { grid-template-columns: 1fr; }
@@ -2180,6 +2203,7 @@
 <div class="tab-content" id="tab-valuation">
     <div class="leaders-loading" id="val-loading">데이터를 불러오는 중...</div>
     <div id="val-content" style="display:none;">
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">PER·PBR은 최근 4개 분기 합계(공시 시점 기준) 기준입니다. 밴드도 같은 기준으로 다시 계산되었습니다.</div>
         <div class="stk-filters">
             <div id="val-sector-dd" style="position:relative; display:inline-block;">
                 <button type="button" id="val-sector-btn" onclick="toggleValSectorMenu(event)" style="background:#f8f9fa; color:#1f2937; border:1px solid #d0d7de; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:13px;">섹터: 전체 ▾</button>
@@ -2235,7 +2259,7 @@
 
         <div class="data-table sv-section">
             <div class="section-title">재무정보</div>
-            <div id="sv-fin-na" class="sv-empty" style="display:none;">다음 단계에서 제공</div>
+            <div id="sv-fin-na" class="sv-empty" style="display:none;"></div>
             <div id="sv-fin">
                 <div class="sv-controls">
                     <div class="sv-btn-group" id="sv-fin-table">
@@ -2272,6 +2296,18 @@
                     <div id="sv-table-view" style="display:none;">
                         <div style="display:flex; justify-content:flex-end; margin:10px 0 6px;"><span class="period-btn" id="sv-copy">표 복사하기</span></div>
                         <div class="sv-scroll" style="margin-bottom:6px;"><table class="sv-table" id="sv-detail"></table></div>
+                        <div id="sv-cm-modal" class="sv-cm-modal" style="display:none;" onclick="if (event.target === this) svCmClose()">
+                            <div class="sv-cm-box">
+                                <div class="sv-cm-head"><b id="sv-cm-title">계정 지정</b><span class="sv-cm-close" onclick="svCmClose()" title="닫기">✕</span></div>
+                                <div class="sv-cm-cur" id="sv-cm-cur"></div>
+                                <div class="sv-cm-tools">
+                                    <input type="text" id="sv-cm-search" class="keyword-input" placeholder="계정 이름 검색 (예: Interest, Payable)" autocomplete="off" oninput="svCmRenderList()">
+                                    <span class="period-btn" onclick="svCmSet(null)" title="이 항목은 이 회사에 해당 계정이 없음">해당 없음</span>
+                                    <span class="period-btn" id="sv-cm-revert" onclick="svCmDelete()" title="사용자 지정을 지우고 AI 또는 규칙 결과로">되돌리기</span>
+                                </div>
+                                <div class="sv-cm-list" id="sv-cm-list"></div>
+                            </div>
+                        </div>
                         <div class="sv-note">굵은 글씨는 핵심 항목, 기울임 글씨는 계산값입니다 (마우스를 올리면 계산식). 금액 단위: 원 (조·억 표기)</div>
                         <div class="section-title" style="margin-top:14px;">지표</div>
                         <div class="sv-scroll"><table class="sv-table" id="sv-metrics"></table></div>
@@ -8184,9 +8220,17 @@
         if (a >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
         return '$' + v.toLocaleString();
     }
+    // 통화 분기: 미국 종목은 달러 표기, 한국 표기는 그대로
+    function svIsUsd() { return sv.market === 'US'; }
+    function svMoney(v) { return svIsUsd() ? svUsd(v) : svWon(v); }                       // 전체 금액 (상세 표·요약)
+    function svPerShare(v) { return v == null ? '-' : svIsUsd() ? '$' + v.toFixed(2) : Math.round(v).toLocaleString() + '원'; }   // 주당 값
+    function svShares(v) {                                                                   // 주식수 (미국 표기)
+        if (v == null) return '-';
+        return v >= 1e9 ? (v / 1e9).toFixed(1) + 'B주' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M주' : Math.round(v).toLocaleString() + '주';
+    }
     function svVal(key, v) {
         if (v == null) return '-';
-        return SV_EPS.has(key) ? Math.round(v).toLocaleString() + '원' : svWon(v);
+        return SV_EPS.has(key) ? svPerShare(v) : svMoney(v);
     }
     function svPct(v, colored) {
         if (v == null) return '-';
@@ -8303,21 +8347,19 @@
         svLoadSummary();
         svLoadNotes();
         const kr = market === 'KR';
-        document.getElementById('sv-fin').style.display = kr ? '' : 'none';
-        document.getElementById('sv-fin-na').style.display = kr ? 'none' : 'block';
+        document.getElementById('sv-fin').style.display = '';
+        document.getElementById('sv-fin-na').style.display = 'none';
         document.getElementById('sv-band').style.display = kr ? '' : 'none';
         const bandNa = document.getElementById('sv-band-na');
         bandNa.style.display = kr ? 'none' : 'block';
-        bandNa.textContent = kr ? '' : '다음 단계에서 제공';
+        bandNa.textContent = kr ? '' : '밴드 자료 없음(미국은 준비 중)';
+        svLoadFinancials();
+        svLoadPrices();
+        svLoadDisc();
         if (kr) {
-            svLoadFinancials();
-            svLoadPrices();
             svLoadBand();
-            svLoadDisc();
-        } else {
+        } else {   // 밴드 API 는 미국 종목으로 부르지 않음
             ['sv-per-band', 'sv-pbr-band'].forEach(id => { const c = Chart.getChart(id); if (c) c.destroy(); });
-            document.getElementById('sv-disc').innerHTML = '<div class="sv-empty">다음 단계에서 제공</div>';
-            document.getElementById('sv-disc-more').style.display = 'none';
         }
     }
 
@@ -8334,7 +8376,7 @@
             sv.summary = { error: '요약을 불러오지 못했습니다' };
         }
         svRenderSummary();
-        if (sv.fin && sv.mode === 'chart' && sv.market === 'KR' && sv.summary.shares) svRenderCharts();
+        if (sv.fin && sv.mode === 'chart' && sv.summary.shares) svRenderCharts();
     }
 
     function svRenderSummary() {
@@ -8351,14 +8393,15 @@
         box.innerHTML = head + `<span class="sv-price">${price}</span> ${ch}
             <span class="period-btn" id="sv-wl-btn" onclick="svToggleWatchlist()">${s.in_watchlist ? '★ 워치리스트에서 빼기' : '☆ 워치리스트에 추가'}</span></div>
             <div class="sv-stats">
-                ${stat('시가총액', usd ? svUsd(s.market_cap) : svWon(s.market_cap), s.market_cap_basis)}
+                ${stat('시가총액', usd ? svUsd(s.market_cap) : svWon(s.market_cap),
+                       usd && s.shares ? `${s.market_cap_basis || ''} · 주식수 ${svShares(s.shares)}` : s.market_cap_basis)}
                 ${stat('PER', s.per == null ? '-' : s.per.toFixed(1) + '배', s.valuation_basis)}
                 ${stat('PBR', s.pbr == null ? '-' : s.pbr.toFixed(2) + '배', s.valuation_basis)}
-                ${stat('ROE', s.roe == null ? '-' : s.roe.toFixed(1) + '%', sv.market === 'KR' ? '4분기누적 지배주주순이익 / 평균 지배주주지분' : 'yfinance')}
+                ${stat('ROE', s.roe == null ? '-' : s.roe.toFixed(1) + '%', sv.market === 'KR' || s.financials_ready ? '4분기누적 지배주주순이익 / 평균 지배주주지분' : 'yfinance')}
                 ${stat('결산월', s.fiscal_month ? s.fiscal_month + '월' : '-')}
                 ${stat('연결/별도', s.fs_div_label || '-')}
             </div>
-            ${sv.market === 'KR' && !s.financials_ready ? '<div class="sv-note">재무 3표를 받아오는 중이라 PER·PBR·ROE가 비어 있을 수 있습니다.</div>' : ''}`;
+            ${!s.financials_ready ? '<div class="sv-note">재무 3표를 받아오는 중이라 PER·PBR·ROE가 비어 있을 수 있습니다.</div>' : ''}`;
     }
 
     async function svToggleWatchlist() {
@@ -8388,7 +8431,7 @@
         if (!sv.fin) { status.innerHTML = '<div class="sv-note">불러오는 중...</div>'; document.getElementById('sv-fin-content').style.display = 'none'; }
         let d;
         try {
-            const res = await fetch(API_BASE + `/api/stock/financials?market=KR&code=${encodeURIComponent(sv.code)}&years=${sv.years}`);
+            const res = await fetch(API_BASE + `/api/stock/financials?market=${sv.market}&code=${encodeURIComponent(sv.code)}&years=${sv.years}`);
             d = await res.json();
             if (!res.ok) d = { status: 'failed', error: d.message || d.error || ('HTTP ' + res.status) };
         } catch (e) {
@@ -8398,7 +8441,9 @@
         if (d.status === 'fetching') {
             const p = d.progress || {};
             const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
-            status.innerHTML = `<div class="sv-note">DART에서 재무제표를 받아오는 중... ${p.total ? `${p.done} / ${p.total} 보고서 (${pct}%)` : '준비 중'}</div>`;
+            status.innerHTML = svIsUsd()
+                ? `<div class="sv-note">SEC에서 재무제표를 받아오는 중... ${p.total ? `${p.done} / ${p.total} (${pct}%)` : '준비 중'}</div>`
+                : `<div class="sv-note">DART에서 재무제표를 받아오는 중... ${p.total ? `${p.done} / ${p.total} 보고서 (${pct}%)` : '준비 중'}</div>`;
             sv.pollTimer = setTimeout(svLoadFinancials, 3000);
             return;
         }
@@ -8424,7 +8469,7 @@
     async function svLoadPrices() {
         const t = sv.token;
         try {
-            const res = await fetch(API_BASE + '/api/stock/prices?market=KR&code=' + encodeURIComponent(sv.code));
+            const res = await fetch(API_BASE + `/api/stock/prices?market=${sv.market}&code=` + encodeURIComponent(sv.code));
             const d = await res.json();
             if (t !== sv.token) return;
             sv.prices = res.ok && d.prices && Object.keys(d.prices).length ? d.prices : null;
@@ -8503,15 +8548,17 @@
         return rows;
     }
 
-    function svFmtCell(id, v) { return v == null ? '-' : (SV_EPS.has(id) ? Math.round(v).toLocaleString() + '원' : svWon(v)); }
+    function svFmtCell(id, v) { return v == null ? '-' : (SV_EPS.has(id) ? svPerShare(v) : svMoney(v)); }
     function svQLabel(lb) {
         const f = sv.fin;
         const [y, m] = lb.split('.').map(Number);
         const mt = f.fiscal_month || 12;
         const fy = m <= mt ? y : y + 1;
+        const q = Math.floor(((m - mt - 1 + 24) % 12) / 3) + 1;
+        if (svIsUsd())   // 미국: 연결/별도 구분 없이 회계연도 분기만 (예: FY26 Q2)
+            return `(${sv.view === 'annual' ? `FY${String(fy).slice(2)}` : `FY${String(fy).slice(2)} Q${q}`})`;
         const fs = ((f.fs_div_by_period || {})[sv.view === 'annual' ? 'annual' : 'quarter'] || {})[lb];
         const fsl = fs === 'CFS' ? '연결' : fs === 'OFS' ? '별도' : '';
-        const q = Math.floor(((m - mt - 1 + 24) % 12) / 3) + 1;
         const name = sv.view === 'annual' ? `FY${String(fy).slice(2)}` : `${String(fy).slice(2)}Q${q}`;
         return `(${name}${fsl ? ', ' + fsl : ''})`;
     }
@@ -8522,7 +8569,16 @@
         if (!f || f.status !== 'ready') { content.style.display = 'none'; return; }
         // 경고·안내
         const notes = [];
-        if (f.fs_div_label) notes.push(`${f.fs_div_label} 기준 · 결산 ${f.fiscal_month}월 · 단위 원`);
+        if (f.fs_div_label) notes.push(`${f.fs_div_label} 기준 · 결산 ${f.fiscal_month}월 · 단위 ${svIsUsd() ? 'USD' : '원'}`);
+        const cms = svIsUsd() ? f.concept_map_summary : null;   // AI 가 정한 항목 수 (한국은 다음 단계)
+        if (cms && (cms.ai || cms.user))
+            notes.push(`AI가 정한 항목 ${cms.ai || 0}개, 확인 필요 ${cms.ai_low || 0}개${cms.user ? `, 수동 지정 ${cms.user}개` : ''} — 표 보기에서 항목 이름을 누르면 계정을 바꿀 수 있습니다`);
+        const sa = svIsUsd() ? f.split_adjustment : null;
+        if (sa && sa.splits && sa.splits.length) {
+            const last = sa.splits[sa.splits.length - 1];
+            const n = ((sa.shares_periods || {})[sv.view === 'annual' ? 'annual' : 'quarter'] || []).length;
+            if (n) notes.push(`주식분할 ${last.date} ${last.ratio}:1 반영 — 분할 전 ${n}개 기간의 주식수·주당이익을 현재 주식수 기준으로 환산`);
+        }
         const missing = (f.missing || []).filter(m => m.sheet === sv.table);
         if ((f.missing || []).length >= 10)
             notes.push('금융회사 등 일반 기업과 양식이 달라 빈 항목이 많습니다 (빈 칸은 "-").');
@@ -8559,15 +8615,24 @@
             Object.values(it[sv.view] || {}).forEach(v => { if (v != null && Math.abs(v) > mx) mx = Math.abs(v); });
         });
         sv.unitMax = mx;
-        sv.unit = mx >= 1e12 ? 'jo' : 'eok';
+        // 미국: 10억 달러 이상이면 B, 아니면 M. 한국: 1조 이상이면 조, 아니면 억
+        sv.unit = svIsUsd() ? (mx >= 1e9 ? 'B' : 'M') : (mx >= 1e12 ? 'jo' : 'eok');
     }
-    function svUnitName() { return sv.unit === 'jo' ? '조원' : '억원'; }
+    function svUnitName() { return sv.unit === 'B' ? '$B' : sv.unit === 'M' ? '$M' : sv.unit === 'jo' ? '조원' : '억원'; }
+    function svAmtUsd(v) {        // 미국 금액: 표 단위(B/M)로 소수 한 자리. B 단위에서 1조 달러 이상은 T
+        const sign = v < 0 ? '-' : '', a = Math.abs(v);
+        if (sv.unit === 'M') return sign + '$' + (a / 1e6).toFixed(1) + 'M';
+        if (a >= 1e12) return sign + '$' + (a / 1e12).toFixed(1) + 'T';
+        return sign + '$' + (a / 1e9).toFixed(1) + 'B';
+    }
     function svAmt(v, digits) {   // 단위에 맞춘 금액 표기 (툴팁·요약 표)
         if (v == null) return '-';
+        if (svIsUsd()) return svAmtUsd(v);
         if (sv.unit === 'jo') return (v / 1e12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '조';
         return Math.round(v / 1e8).toLocaleString() + '억';
     }
     function svAxisAmt(v) {       // 축 눈금
+        if (svIsUsd()) return svAmtUsd(v);
         if (sv.unit === 'jo') return (v / 1e12).toLocaleString(undefined, { maximumFractionDigits: 1 }) + '조';
         return Math.round(v / 1e8).toLocaleString() + '억';
     }
@@ -8575,7 +8640,7 @@
         if (v == null) return '-';
         if (unit === 'pct') return v.toFixed(1) + '%';
         if (unit === 'turn') return v.toFixed(2) + '회';
-        if (unit === 'price') return Math.round(v).toLocaleString() + '원';
+        if (unit === 'price') return svIsUsd() ? '$' + v.toFixed(2) : Math.round(v).toLocaleString() + '원';
         return svAmt(v);
     }
     function svColors() {
@@ -8933,7 +8998,7 @@
                 order: s.type === 'line' ? 0 : 1,
                 unit: s.unit,
             }));
-            const axisTick = unit => v => unit === 'pct' ? v + '%' : unit === 'turn' ? v + '회' : unit === 'price' ? Math.round(v).toLocaleString() + '원' : svAxisAmt(v);
+            const axisTick = unit => v => unit === 'pct' ? v + '%' : unit === 'turn' ? v + '회' : unit === 'price' ? (svIsUsd() ? '$' + v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : Math.round(v).toLocaleString() + '원') : svAxisAmt(v);
             const scales = {
                 x: { stacked: !!d.stacked, grid: { display: false }, ticks: xTicks },
                 y: { stacked: !!d.stacked, position: 'left', ticks: { color: C.muted, font: { size: 10 }, callback: axisTick(units.L) },
@@ -8967,7 +9032,11 @@
         let html = '<thead><tr><th>항목</th>' + periods.map(lb => `<th>${lb}<small>${svQLabel(lb)}</small></th>`).join('') + '</tr></thead><tbody>';
         rows.forEach(r => {
             const cls = [r.key ? 'sv-key' : '', r.lv ? 'sv-lv' + r.lv : ''].filter(Boolean).join(' ');
-            html += `<tr${cls ? ` class="${cls}"` : ''}><td>${r.sign ? `(${r.sign}) ` : ''}${svEsc(r.label)}</td>` + periods.map(lb => {
+            const cm = svIsUsd() && r.id && f.concepts_used && f.concepts_used[r.id];   // 미국: 계정 대응 표시·지정 (한국은 다음 단계)
+            const nameCell = cm
+                ? `<td class="sv-cm-name" data-key="${svEsc(r.id)}" title="${svEsc(svCmTitle(r.id, cm))}" onclick="svCmOpen('${svEsc(r.id)}')">${r.sign ? `(${r.sign}) ` : ''}${svEsc(r.label)}${svCmBadge(cm)}</td>`
+                : `<td>${r.sign ? `(${r.sign}) ` : ''}${svEsc(r.label)}</td>`;
+            html += `<tr${cls ? ` class="${cls}"` : ''}>${nameCell}` + periods.map(lb => {
                 const formula = r.calc(lb);
                 return `<td${formula ? ` class="sv-calc" title="계산값: ${svEsc(formula)}"` : ''}>${svFmtCell(r.id, r.get(lb))}</td>`;
             }).join('') + '</tr>';
@@ -8985,16 +9054,110 @@
         document.getElementById('sv-metrics').innerHTML = mh + '</tbody>';
     }
 
+    // --- 계정 대응 (미국 종목): 배지와 지정 창 ---
+    function svCmBadge(cm) {
+        if (cm.source === 'user') return '<span class="sv-cm-badge sv-cm-user">수동</span>';
+        if (cm.source === 'ai') return cm.confidence === 'low' ? '<span class="sv-cm-badge sv-cm-low">AI 확인 필요</span>' : '<span class="sv-cm-badge sv-cm-ai">AI</span>';
+        return '';
+    }
+    function svCmTitle(key, cm) {
+        const c = cm.mapped || cm.concept;
+        const src = { rule: '규칙표', ai: 'AI', user: '사용자 지정' }[cm.source] || cm.source;
+        let t = `${src}: ${c || '해당 없음'}`;
+        if (cm.source !== 'rule') t += `\n근거: ${cm.reason || '-'}\n확신도: ${cm.confidence || '-'}`;
+        return t + '\n(누르면 계정을 바꿀 수 있습니다)';
+    }
+    const svCm = { key: null, data: null, busy: false };
+    async function svCmOpen(key) {
+        if (!svIsUsd() || !sv.fin) return;
+        svCm.key = key;
+        const modal = document.getElementById('sv-cm-modal');
+        modal.style.display = 'flex';
+        const it = sv.flat[key];
+        document.getElementById('sv-cm-title').textContent = `${it ? it.label : key} — 계정 지정 (${sv.code})`;
+        document.getElementById('sv-cm-cur').textContent = '계정 목록을 불러오는 중...';
+        document.getElementById('sv-cm-list').innerHTML = '';
+        document.getElementById('sv-cm-search').value = '';
+        try {
+            const res = await fetch(API_BASE + `/api/stock/concept-map?market=US&code=${encodeURIComponent(sv.code)}`);
+            svCm.data = await res.json();
+            if (!res.ok) throw new Error(svCm.data.message || svCm.data.error);
+        } catch (e) {
+            document.getElementById('sv-cm-cur').textContent = '계정 목록을 불러오지 못했습니다: ' + (e.message || e);
+            return;
+        }
+        svCmRenderCur();
+        svCmRenderList();
+        document.getElementById('sv-cm-search').focus();
+    }
+    function svCmClose() { document.getElementById('sv-cm-modal').style.display = 'none'; svCm.key = null; }
+    function svCmCurrent() {
+        const cu = (sv.fin && sv.fin.concepts_used && sv.fin.concepts_used[svCm.key]) || {};
+        return { concept: cu.mapped || cu.concept || null, source: cu.source || 'rule', reason: cu.reason, confidence: cu.confidence, has_prev: cu.has_prev };
+    }
+    function svCmRenderCur() {
+        const cur = svCmCurrent();
+        const src = { rule: '규칙표', ai: 'AI', user: '사용자 지정' }[cur.source] || cur.source;
+        const def = ((svCm.data.keys || []).find(k => k.key === svCm.key) || {}).definition || '';
+        document.getElementById('sv-cm-cur').innerHTML =
+            `<div>정의: ${svEsc(def)}</div><div>현재: <b>${svEsc(cur.concept || '해당 없음(비어 있음)')}</b> · 출처 ${svEsc(src)}` +
+            (cur.source !== 'rule' ? ` · 근거 ${svEsc(cur.reason || '-')} · 확신도 ${svEsc(cur.confidence || '-')}` : '') + `</div>` +
+            `<div style="margin-top:3px;">${svEsc(svCm.data.entity || '')}${svCm.data.sic_desc ? ' · 업종 ' + svEsc(svCm.data.sic_desc) : ''} · 계정 ${(svCm.data.concepts || []).length}개</div>`;
+        document.getElementById('sv-cm-revert').style.display = cur.source === 'user' ? '' : 'none';
+    }
+    function svCmFmtVal(c) {
+        if (c.value == null) return '-';
+        if (c.unit === 'USD') return svUsd(c.value);
+        if (c.unit === 'shares') return svShares(c.value);
+        return String(c.value);
+    }
+    function svCmRenderList() {
+        if (!svCm.data) return;
+        const q = document.getElementById('sv-cm-search').value.trim().toLowerCase();
+        const cur = svCmCurrent().concept;
+        const list = (svCm.data.concepts || []).filter(c => !q || c.concept.toLowerCase().includes(q));
+        const shown = list.slice(0, 300);
+        document.getElementById('sv-cm-list').innerHTML =
+            `<div class="sv-cm-row" style="cursor:default;color:var(--text-muted);"><span>계정 (${list.length}개${list.length > shown.length ? ', 300개까지 표시' : ''})</span><span>단위</span><span>최근 기간</span><span class="v">최근 값</span></div>` +
+            shown.map(c => `<div class="sv-cm-row${c.concept === cur ? ' sv-cm-sel' : ''}" onclick="svCmSet(${JSON.stringify(c.concept)})" title="이 계정으로 지정">
+                <span class="c">${svEsc(c.concept)}</span><span>${svEsc(c.unit || '')}</span><span>${svEsc(c.end || '')}</span><span class="v">${svEsc(svCmFmtVal(c))}</span></div>`).join('');
+    }
+    async function svCmApply(method, body) {
+        if (svCm.busy) return;
+        svCm.busy = true;
+        document.getElementById('sv-cm-cur').textContent = '저장하고 다시 계산하는 중...';
+        try {
+            const res = await fetch(API_BASE + '/api/stock/concept-map', { method, headers: { 'Content-Type': 'application/json' },
+                                                                          body: JSON.stringify(Object.assign({ market: 'US', code: sv.code, years: sv.years }, body)) });
+            const d = await res.json();
+            if (!res.ok) throw new Error(d.message || d.error || ('HTTP ' + res.status));
+            sv.fin = d;
+            sv.flat = {};
+            Object.values(d.statements).forEach(st => Object.entries(st.items).forEach(([k, it]) => { sv.flat[k] = it; }));
+            svRenderFinancials();
+            svCmRenderCur();
+            svCmRenderList();
+        } catch (e) {
+            document.getElementById('sv-cm-cur').textContent = '저장하지 못했습니다: ' + (e.message || e);
+        } finally {
+            svCm.busy = false;
+        }
+    }
+    function svCmSet(concept) { if (svCm.key) svCmApply('PUT', { item: svCm.key, concept }); }
+    function svCmDelete() { if (svCm.key) svCmApply('DELETE', { item: svCm.key }); }
+
     function svCopyTable() {
         const f = sv.fin;
         if (!f || f.status !== 'ready') return;
         const periods = svPeriods();
-        const lines = [['항목(억원)', ...periods].join('\t')];
+        const usd = svIsUsd();   // 미국: 백만 달러 단위, EPS 는 달러 소수 두 자리
+        const lines = [[usd ? '항목(단위 $M)' : '항목(억원)', ...periods].join('\t')];
         svRows(sv.table).forEach(r => {
-            const name = '  '.repeat(r.lv) + (r.sign ? `(${r.sign}) ` : '') + r.label + (SV_EPS.has(r.id) ? '(원)' : '');
+            const name = '  '.repeat(r.lv) + (r.sign ? `(${r.sign}) ` : '') + r.label + (SV_EPS.has(r.id) ? (usd ? '($)' : '(원)') : '');
             lines.push([name, ...periods.map(lb => {
                 const v = r.get(lb);
                 if (v == null) return '';
+                if (usd) return SV_EPS.has(r.id) ? v.toFixed(2) : Math.round(v / 1e6);
                 return SV_EPS.has(r.id) ? Math.round(v) : Math.round(v / 1e8);
             })].join('\t'));
         });
@@ -9217,7 +9380,7 @@
         box.innerHTML = '<div class="sv-note">불러오는 중...</div>';
         document.getElementById('sv-disc-more').style.display = 'none';
         try {
-            const res = await fetch(API_BASE + '/api/stock/disclosures?market=KR&code=' + encodeURIComponent(sv.code));
+            const res = await fetch(API_BASE + `/api/stock/disclosures?market=${sv.market}&code=` + encodeURIComponent(sv.code));
             const d = await res.json();
             if (t !== sv.token) return;
             if (!res.ok) { box.innerHTML = `<div class="sv-empty">${svEsc(d.message || d.error || '공시를 불러오지 못했습니다')}</div>`; return; }
@@ -9231,9 +9394,11 @@
     function svRenderDisc() {
         const box = document.getElementById('sv-disc');
         if (!sv.disc.length) { box.innerHTML = '<div class="sv-empty">최근 1년 공시가 없습니다.</div>'; return; }
+        const usd = svIsUsd();   // 미국: 서식 이름(10-K, 10-Q, 8-K, DEF 14A)을 앞에 작은 표시로, 링크는 SEC 원문 새 창
         box.innerHTML = sv.disc.slice(0, sv.discShown).map(it => `
             <div class="sv-disc-item"><span class="sv-disc-date">${svEsc(it.date)}</span>
-                <a href="${svEsc(it.url)}" target="_blank" rel="noopener noreferrer">${svEsc(it.title)}</a>
+                ${usd && it.form ? `<span class="sv-disc-form">${svEsc(it.form)}</span>` : ''}
+                <a href="${svEsc(it.url)}" target="_blank" rel="noopener noreferrer">${svEsc(usd && it.form && it.title.startsWith(it.form) ? it.title.slice(it.form.length).trim() || it.title : it.title)}</a>
                 <span class="sv-disc-filer">${svEsc(it.filer)}</span></div>`).join('');
         const more = document.getElementById('sv-disc-more');
         more.style.display = sv.discShown < sv.disc.length ? 'inline-block' : 'none';

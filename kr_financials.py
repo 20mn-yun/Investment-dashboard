@@ -861,11 +861,15 @@ def compute(cache, years=5, name=""):
         order = ["Q1", "H1", "Q3", "FY"]
         for idx, (k, rc, by, pend, dl) in enumerate(fy["plan"]):
             rcalc = {}
+            used = []   # 이 분기 값에 쓰인 보고서 (접수번호) — 공시 시점 판정용
             for kk in order[:idx + 1]:
                 if kk in reps:
                     rcalc.update(reps[kk]["calc"])
+                    used.append(reps[kk]["rcept"])
+            avail = max((u[:8] for u in used if len(u) >= 8), default=None)
             quarters.append({"end": pend, "fs": reps[k]["fs"] if k in reps else (reps["FY"]["fs"] if "FY" in reps else None),
-                             "vals": qv[k], "rcalc": rcalc, "rid": f"{by}_{rc}"})
+                             "vals": qv[k], "rcalc": rcalc, "rid": f"{by}_{rc}",
+                             "rcept": reps[k]["rcept"] if k in reps else None, "used": used, "avail": avail})
         annual.append({"end": fy["fy_end"], "fs": reps["FY"]["fs"] if "FY" in reps else None,
                        "rid": next((f"{by}_{rc}" for (kk, rc, by, pend, dl) in fy["plan"] if kk == "FY"), None),
                        "vals": {key: g("FY", key)[0] for key in kinds if g("FY", key) and g("FY", key)[0] is not None},
@@ -1054,6 +1058,9 @@ def compute(cache, years=5, name=""):
             "annual": {_label(p["end"]): _shares_for(cache, p.get("rid"), p["end"]) for p in a_out},
         },
         "shares_pending": len(_shares_backlog(cache)),
+        # 분기 값이 공시된 시점(YYYYMMDD)과 쓰인 보고서 접수번호 — 밸류에이션 "공시 시점 기준" 계산용
+        "available_from": {"quarter": {_label(p["end"]): p.get("avail") for p in q_out}},
+        "reports_used": {"quarter": {_label(p["end"]): p.get("used") for p in q_out}},
         "fiscal_month": acc_mt,
         "unit": "원",
         "periods": {"quarter": [_label(p["end"]) for p in q_out], "ttm": [_label(p["end"]) for p in t_out],
