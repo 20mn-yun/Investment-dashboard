@@ -35,14 +35,9 @@ def _label_end(lb):
     return kr_financials._month_end(int(y), int(m))
 
 
-def build_series(code, cache=None):
-    """저장본 → 분기별 점 목록(오래된 순). 저장본이 없으면 None.
-    점: {end, label, ttm_ni, equity, avail(TTM 이 공시된 날), equity_avail, reports}
-    shares: [{stlm, common, rcept}] (공시 접수일 기준 as-of 선택용)"""
-    cache = cache or kr_financials._load_cache(code)
-    if not cache or not cache.get("acc_mt"):
-        return None
-    out = kr_financials.compute(cache, kr_financials.MAX_YEARS)
+def series_from_output(code, out, shares=None):
+    """compute() 응답(한국 kr_financials / 미국 us_financials 공통 구조) → 분기별 점 목록.
+    shares 를 주지 않으면 응답의 shares_by_period(기간 말 주식수)를 쓴다 — 공시일 대신 기간 말을 기준으로 as-of 선택."""
     ni = out["statements"]["IS"]["items"]["net_income_owner"]
     eq = out["statements"]["BS"]["items"]["equity_owner"]
     avail_q = out["available_from"]["quarter"]
@@ -61,6 +56,25 @@ def build_series(code, cache=None):
             "reports": [{"period": x, "rcept": r} for x in last4 for r in (used_q.get(x) or [])],
             "fs": out["fs_div_by_period"]["quarter"].get(lb),
         })
+    if shares is None:
+        shares = []
+        for lb, d in (out.get("shares_by_period") or {}).get("quarter", {}).items():
+            if d and d.get("common"):
+                end = _label_end(lb)
+                shares.append({"stlm": _d(d.get("stlm_dt")) or end, "common": d["common"], "rcept": end, "rid": lb,
+                               "source": d.get("source")})
+    return {"code": code, "market": out.get("market", "KR"), "name": out.get("name") or "", "fs_div": out.get("fs_div"),
+            "points": points, "shares": shares, "acc_mt": out.get("fiscal_month") or 12, "updated_at": out.get("cache_updated_at")}
+
+
+def build_series(code, cache=None):
+    """한국 저장본 → 분기별 점 목록(오래된 순). 저장본이 없으면 None.
+    점: {end, label, ttm_ni, equity, avail(TTM 이 공시된 날), equity_avail, reports}
+    shares: [{stlm, common, rcept}] (DART 주식총수, 공시 접수일 기준 as-of 선택용)"""
+    cache = cache or kr_financials._load_cache(code)
+    if not cache or not cache.get("acc_mt"):
+        return None
+    out = kr_financials.compute(cache, kr_financials.MAX_YEARS)
     shares = []
     reports = cache.get("reports", {})
     for rid, sh in (cache.get("shares") or {}).items():
@@ -69,8 +83,9 @@ def build_series(code, cache=None):
         rc = (reports.get(rid) or {}).get("rcept_no", "")
         shares.append({"stlm": _d(sh.get("stlm_dt")), "common": sh["common"], "rcept": _d(rc), "rid": rid})
     shares = [x for x in shares if x["stlm"] and x["rcept"]]
-    return {"code": code, "name": out.get("name") or cache.get("corp_name_dart", ""), "fs_div": out.get("fs_div"),
-            "points": points, "shares": shares, "acc_mt": cache["acc_mt"], "updated_at": cache.get("updated_at")}
+    s = series_from_output(code, out, shares)
+    s["name"] = s["name"] or cache.get("corp_name_dart", "")
+    return s
 
 
 def get_series(code, refresh=False):

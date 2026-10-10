@@ -1217,6 +1217,20 @@ def get_valuation():
 
 @app.route("/api/valuation/band/<ticker>", methods=["GET"])
 def get_valuation_band(ticker):
+    """PER/PBR 밴드. KR(기본): 배치 결과 파일. market=US: 종목을 열 때 저장본으로 계산(us_financials.get_band, 하루 보관)."""
+    if request.args.get("market", "").strip().upper() == "US":
+        r, err = _resolve_us_sec(ticker)
+        if err:
+            return err
+        code, name, cik10 = r
+        try:
+            price = (us_financials.get_summary(code, name) or {}).get("price")
+            band = us_financials.get_band(code, name, price)
+        except (us_financials.TransientError, us_financials.NoDataError) as e:
+            return jsonify({"error": "unavailable", "message": str(e)}), 503
+        if not band:
+            return jsonify({"error": "밴드 없음", "message": "재무 저장본이 없습니다 — 먼저 재무정보를 조회하세요"}), 404
+        return jsonify(band)
     cache_path = os.path.join(_CACHE_DIR, "valuation_bands.json")
     try:
         with open(cache_path, "r", encoding="utf-8") as f:
@@ -2222,20 +2236,28 @@ def stock_disclosures_api():
 
 @app.route("/api/stock/concept-map", methods=["GET", "PUT", "DELETE"])
 def stock_concept_map_api():
-    """미국 종목 계정 대응표. GET: 대응표 + 회사 계정 목록. PUT {market, code, item, concept|null}: 사용자 지정 뒤 재계산 응답.
-    DELETE {market, code, item}: 사용자 지정 삭제(AI 또는 규칙으로 되돌림) 뒤 재계산 응답. 한국은 다음 단계."""
+    """종목 계정 대응표(한국·미국). GET: 대응표 + 회사 계정 목록. PUT {market, code, item, concept|null}: 사용자 지정 뒤 재계산 응답.
+    DELETE {market, code, item}: 사용자 지정 삭제(AI 또는 규칙으로 되돌림) 뒤 재계산 응답."""
     body = request.get_json(silent=True) or {}
     market = (body.get("market") or request.args.get("market") or "US").strip().upper()
     code = body.get("code") or request.args.get("code") or ""
-    if market != "US":
-        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
-    r, err = _resolve_us_sec(code)
-    if err:
-        return err
-    code, name, cik10 = r
+    if market == "US":
+        r, err = _resolve_us_sec(code)
+        if err:
+            return err
+        code, name, cik10 = r
+        mod = us_financials
+    elif market == "KR":
+        r, err = _resolve_stock("KR", code)
+        if err:
+            return err
+        _m, code, name, corp_code = r
+        mod = kr_financials
+    else:
+        return jsonify({"error": "market 은 KR 또는 US"}), 400
     years = int(body.get("years") or request.args.get("years") or 5)
     if request.method == "GET":
-        return jsonify(us_financials.concept_map_view(code))
+        return jsonify(mod.concept_map_view(code))
     item = (body.get("item") or "").strip()
     if not item:
         return jsonify({"error": "item 이 필요합니다"}), 400
@@ -2243,8 +2265,8 @@ def stock_concept_map_api():
         if request.method == "PUT":
             concept = body.get("concept")
             concept = concept.strip() if isinstance(concept, str) and concept.strip() else None
-            return jsonify(us_financials.set_user_concept(code, item, concept, years, name))
-        return jsonify(us_financials.delete_user_concept(code, item, years, name))
+            return jsonify(mod.set_user_concept(code, item, concept, years, name))
+        return jsonify(mod.delete_user_concept(code, item, years, name))
     except ValueError as e:
         return jsonify({"error": "bad_request", "message": str(e)}), 400
 

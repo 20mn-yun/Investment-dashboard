@@ -193,6 +193,8 @@ OWNER_FALLBACK = {
     "equity_owner": ("total_equity", "equity_minority", "지배/비지배 구분 없음: 자본총계"),
 }
 SHARES_CONCEPTS = {"bs": "us-gaap:CommonStockSharesOutstanding", "cover": "dei:EntityCommonStockSharesOutstanding"}
+WA_SHARES_LABEL = "가중평균(대체)"                      # 발행주식수 계정이 없어 가중평균 주식수(AI·사용자 지정)로 대체했을 때 표시
+BANDS_DIR = os.path.join(_BD, "cache", "us_bands")      # 종목별 밸류에이션 밴드 (종목을 열 때 계산, 하루 보관)
 
 SHEET_ORDER = ["IS", "BS", "CF"]
 SHEET_NAMES = {"IS": "손익계산서", "BS": "재무상태표", "CF": "현금흐름표"}
@@ -1016,9 +1018,45 @@ def _shares_for(bs, cover, slot_end, actual_end=None):
     return _info(e, v, "carry", e)
 
 
-def latest_shares(cache):
-    """가장 최근 발행주식수 (분할 조정, 표지 값 우선). 반환: (주식수, 날짜) 또는 (None, None)"""
-    bs, cover = _shares_index(adjusted_facts(cache)[0])
+def _shares_override_cid(facts, overrides):
+    """대응표(ai·user)가 지정한 주식수 계정 — shares 단위 계정만 인정"""
+    oc = (overrides or {}).get("shares")
+    if not oc:
+        return None
+    cid = _cid(oc)
+    return cid if cid in facts and (facts[cid] or {}).get("u") == "shares" else None
+
+
+def _wa_shares_index(node):
+    """기간 값 주식수 계정(가중평균 등) → {기간 말(월말): {"val", "filed", "end"}}. 3개월 값 우선, 없으면 연간·반기·9개월, 시점 값은 그대로."""
+    pref = {"inst": -1, "q": 0, "y": 1, "h": 2, "n": 3}
+    out = {}
+    for start, end, val, form, filed, accn in node.get("r", []):
+        e = _d(end)
+        if not e or val is None:
+            continue
+        kind = _duration_kind(start, end) if start else "inst"
+        if kind is None:
+            continue
+        rank = pref.get(kind, 9)
+        key = _snap(e)
+        cur = out.get(key)
+        if cur is None or rank < cur["_rank"] or (rank == cur["_rank"] and filed > cur["filed"]):
+            out[key] = {"val": int(round(val)), "filed": filed, "end": end, "_rank": rank}
+    return out
+
+
+def latest_shares(cache, overrides=None):
+    """가장 최근 발행주식수 (분할 조정, 표지 값 우선). 대응표가 주식수 계정을 지정했으면(가중평균 대체) 그 계정.
+    반환: (주식수, 날짜) 또는 (None, None)"""
+    facts = adjusted_facts(cache)[0]
+    if overrides is None:
+        overrides = concept_map.overrides("US", cache["code"])
+    sh_over = _shares_override_cid(facts, overrides)
+    if sh_over:
+        bs, cover = _wa_shares_index(facts[sh_over]), {}
+    else:
+        bs, cover = _shares_index(facts)
     allv = list(bs.items()) + list(cover.items())
     if not allv:
         return None, None
@@ -1267,6 +1305,17 @@ def compute(cache, years=5, name="", persist=True):
                      has_prev=bool(m.get("prev")))
         else:
             rule_snapshot[key] = c["concept"]
+    # 주식수 항목 (표에는 없지만 대응표로 지정할 수 있음)
+    sh_rule = next((_cname(c) for c in (SHARES_CONCEPTS["bs"], SHARES_CONCEPTS["cover"]) if facts.get(c)), None)
+    concepts_used["shares"] = {"concept": sh_rule, "by_period": {}, "concepts": [sh_rule] if sh_rule else [],
+                               "source": "rule", "confidence": None, "reason": None}
+    m = cmap_items.get("shares")
+    if m and m.get("source") in ("ai", "user"):
+        concepts_used["shares"].update(source=m["source"], confidence=m.get("confidence"), reason=m.get("reason"),
+                                       mapped=(_cname(_cid(m["concept"])) if m.get("concept") else None),
+                                       decided_at=m.get("decided_at"), has_prev=bool(m.get("prev")))
+    else:
+        rule_snapshot["shares"] = sh_rule
     if persist:
         try:
             concept_map.set_rules("US", cache["code"], rule_snapshot, KEEP_SIG)
@@ -1278,6 +1327,9 @@ def compute(cache, years=5, name="", persist=True):
 
     # 주식수 (기간의 실제 종료일 = 그 슬롯에 쓰인 fact 의 end)
     bs_sh, cover_sh = _shares_index(facts)
+    sh_over = _shares_override_cid(facts, overrides)
+    if sh_over:                                   # 발행주식수 계정이 없어 대응표가 고른 계정(가중평균 등)으로 대체
+        bs_sh, cover_sh = _wa_shares_index(facts[sh_over]), {}
     # 분할 조정 표시: 마지막 분할일보다 먼저 끝난 기간은 주식수·EPS 가 현재(분할 후) 기준으로 환산된 값
     last_split = max((d for d, r in splits), default=None)
     split_adj = {"splits": [{"date": d, "ratio": r} for d, r in splits], "source": splits_source, "adjusted_values": n_adjusted,
@@ -1296,7 +1348,10 @@ def compute(cache, years=5, name="", persist=True):
                 actual_end[rep["end"]] = f["end"]
 
     def shares(p):
-        return _shares_for(bs_sh, cover_sh, p["end"], actual_end.get(p["end"]))
+        info = _shares_for(bs_sh, cover_sh, p["end"], actual_end.get(p["end"]))
+        if info and sh_over:
+            info.update(source="wa", label=WA_SHARES_LABEL, concept=_cname(sh_over))
+        return info
 
     # 10-K 에 결산월과 다른 달에 끝난 연간 값이 있으면 경고 (결산월 변경). 10-Q 의 최근 12개월 값(아마존 등)은 조용히 뺀다
     off = set()
@@ -1325,6 +1380,7 @@ def compute(cache, years=5, name="", persist=True):
             "annual": {_label(p["end"]): shares(p) for p in a_out},
         },
         "shares_pending": 0,
+        "shares_label": WA_SHARES_LABEL if sh_over else None,
         "split_adjustment": split_adj,
         "available_from": {"quarter": {_label(p["end"]): p.get("avail") for p in q_out}},
         "reports_used": {"quarter": {_label(p["end"]): p.get("used") for p in q_out}},
@@ -1395,25 +1451,22 @@ def get_summary(code, name):
     except Exception as e:
         print(f"[us_financials] {code} 재무 계산 실패: {type(e).__name__}: {e}", flush=True)
         return base
-    shares, shares_dt = latest_shares(cache)
+    import valuation_ttm
+    v, shares, shares_dt, sh_label, _series = valuation_today(code, cache, fin)
     price = base.get("price")
     if price and shares:
-        mcap, basis = price * shares, f"현재가 × 발행주식수 (SEC {shares_dt})"
+        mcap, basis = price * shares, f"현재가 × 발행주식수 (SEC {shares_dt}{', ' + sh_label if sh_label else ''})"
     else:
         mcap, basis = base.get("market_cap"), base.get("market_cap_basis")
     ttm_lbs = fin["periods"]["ttm"]
-    q_lbs = fin["periods"]["quarter"]
-    ni = fin["statements"]["IS"]["items"]["net_income_owner"]["ttm"].get(ttm_lbs[-1]) if ttm_lbs else None
-    eq = fin["statements"]["BS"]["items"]["equity_owner"]["quarter"].get(q_lbs[-1]) if q_lbs else None
-    per = round(mcap / ni, 2) if mcap and ni and ni > 0 else None
-    pbr = round(mcap / eq, 2) if mcap and eq and eq > 0 else None
+    per, pbr = valuation_ttm.per_pbr(mcap, v)          # 밴드(get_band)의 이번 달 점과 같은 계산
     roe = fin["metrics"]["ttm"].get(ttm_lbs[-1], {}).get("roe") if ttm_lbs else None
     over = {
         "market_cap": mcap, "market_cap_basis": basis,
-        "shares": shares,
+        "shares": shares, "shares_label": sh_label,
         "per": per, "pbr": pbr,
-        "valuation_basis": (f"현재 시가총액 / {ttm_lbs[-1]} 기준 4분기누적 지배주주순이익, 현재 시가총액 / {q_lbs[-1]} 말 지배주주지분 (SEC)"
-                            if ttm_lbs and q_lbs else None),
+        "valuation_basis": (f"현재 시가총액 / {v['ttm_end']} 기준 4분기누적 지배주주순이익, 현재 시가총액 / {v['equity_end']} 말 지배주주지분 "
+                            f"(SEC filed 기준, basis=ttm)" if v.get("equity_end") else None),
         "roe": roe if roe is not None else base.get("roe"),
         "fiscal_month": fin["fiscal_month"],
         "fs_div": "CFS", "fs_div_label": "연결",
@@ -1425,6 +1478,130 @@ def get_summary(code, name):
     out = dict(base)
     out.update(over)
     return out
+
+
+# ===== 밸류에이션 (오늘 기준·밴드) — 한국 valuation_ttm / band_calculator 와 같은 규칙 =====
+def valuation_today(code, cache, out=None):
+    """오늘 기준 TTM 지배주주순이익·최근 분기 말 지배주주지분(공시 filed 기준)과 현재 주식수.
+    반환: (valuation_asof 결과, 주식수, 주식수 날짜, 주식수 표시(가중평균 대체면), 분기 시계열)"""
+    import valuation_ttm
+    code = _norm_code(code)
+    out = out or compute(cache, MAX_YEARS, cache.get("entity", ""))
+    series = valuation_ttm.series_from_output(code, out)
+    v = valuation_ttm.valuation_asof(code, date.today(), series)
+    overrides = concept_map.overrides("US", code)
+    shares, shares_dt = latest_shares(cache, overrides)
+    label = WA_SHARES_LABEL if _shares_override_cid(adjusted_facts(cache)[0], overrides) else None
+    return v, shares, shares_dt, label, series
+
+
+def _percentiles(series):
+    """band_calculator._percentiles 와 같은 규칙: 빈 달을 뺀 값이 24개 미만이면 밴드 없음"""
+    if len(series) < 24:
+        return None
+    import numpy as np
+    qs = np.percentile(np.array(series, dtype=float), [10, 25, 50, 75, 90])
+    return {"p10": round(float(qs[0]), 2), "p25": round(float(qs[1]), 2), "p50": round(float(qs[2]), 2),
+            "p75": round(float(qs[3]), 2), "p90": round(float(qs[4]), 2), "n": len(series)}
+
+
+def compute_band(code, name="", current_price=None, cache=None, out=None):
+    """월별 PER/PBR: 월말 종가 × 그 시점(분할 조정) 주식수 = 월말 시가총액 ÷ 그 월말 기준 공시된 TTM 지배주주순이익,
+    PBR 은 최근 분기 말 지배주주지분. 분모 0 이하는 빈 값. 이번 달은 current_price(요약의 현재가)와 현재 주식수를 써서 요약 PER 과 같게.
+    결과 필드는 한국 밴드(cache/valuation_bands.json 의 종목 항목)와 같다."""
+    import valuation_ttm
+    code = _norm_code(code)
+    t0 = time.time()
+    cache = cache or _load_cache(code)
+    if not cache or not cache.get("facts"):
+        return None
+    out = out or compute(cache, MAX_YEARS, name)
+    v_today, shares_now, shares_dt, sh_label, series = valuation_today(code, cache, out)
+    prices = (monthly_prices(code) or {}).get("prices") or {}
+    if not prices:
+        return None
+    today = date.today()
+    cur_lb = f"{today.year}.{today.month:02d}"
+    rows, per_s, pbr_s, approx = [], [], [], 0
+    for lb in sorted(prices):
+        y, m = (int(x) for x in lb.split("."))
+        asof = min(_month_end(y, m), today)
+        is_cur = lb == cur_lb
+        px = current_price if (is_cur and current_price) else prices[lb]
+        v = v_today if is_cur else valuation_ttm.valuation_asof(code, asof, series)
+        if is_cur:
+            sh = shares_now
+        elif v.get("shares"):
+            sh = v["shares"]["common"]
+        else:
+            sh = shares_now
+            approx += 1
+        mcap = px * sh if px and sh else None
+        per, pbr = valuation_ttm.per_pbr(mcap, v)
+        rows.append({"date": lb.replace(".", "-"), "per": per, "pbr": pbr})
+        if per is not None:
+            per_s.append(per)
+        if pbr is not None:
+            pbr_s.append(pbr)
+    acc_mt = out.get("fiscal_month") or 12
+    eps_by_year, bps_by_year = {}, {}
+    for yy in range(today.year - 6, today.year + 1):
+        fy_end = _month_end(yy, acc_mt)
+        if fy_end > today:
+            continue
+        vy = valuation_ttm.valuation_asof(code, fy_end, series)
+        shy = vy["shares"]["common"] if vy.get("shares") else shares_now
+        if vy.get("ttm_ni") is not None and shy:
+            eps_by_year[yy] = round(vy["ttm_ni"] / shy, 2)
+        if vy.get("equity") is not None and shy:
+            bps_by_year[yy] = round(vy["equity"] / shy, 2)
+    return {
+        "code": code, "market": "US", "shares": shares_now, "shares_label": sh_label,
+        "latest_eps_year": int(v_today["ttm_end"][:4]) if v_today.get("ttm_end") else None,
+        "latest_eps": round(v_today["ttm_ni"] / shares_now, 2) if v_today.get("ttm_ni") is not None and shares_now else None,
+        "latest_bps": round(v_today["equity"] / shares_now, 2) if v_today.get("equity") is not None and shares_now else None,
+        "eps_by_year": eps_by_year, "bps_by_year": bps_by_year,
+        "per_band": _percentiles(per_s), "pbr_band": _percentiles(pbr_s),
+        "series": rows,
+        "basis": "ttm", "ttm_end": v_today.get("ttm_end"), "equity_end": v_today.get("equity_end"),
+        "approx_share_months": approx, "price_source": "yfinance 1mo" + (" + 현재가" if current_price else ""),
+        "computed_at": _now(), "compute_seconds": round(time.time() - t0, 2), "cache_updated_at": cache.get("updated_at"),
+    }
+
+
+def get_band(code, name="", current_price=None):
+    """저장본(cache/us_bands/<코드>.json)이 오늘 것이고 재무 저장본이 그대로면 재사용, 아니면 계산해 저장.
+    current_price 가 있으면 이번 달 점을 현재가로 다시 계산해 요약 PER 과 맞춘다."""
+    code = _norm_code(code)
+    cache = _load_cache(code)
+    if not cache or not cache.get("facts"):
+        return None
+    path = os.path.join(BANDS_DIR, f"{code}.json")
+    band = None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            band = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        band = None
+    today = date.today().isoformat()
+    if band and ((band.get("computed_at") or "")[:10] != today or band.get("cache_updated_at") != cache.get("updated_at")):
+        band = None
+    if band is None:
+        band = compute_band(code, name, current_price, cache)
+        if band:
+            _atomic_write_json(path, band)
+            band["cached"] = False
+        return band
+    band["cached"] = True
+    if current_price and band.get("series"):
+        import valuation_ttm
+        v, shares_now, _dt, _lb, _s = valuation_today(code, cache)
+        mcap = current_price * shares_now if shares_now else None
+        per, pbr = valuation_ttm.per_pbr(mcap, v)
+        cur = f"{date.today().year}-{date.today().month:02d}"
+        if band["series"][-1]["date"] == cur:
+            band["series"][-1] = {"date": cur, "per": per, "pbr": pbr}
+    return band
 
 
 # ===== 공시 목록 (SEC submissions) =====
@@ -1569,6 +1746,8 @@ ITEM_DEFS = {
     "capex_ppe": "유형자산 취득 지출", "capex_intangible": "무형자산 취득 지출", "cff": "재무활동현금흐름",
     "dividends_paid": "배당금 지급", "treasury_purchase": "자기주식 취득", "cash_change": "현금 증감 (기간)",
     "cash_end": "기말 현금 (현금흐름표, 제한현금 포함 가능)",
+    "shares": "발행주식수 (보통주, 시점 값; CommonStockSharesOutstanding·EntityCommonStockSharesOutstanding 계열). "
+              "없으면 가중평균 희석주식수(WeightedAverageNumberOfDilutedSharesOutstanding, 기간 값)를 대체로 고를 수 있다",
 }
 _ai_jobs = {}
 _ai_skip_today = {}       # 코드 → 오늘 날짜 (한도·조건으로 오늘은 더 묻지 않음)
@@ -1647,6 +1826,7 @@ AI_SYSTEM = """당신은 미국 SEC XBRL(us-gaap) 재무제표 계정 대응 전
 - 알맞은 계정이 없으면 concept 을 null 로 둔다. 뜻이 다른 계정(예: 현금 지급액·세무 이자·변동액을 비용 대신)을 억지로 고르지 않는다. null 이 틀린 계정보다 낫다.
 - 손익 항목은 손익계산서 계정(기간 값), 재무상태표 항목은 시점 값, 현금흐름 항목은 현금흐름표 계정을 고른다.
 - 합계 항목(자산총계·부채총계·자본총계)은 구성 항목이 아니라 합계 계정이어야 한다.
+- shares(발행주식수) 항목: 시점 값 발행주식수 계정이 없으면 가중평균 희석주식수(WeightedAverageNumberOfDilutedSharesOutstanding)를 대체로 고르고 confidence 는 medium, reason 에 "가중평균 대체"라고 적는다. 그것도 없으면 기본 가중평균(…SharesOutstandingBasic).
 - 각 답에 reason(한국어 한 줄)과 confidence(high|medium|low)를 붙인다. 뜻이 조금 다르거나 근사치면 low.
 - 출력은 JSON 하나만. 설명·마크다운 금지. 형식:
 {"items": {"항목키": {"concept": "계정이름 또는 null", "reason": "한 줄", "confidence": "high|medium|low"}, ...}}"""
@@ -1700,7 +1880,7 @@ def validate_answers(cache, answers, current):
     kinds = {key: (sheet, kind) for sheet, key, label, kind, cands in RULES}
     ok, rejected = {}, []
     for key, a in answers.items():
-        if key not in kinds:
+        if key not in kinds and key != "shares":
             rejected.append((key, a.get("concept"), "모르는 항목 키"))
             continue
         c = a.get("concept")
@@ -1712,7 +1892,7 @@ def validate_answers(cache, answers, current):
             rejected.append((key, c, "회사 계정 목록에 없음"))
             continue
         unit = facts[cid].get("u")
-        want = "USD/shares" if kinds[key][1] == "eps" else "USD"
+        want = "shares" if key == "shares" else ("USD/shares" if kinds[key][1] == "eps" else "USD")
         if unit != want:
             rejected.append((key, c, f"단위 불일치 ({unit}, 필요 {want})"))
             continue
@@ -1759,7 +1939,12 @@ def _pending_keys(out):
     """AI 에 물을 항목: 핵심 항목 중 전 기간 값이 없고(missing), 대응표에 ai·user 답이 없는 것 (계산으로 채워진 항목은 제외)"""
     cu = out.get("concepts_used") or {}
     missing = {m["key"] for m in out.get("missing") or []}
-    return [k for k in CORE_KEYS if k in missing and k in cu and cu[k].get("source") == "rule"]
+    keys = [k for k in CORE_KEYS if k in missing and k in cu and cu[k].get("source") == "rule"]
+    # 주식수: 규칙 계정이 전부 비어 기간별 주식수가 하나도 없으면 묻는다 (가중평균 대체 허용)
+    sbp = (out.get("shares_by_period") or {}).get("quarter") or {}
+    if (cu.get("shares") or {}).get("source") == "rule" and not any(sbp.values()):
+        keys.append("shares")
+    return keys
 
 
 def _ai_needed(code, out):
@@ -1866,6 +2051,7 @@ def concept_map_view(code):
             e["prev"] = dict(e["prev"], concept=_cname(_cid(e["prev"]["concept"])))
         items[k] = e
     labels = {key: label for sheet, key, label, kind, cands in RULES if key not in HIDDEN_KEYS}
+    labels["shares"] = "발행주식수"
     return {"market": "US", "code": code, "items": items, "ai_asked": cm.get("ai_asked"), "ai_log": cm.get("ai_log", [])[-3:],
             "keys": [{"key": k, "label": lb, "definition": ITEM_DEFS.get(k, "")} for k, lb in labels.items()],
             "concepts": concept_catalog(cache) if cache else [], "entity": (cache or {}).get("entity"),
@@ -1875,7 +2061,7 @@ def concept_map_view(code):
 def set_user_concept(code, key, concept, years=5, name=""):
     """PUT: 사용자 지정(concept None = 해당 없음) 뒤 다시 계산한 응답. 계정이 저장본에 없으면 ValueError."""
     code = _norm_code(code)
-    labels = {k for sheet, k, label, kind, cands in RULES if k not in HIDDEN_KEYS}
+    labels = {k for sheet, k, label, kind, cands in RULES if k not in HIDDEN_KEYS} | {"shares"}
     if key not in labels:
         raise ValueError(f"모르는 항목: {key}")
     cache = _load_cache(code)

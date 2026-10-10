@@ -11,6 +11,7 @@
 """
 import calendar
 import gzip
+import hashlib
 import json
 import os
 import re
@@ -20,6 +21,8 @@ import time
 from datetime import date, datetime
 
 import requests
+
+import concept_map
 
 _BD = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.join(_BD, "cache", "kr_financials")
@@ -451,6 +454,7 @@ def _ensure_acc_mt(cache, corp_code):
     cache["acc_mt"] = int(mt)
     cache["acc_mt_checked"] = date.today().isoformat()
     cache["corp_name_dart"] = d.get("corp_name", "")
+    cache["induty_code"] = (d.get("induty_code") or "").strip() or None     # KSIC 업종코드 (AI 지시문용)
     return True
 
 
@@ -626,6 +630,10 @@ def get_financials_nowait(code, corp_code, name="", years=5):
     elif needs_fetch(code, years_fetch):
         job = start_fetch(code, corp_code, years_fetch)
         out["updating"] = job_progress(job)
+    elif _ai_needed(code, out):
+        job = _start_ai(code)
+        if job:
+            out["updating"] = {"done": 0, "total": 1, "stage": "ai"}
     return out
 
 
@@ -677,22 +685,46 @@ def match_rule(rows, ids, names):
     return None, None
 
 
-def extract(report):
-    """보고서 하나 → ({키: (thstrm_amount, thstrm_add_amount)}, {계산으로 채운 키: 계산식})"""
+def kr_cid(row):
+    """계정 식별자: '표|account_id' (표준코드가 없으면 '표|nm:계정이름'). 대응표(concept_map)와 AI 가 쓰는 이름."""
+    I = {f: i for i, f in enumerate(ROW_FIELDS)}
+    aid = (row[I["account_id"]] or "").strip()
+    nm = (row[I["account_nm"]] or "").strip()
+    sj = row[I["sj_div"]]
+    return f"{sj}|{aid}" if aid and not aid.startswith("-표준") else f"{sj}|nm:{nm}"
+
+
+def _find_by_cid(rows, cid):
+    for x in rows:
+        if kr_cid(x) == cid:
+            return x
+    return None
+
+
+def extract(report, overrides=None):
+    """보고서 하나 → ({키: (thstrm_amount, thstrm_add_amount)}, {계산으로 채운 키: 계산식}, {키: 쓰인 계정 식별자})
+    overrides(대응표의 ai·user 지정) {키: 계정 식별자 또는 None}: 지정 계정만 쓰고, None 이면 그 항목은 비운다(대체 계산도 하지 않음)."""
     I = {f: i for i, f in enumerate(ROW_FIELDS)}
     rows = report.get("rows") or []
     sheets = {s: _sheet_rows(rows, s) for s in SHEET_ORDER}
-    out, calc = {}, {}
+    out, calc, used = {}, {}, {}
+    overrides = overrides or {}
+    blocked = {k for k, v in overrides.items() if v is None}
 
     def val(x):
         return (_amount(x[I["thstrm_amount"]]), _amount(x[I["thstrm_add_amount"]]))
 
     for sheet, key, label, kind, ids, names in RULES:
-        x, _ = match_rule(sheets[sheet], ids, names)
-        if x is not None and any(w in x[I["account_nm"]] for w in RULE_EXCLUDE_NAMES.get(key, [])):
-            x = None
+        if key in overrides:
+            oc = overrides[key]
+            x = _find_by_cid(rows, oc) if oc else None
+        else:
+            x, _ = match_rule(sheets[sheet], ids, names)
+            if x is not None and any(w in x[I["account_nm"]] for w in RULE_EXCLUDE_NAMES.get(key, [])):
+                x = None
         if x is not None:
             out[key] = val(x)
+            used[key] = kr_cid(x)
 
     def _stock_sum(keys):   # 시점 값 합 (있는 항목만, 하나도 없으면 None)
         xs = [out[k][0] for k in keys if k in out and out[k][0] is not None]
@@ -701,13 +733,15 @@ def extract(report):
     # 금융자산·금융부채 대체 (합계 항목이 없을 때)
     for key, parts in (("cur_fin_assets", ["cash", "st_fin"]), ("noncur_fin_assets", ["lt_fin"]),
                        ("cur_fin_liab", ["st_borrow", "cur_ltd", "cur_bonds"]), ("noncur_fin_liab", ["lt_borrow", "bonds"])):
+        if key in blocked:
+            continue
         if key not in out:
             v = _stock_sum(parts)
             if v is not None:
                 out[key] = (v, None)
                 calc[key] = FIN_FALLBACK_FORMULAS[key]
     # 유형자산 취득 합계가 없으면 구성항목 합산
-    if "capex_ppe" not in out:
+    if "capex_ppe" not in out and "capex_ppe" not in blocked:
         parts = [match_rule(sheets["CF"], ids, names)[0] for ids, names in CAPEX_PPE_PARTS]
         amts = [_amount(x[I["thstrm_amount"]]) for x in parts if x is not None]
         amts = [a for a in amts if a is not None]
@@ -715,7 +749,9 @@ def extract(report):
             out["capex_ppe"] = (sum(abs(a) for a in amts), None)
             calc["capex_ppe"] = CAPEX_PPE_PARTS_FORMULA
     # 당기순이익이 없으면 지배주주순이익 + 비지배주주순이익 (3개월·누적 각각)
-    if "net_income" not in out and "net_income_owner" in out and "net_income_minority" in out:
+    if "net_income" in blocked:
+        pass
+    elif "net_income" not in out and "net_income_owner" in out and "net_income_minority" in out:
         o, m = out["net_income_owner"], out["net_income_minority"]
         out["net_income"] = (_add(o[0], m[0]), _add(o[1], m[1]))
         if out["net_income"][0] is not None:
@@ -726,13 +762,13 @@ def extract(report):
         out["net_income"] = out["net_income_owner"]
         calc["net_income"] = NET_INCOME_OWNER_ONLY_FORMULA
     # 현금 증감이 없으면 기말 현금 - 기초 현금 (누적 기간 기준 → 분기 값은 기존 차감 규칙으로)
-    if "cash_change" not in out and out.get("cash_end", (None,))[0] is not None:
+    if "cash_change" not in out and "cash_change" not in blocked and out.get("cash_end", (None,))[0] is not None:
         xb, _ = match_rule(sheets["CF"], *CASH_BEGIN_RULE)
         b = _amount(xb[I["thstrm_amount"]]) if xb is not None else None
         if b is not None:
             out["cash_change"] = (out["cash_end"][0] - b, None)
             calc["cash_change"] = CASH_CHANGE_FORMULA
-    return out, calc
+    return out, calc, used
 
 
 # ===== 계산 =====
@@ -795,13 +831,17 @@ def _shares_for(cache, rid, period_end):
     return _info(best, "carry", (best.get("stlm_dt") or "")[:10])
 
 
-def compute(cache, years=5, name=""):
+def compute(cache, years=5, name="", persist=True):
+    """저장본 → 응답. persist=True 면 대응표(concept_map, KR)의 ai·user 지정을 반영하고 규칙이 고른 계정을 스냅샷으로 남긴다."""
     acc_mt = cache["acc_mt"]
     reports = cache.get("reports", {})
     today = date.today()
     fy_last = _fy_end_of(today, acc_mt)
     warnings = []
     kinds = {key: (sheet, kind) for sheet, key, label, kind, ids, names in RULES}
+    overrides = concept_map.overrides("KR", cache["code"]) if persist else {}
+    cmap_items = concept_map.load("KR", cache["code"])["items"] if persist else {}
+    blocked = {k for k, v in overrides.items() if v is None}
 
     # 회계연도별 보고서 값
     n_fy = MAX_YEARS + 1
@@ -813,8 +853,8 @@ def compute(cache, years=5, name=""):
         for key, rc, by, pend, deadline in plan:
             r = reports.get(f"{by}_{rc}")
             if r and r.get("status") == "ok":
-                v, calc = extract(r)
-                reps[key] = {"v": v, "calc": calc, "fs": r["fs_div"], "rcept": r.get("rcept_no", ""), "end": pend}
+                v, calc, used = extract(r, overrides)
+                reps[key] = {"v": v, "calc": calc, "used": used, "fs": r["fs_div"], "rcept": r.get("rcept_no", ""), "end": pend}
                 rd = r.get("rcept_no", "")[:8]
                 if len(rd) == 8 and rd <= pend.strftime("%Y%m%d"):
                     warnings.append(f"{_label(pend)} 보고서 접수일({rd})이 기간 말보다 빠름 — 기간 대응 확인 필요")
@@ -906,10 +946,10 @@ def compute(cache, years=5, name=""):
             for key, formula in p.get("rcalc", {}).items():
                 if v.get(key) is not None:
                     mark(key, view, lb, formula)
-            if "gross_profit" not in v and v.get("revenue") is not None and v.get("cogs") is not None:
+            if "gross_profit" not in v and "gross_profit" not in blocked and v.get("revenue") is not None and v.get("cogs") is not None:
                 v["gross_profit"] = v["revenue"] - v["cogs"]
                 mark("gross_profit", view, lb, "매출액 - 매출원가")
-            if "sga" not in v and v.get("gross_profit") is not None and v.get("operating_income") is not None:
+            if "sga" not in v and "sga" not in blocked and v.get("gross_profit") is not None and v.get("operating_income") is not None:
                 v["sga"] = v["gross_profit"] - v["operating_income"]
                 mark("sga", view, lb, "매출총이익 - 영업이익")
             if v.get("cash") is not None:
@@ -931,9 +971,42 @@ def compute(cache, years=5, name=""):
                     v["fcf"] = v["cfo"] - v["capex"]
                     mark("fcf", view, lb, "영업현금흐름 - CAPEX")
             for key, (src, minority, formula) in OWNER_FALLBACK.items():
-                if key not in v and minority not in v and v.get(src) is not None:
+                if key not in v and key not in blocked and minority not in v and v.get(src) is not None:
                     v[key] = v[src]
                     mark(key, view, lb, formula)
+
+    # 쓰인 계정 (항목별: 최근 보고서에서 규칙·대응표가 고른 계정, 출처 rule|ai|user 와 근거·확신도)
+    concepts_used = {key: {"concept": None, "by_period": {}, "concepts": [], "source": "rule", "confidence": None, "reason": None}
+                     for sheet, key, label, kind, ids, names in RULES if key not in HIDDEN_KEYS}
+    for fy in fys:
+        for slot in ("Q1", "H1", "Q3", "FY"):
+            rep_ = fy["reps"].get(slot)
+            if not rep_:
+                continue
+            for key, cid in rep_.get("used", {}).items():
+                if key in concepts_used:
+                    concepts_used[key]["by_period"][_label(rep_["end"])] = cid
+    rule_snapshot = {}
+    for key, c in concepts_used.items():
+        last = max(c["by_period"]) if c["by_period"] else None
+        c["concept"] = c["by_period"].get(last)
+        c["concepts"] = sorted(set(c["by_period"].values()))
+        c["by_period"] = {lb: v for lb, v in c["by_period"].items() if lb >= (sorted(c["by_period"])[-8] if len(c["by_period"]) > 8 else "")}  # 최근 8개 기간만
+        m = cmap_items.get(key)
+        if m and m.get("source") in ("ai", "user"):
+            c.update(source=m["source"], confidence=m.get("confidence"), reason=m.get("reason"), mapped=m.get("concept"),
+                     decided_at=m.get("decided_at"), has_prev=bool(m.get("prev")))
+        else:
+            rule_snapshot[key] = c["concept"]
+    if persist:
+        try:
+            concept_map.set_rules("KR", cache["code"], rule_snapshot, KR_RULES_SIG)
+        except OSError as e:
+            print(f"[kr_financials] 대응표 저장 실패 {cache['code']}: {type(e).__name__}", flush=True)
+    cm_summary = {"ai": sum(1 for c in concepts_used.values() if c["source"] == "ai"),
+                  "ai_low": sum(1 for c in concepts_used.values() if c["source"] == "ai" and c.get("confidence") == "low"),
+                  "user": sum(1 for c in concepts_used.values() if c["source"] == "user"),
+                  "induty_code": cache.get("induty_code")}
 
     # 출력 범위
     years = max(1, min(MAX_YEARS, int(years)))
@@ -1067,6 +1140,8 @@ def compute(cache, years=5, name=""):
                     "annual": [_label(p["end"]) for p in a_out]},
         "statements": statements,
         "order": {s: statements[s]["order"] for s in SHEET_ORDER},   # 재무제표 순서 (JSON 키 정렬과 무관)
+        "concepts_used": concepts_used,
+        "concept_map_summary": cm_summary,
         "partial_missing": partial,
         "metrics": metrics_out,
         "missing": missing,
@@ -1090,4 +1165,306 @@ def get_financials(code, corp_code, name="", years=5):
     cache, warnings = refresh(code, corp_code, max(DEFAULT_YEARS, years))
     out = compute(cache, years, name)
     out["warnings"] = warnings + out["warnings"]
+    return out
+
+
+# ===== AI 계정 대응 (한국) — us_financials 와 같은 구조: 규칙이 못 잡은 핵심 항목만 Claude Haiku 에 묻고 검증을 통과한 답을 대응표(source ai)에 저장 =====
+KR_RULES_SIG = hashlib.sha1(("kr-rules-v1\n" + repr(RULES) + repr(RULE_EXCLUDE_NAMES)).encode()).hexdigest()[:12]
+CORE_KEYS = ["revenue", "cogs", "operating_income", "net_income", "net_income_owner", "total_assets", "current_assets",
+             "current_liabilities", "total_liabilities", "total_equity", "equity_owner", "trade_receivables", "trade_payables",
+             "inventories", "ppe", "cash", "cur_fin_liab", "noncur_fin_liab", "finance_cost", "cfo", "cfi", "cff",
+             "capex_ppe", "cash_end"]
+AI_SYSTEM_KR = """당신은 한국 DART(K-IFRS) 재무제표 계정 대응 전문가입니다.
+한 회사가 실제로 공시한 계정 목록이 주어집니다(식별자 | 표 | 계정이름 | 최근 값). 요청한 재무 항목마다 그 목록에서 가장 알맞은 계정 하나를 고르세요.
+
+규칙
+- concept 은 목록의 식별자("표|계정ID" 또는 표준코드가 없으면 "표|nm:계정이름")를 글자 그대로 쓴다. 목록에 없는 식별자를 만들지 않는다.
+- 한국 공시는 계정 이름이 더 중요하다. 계정ID 가 "표준계정코드 미사용"이어도 이름이 맞으면 고른다.
+- 알맞은 계정이 없으면 concept 을 null 로 둔다. 뜻이 다른 계정(예: 현금 지급액·조정 항목을 비용 대신, 포괄손익을 순이익 대신)을 억지로 고르지 않는다. null 이 틀린 계정보다 낫다.
+- 손익 항목은 IS 또는 CIS 표(기간 값), 재무상태표 항목은 BS 표(시점 값), 현금흐름 항목은 CF 표에서 고른다.
+- 합계 항목(자산총계·부채총계·자본총계)은 구성 항목이 아니라 합계 계정이어야 한다.
+- 지배주주순이익은 "지배기업 소유주지분"·"지배주주지분 순이익" 같은 이름의 당기순이익 배분 계정이다(총포괄손익 배분 계정이 아님).
+- 각 답에 reason(한국어 한 줄)과 confidence(high|medium|low)를 붙인다. 뜻이 조금 다르거나 근사치면 low.
+- 출력은 JSON 하나만. 설명·마크다운 금지. 형식:
+{"items": {"항목키": {"concept": "식별자 또는 null", "reason": "한 줄", "confidence": "high|medium|low"}, ...}}"""
+AI_FINANCIAL_NOTE_KR = """이 회사는 금융회사(은행·보험·증권·카드·금융지주)입니다.
+- revenue(매출액) 자리에는 영업수익을 고른다: 영업수익·순영업수익 계정이 있으면 그것, 없으면 이자수익(총액)과 수수료수익 중 총수익에 가장 가까운 것(순이자이익보다 이자수익 우선). reason 에 무엇으로 대체했는지 적는다.
+- operating_income(영업이익) 자리는 공시된 영업이익 계정이 있으면 그대로 고른다. 없으면 null.
+- cogs(매출원가)·gross_profit·inventories(재고)·current_assets·current_liabilities·trade_receivables·trade_payables 는 금융회사에 없는 것이 정상이므로 null 이 맞다."""
+_ai_jobs = {}
+_ai_skip_today = {}
+
+
+def _item_defs():
+    import us_financials
+    return us_financials.ITEM_DEFS
+
+
+def _is_financial(cache):
+    """금융회사 판정: KSIC 업종코드 64~66(금융·보험) 또는 회사명 키워드"""
+    code = str(cache.get("induty_code") or "")
+    name = cache.get("corp_name_dart") or ""
+    return code[:2] in ("64", "65", "66") or any(w in name for w in ("금융", "은행", "보험", "증권", "카드", "캐피탈", "자산운용", "저축"))
+
+
+def _ensure_induty(cache, corp_code):
+    """업종코드가 저장본에 없으면 DART 회사 개황 1회 조회해 저장 (AI 지시문용, 실패해도 계속)"""
+    if cache.get("induty_code") is not None or cache.get("induty_checked"):
+        return cache
+    try:
+        d = _dart_get("company.json", {"corp_code": corp_code})
+    except TransientError as e:          # 키 누락·한도 초과 등: 저장하지 않고 다음에 다시 시도
+        print(f"[kr_financials] {cache.get('code')} 업종코드 조회 실패: {e}", flush=True)
+        return cache
+    cache["induty_code"] = (d.get("induty_code") or "").strip() or None
+    cache["induty_checked"] = date.today().isoformat()
+    with _code_lock(cache["code"]):
+        _atomic_write(_cache_path(cache["code"]), cache)
+    return cache
+
+
+def _latest_ok_report(cache, annual=False):
+    oks = [(rid, r) for rid, r in cache.get("reports", {}).items() if r.get("status") == "ok" and (not annual or rid.endswith("_11011"))]
+    if not oks:
+        return None, None
+    rid = max(oks, key=lambda t: (t[1].get("rcept_no") or "", t[0]))[0]
+    return rid, cache["reports"][rid]
+
+
+def concept_catalog(cache, max_n=None):
+    """회사가 쓰는 계정 목록(최근 보고서 기준) [{"concept", "name", "sheet", "unit", "end", "value"}] — 표 순서, 중복 식별자는 하나"""
+    I = {f: i for i, f in enumerate(ROW_FIELDS)}
+    rid, r = _latest_ok_report(cache)
+    if not r:
+        return []
+    by, rc = rid.split("_")
+    out, seen = [], set()
+    order = {"IS": 0, "CIS": 1, "BS": 2, "CF": 3}
+    rows = sorted(r["rows"], key=lambda x: (order.get(x[I["sj_div"]], 9), int(x[I["ord"]]) if str(x[I["ord"]]).isdigit() else 0))
+    for x in rows:
+        if x[I["sj_div"]] not in order:
+            continue
+        cid = kr_cid(x)
+        if cid in seen:
+            continue
+        seen.add(cid)
+        out.append({"concept": cid, "name": (x[I["account_nm"]] or "").strip(), "sheet": x[I["sj_div"]], "unit": "KRW",
+                    "end": r.get("rcept_no", "")[:8], "value": _amount(x[I["thstrm_amount"]]),
+                    "detail": (x[I["account_detail"]] or "").strip() if x[I["account_detail"]] not in ("", "-") else ""})
+    if max_n and len(out) > max_n:
+        out = [x for x in out if x["value"] not in (None, 0)]
+    return out
+
+
+def _ai_user_message(cache, keys, catalog):
+    defs = _item_defs()
+    items = "\n".join(f"- {k}: {defs.get(k, k)}" for k in keys)
+    rows = "\n".join(f"{c['concept']} | {c['sheet']} | {c['name']}{(' (' + c['detail'] + ')') if c.get('detail') else ''} | "
+                     f"{c['value'] if c['value'] is not None else ''}" for c in catalog)
+    fin = ("\n\n" + AI_FINANCIAL_NOTE_KR) if _is_financial(cache) else ""
+    return (f"회사: {cache.get('corp_name_dart') or cache.get('code')} ({cache.get('code')})\n"
+            f"업종(KSIC 코드): {cache.get('induty_code') or '알 수 없음'}{fin}\n\n"
+            f"대응할 항목 (키: 정의)\n{items}\n\n"
+            f"회사가 쓰는 계정 목록 ({len(catalog)}개; 식별자 | 표 | 계정이름 | 최근 보고서 값, 단위 원)\n{rows}")
+
+
+def validate_answers(cache, answers, current):
+    """AI 답 검증 (us_financials.validate_answers 와 같은 뼈대). 반환 (통과 {키: 답}, 거절 [(키, concept, 이유)])"""
+    import us_financials
+    I = {f: i for i, f in enumerate(ROW_FIELDS)}
+    kinds = {key: (sheet, kind) for sheet, key, label, kind, ids, names in RULES if key not in HIDDEN_KEYS}
+    rid, r = _latest_ok_report(cache)
+    rows = (r or {}).get("rows") or []
+    cids = {kr_cid(x): x for x in rows}
+    ok, rejected = {}, []
+    for key, a in answers.items():
+        if key not in kinds:
+            rejected.append((key, a.get("concept"), "모르는 항목 키"))
+            continue
+        c = a.get("concept")
+        if c in (None, "", "null"):
+            ok[key] = {"concept": None, "reason": a.get("reason", ""), "confidence": a.get("confidence", "medium")}
+            continue
+        if c not in cids:
+            rejected.append((key, c, "회사 계정 목록에 없음"))
+            continue
+        sheet = c.split("|", 1)[0]
+        want = {"IS": ("IS", "CIS"), "BS": ("BS",), "CF": ("CF",)}[kinds[key][0]]
+        if sheet not in want:
+            rejected.append((key, c, f"표 불일치 ({sheet}, 필요 {'/'.join(want)})"))
+            continue
+        ok[key] = {"concept": c, "reason": a.get("reason", ""), "confidence": a.get("confidence", "medium") or "medium"}
+
+    # 합계 대조: 최근 사업보고서 값으로 (규칙이 고른 계정 + AI 답)
+    rid_a, ra = _latest_ok_report(cache, annual=True)
+    rows_a = (ra or r or {}).get("rows") or []
+    merged = {k: v for k, v in current.items() if v}
+    merged.update({k: v["concept"] for k, v in ok.items() if v["concept"]})
+
+    def val(key):
+        x = _find_by_cid(rows_a, merged.get(key)) if merged.get(key) else None
+        return _amount(x[I["thstrm_amount"]]) if x is not None else None
+
+    def drop(keys, why):
+        for k in keys:
+            if k in ok and ok[k]["concept"]:
+                rejected.append((k, ok[k]["concept"], why))
+                del ok[k]
+
+    within = us_financials._within
+    rev, cogs, gp = val("revenue"), val("cogs"), val("gross_profit")
+    if None not in (rev, cogs, gp) and not within(rev - cogs, gp):
+        drop(["revenue", "cogs", "gross_profit"], f"매출액 - 매출원가 ≠ 매출총이익 ({rev:,} - {cogs:,} vs {gp:,})")
+    ta, tl, te = val("total_assets"), val("total_liabilities"), val("total_equity")
+    if None not in (ta, tl, te) and not within(ta, tl + te):
+        drop(["total_assets", "total_liabilities", "total_equity"], f"자산총계 ≠ 부채 + 자본 ({ta:,} vs {tl + te:,})")
+    ca = val("current_assets")
+    if None not in (ca, ta) and ca >= ta:
+        drop(["current_assets"], f"유동자산({ca:,}) ≥ 자산총계({ta:,})")
+    cl = val("current_liabilities")
+    if None not in (cl, tl) and cl > tl:
+        drop(["current_liabilities"], f"유동부채({cl:,}) > 부채총계({tl:,})")
+    ni, nio = val("net_income"), val("net_income_owner")
+    if None not in (ni, nio) and abs(nio) > abs(ni) * 1.5 + 1:
+        drop(["net_income_owner"], f"지배주주순이익({nio:,})이 당기순이익({ni:,})보다 훨씬 큼")
+    for key in ("cash", "cash_end", "ppe", "inventories", "trade_receivables", "trade_payables", "total_assets", "revenue"):
+        v = val(key)
+        if v is not None and v < 0:
+            drop([key], f"음수 ({v:,})")
+    cfo = val("cfo")
+    if cfo is not None and ta is not None and abs(cfo) > ta:
+        drop(["cfo"], f"영업현금흐름({cfo:,}) 절댓값이 자산총계보다 큼")
+    return ok, rejected
+
+
+def _pending_keys(out):
+    """AI 에 물을 항목: 핵심 항목 중 전 기간 값이 없고(missing) 대응표에 ai·user 답이 없는 것"""
+    cu = out.get("concepts_used") or {}
+    missing = {m["key"] for m in out.get("missing") or []}
+    return [k for k in CORE_KEYS if k in missing and k in cu and cu[k].get("source") == "rule"]
+
+
+def _ai_needed(code, out):
+    with _jobs_guard:
+        job = _ai_jobs.get(code)
+        if job and job["state"] == "running":
+            return True
+        if job:
+            _ai_jobs.pop(code, None)
+    today = date.today().isoformat()
+    if _ai_skip_today.get(code) == today:
+        return False
+    if concept_map.load("KR", code).get("ai_asked") == today:
+        return False
+    return bool(_pending_keys(out))
+
+
+def _start_ai(code):
+    with _jobs_guard:
+        job = _ai_jobs.get(code)
+        if job and job["state"] == "running":
+            return job
+        job = {"state": "running", "started_at": _now(), "result": None}
+        _ai_jobs[code] = job
+
+    def run():
+        try:
+            job["result"] = ai_fill(code)
+        except Exception as e:
+            job["result"] = {"called": False, "error": f"{type(e).__name__}: {e}"}
+            print(f"[kr_financials] {code} AI 대응 에러: {type(e).__name__}: {e}", flush=True)
+        job["state"] = "done"
+    threading.Thread(target=run, daemon=True).start()
+    return job
+
+
+def ai_fill(code, cache=None, force=False, dry_run=False):
+    """규칙이 못 잡은 핵심 항목을 AI 에 묻고 검증을 통과한 답을 대응표(KR)에 저장. 하루 한 번. 호출 한도는 us_financials 와 공유."""
+    import us_financials
+    cache = cache or _load_cache(code)
+    if not cache or not cache.get("acc_mt"):
+        return {"called": False, "reason": "저장본 없음"}
+    today = date.today().isoformat()
+    cm = concept_map.load("KR", code)
+    if cm.get("ai_asked") == today and not force:
+        return {"called": False, "reason": "오늘 이미 물었음"}
+    out = compute(cache, MAX_YEARS, cache.get("corp_name_dart", ""))
+    pending = _pending_keys(out)
+    if not pending:
+        return {"called": False, "reason": "빈 핵심 항목 없음"}
+    cache = _ensure_induty(cache, cache.get("corp_code"))
+    allowed, n = us_financials._ai_allowed()
+    if not allowed:
+        _ai_skip_today[code] = today
+        print(f"[kr_financials] AI 일일 한도({us_financials.DAILY_AI_LIMIT}) 도달, {code} 계정 대응 skip (빈 항목 {len(pending)}개)", flush=True)
+        return {"called": False, "reason": f"일일 한도 {us_financials.DAILY_AI_LIMIT} 도달", "asked": pending}
+    catalog = concept_catalog(cache, us_financials.AI_MAX_CONCEPTS)
+    current = {k: v["concept"] for k, v in out["concepts_used"].items() if v.get("concept")}
+    user = _ai_user_message(cache, pending, catalog)
+    if dry_run:
+        return {"called": False, "reason": "dry_run", "asked": pending, "system": AI_SYSTEM_KR, "user": user, "sent_concepts": len(catalog)}
+    concept_map.mark_asked("KR", code, today)
+    tokens = {"input": 0, "output": 0}
+    answers, err = None, None
+    for attempt in range(2):
+        try:
+            text, ti, to = us_financials._call_ai(AI_SYSTEM_KR, user)
+            tokens["input"] += ti or 0
+            tokens["output"] += to or 0
+            answers = us_financials._parse_ai_json(text)
+            break
+        except Exception as e:
+            err = f"{type(e).__name__}"
+            print(f"[kr_financials] {code} AI 응답 파싱/호출 실패 ({attempt + 1}/2): {err}", flush=True)
+    if answers is None:
+        return {"called": True, "reason": f"AI 응답 실패: {err}", "asked": pending, "tokens": tokens, "sent_concepts": len(catalog)}
+    answers = {k: v for k, v in answers.items() if k in pending and isinstance(v, dict)}
+    ok, rejected = validate_answers(cache, answers, current)
+    for k, c, why in rejected:
+        print(f"[kr_financials] {code} AI 답 거절 {k}={c}: {why}", flush=True)
+    meta = {"asked": pending, "sent_concepts": len(catalog), "tokens": tokens,
+            "accepted": {k: v["concept"] for k, v in ok.items()}, "rejected": rejected, "daily_count": n}
+    concept_map.set_ai("KR", code, ok, meta)
+    print(f"[kr_financials] {code} AI 계정 대응: 물음 {len(pending)}개, 저장 {len(ok)}개, 거절 {len(rejected)}개, "
+          f"토큰 {tokens['input']}+{tokens['output']}, 오늘 {n}/{us_financials.DAILY_AI_LIMIT}", flush=True)
+    return {"called": True, "asked": pending, "accepted": meta["accepted"], "rejected": rejected, "tokens": tokens,
+            "sent_concepts": len(catalog), "answers": answers}
+
+
+def concept_map_view(code):
+    """GET /api/stock/concept-map (KR): 대응표 + 회사 계정 목록(식별자·이름·표·최근 값)"""
+    cache = _load_cache(code)
+    cm = concept_map.load("KR", code)
+    labels = {key: label for sheet, key, label, kind, ids, names in RULES if key not in HIDDEN_KEYS}
+    defs = _item_defs()
+    return {"market": "KR", "code": code, "items": cm.get("items", {}), "ai_asked": cm.get("ai_asked"), "ai_log": cm.get("ai_log", [])[-3:],
+            "keys": [{"key": k, "label": lb, "definition": defs.get(k, "")} for k, lb in labels.items()],
+            "concepts": concept_catalog(cache) if cache else [], "entity": (cache or {}).get("corp_name_dart"),
+            "sic": (cache or {}).get("induty_code"), "sic_desc": ("금융회사(업종 추정)" if cache and _is_financial(cache) else None)}
+
+
+def set_user_concept(code, key, concept, years=5, name=""):
+    """PUT: 사용자 지정(concept None = 해당 없음) 뒤 다시 계산한 응답"""
+    labels = {k for sheet, k, label, kind, ids, names in RULES if k not in HIDDEN_KEYS}
+    if key not in labels:
+        raise ValueError(f"모르는 항목: {key}")
+    cache = _load_cache(code)
+    if not cache or not cache.get("acc_mt"):
+        raise ValueError("저장본 없음 — 먼저 재무정보를 조회하세요")
+    if concept is not None:
+        if concept not in {c["concept"] for c in concept_catalog(cache)}:
+            raise ValueError(f"회사 계정 목록에 없음: {concept}")
+    concept_map.set_user("KR", code, key, concept)
+    out = compute(cache, years, name)
+    out.update(status="ready", updating=None)
+    return out
+
+
+def delete_user_concept(code, key, years=5, name=""):
+    cache = _load_cache(code)
+    if not cache or not cache.get("acc_mt"):
+        raise ValueError("저장본 없음")
+    _, removed = concept_map.delete_user("KR", code, key)
+    out = compute(cache, years, name)
+    out.update(status="ready", updating=None, removed=removed)
     return out
