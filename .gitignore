@@ -66,3 +66,13 @@ _dart_test_drive/
 
 # 지표 수동입력 런타임 데이터
 indicators_manual.json
+
+# 통합 워치리스트 (개인설정)
+watchlist.json
+watchlist_unmatched.json
+
+# 한국 종목 재무 3표 캐시 (조회 시 생성)
+cache/kr_financials/
+
+# 나의 판단 원본 (개인 기록, public repo: 절대 커밋 금지)
+stock_notes/

@@ -1538,6 +1538,119 @@
         @media (max-width: 768px) {
             #mmap-container { height: 400px !important; }
         }
+
+        /* ===== 재무정보 탭 (내부 식별자 stockview) ===== */
+        #tab-stockview {
+            /* 이 탭 차트 전용 색: 부드러운 톤, 증감 표시(--up 빨강, --accent 파랑)와 구분 */
+            --sv-c1: #8fb3c7;   /* 매출액·주요 금액 */
+            --sv-c2: #e3a76f;   /* 순이익·부가 항목 */
+            --sv-c3: #8fbf9a;   /* 영업이익·영업현금흐름 */
+            --sv-c4: #b4a2d6;   /* 매출총이익·판매관리비·보조 */
+            --sv-c5: #e5cc78;   /* 매출원가·CAPEX·지배주주 */
+            --sv-c6: #7d8b96;   /* 주가·합계선·비율선 */
+        }
+        .sv-search-wrap { position: relative; max-width: 520px; }
+        .sv-search-wrap .keyword-input { width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 14px; }
+        .sv-wl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px; }
+        .sv-wl-chips .period-btn { padding: 4px 10px; font-size: 12px; }
+        .sv-section { margin-bottom: 18px; }
+        .sv-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; margin-bottom: 12px; }
+        .sv-name { font-size: 20px; font-weight: bold; color: var(--text); }
+        .sv-sub { font-size: 13px; color: var(--text-muted); }
+        .sv-price { font-size: 20px; font-weight: bold; color: var(--text); }
+        .sv-up { color: var(--up); }
+        .sv-down { color: var(--accent); }
+        .sv-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 16px; }
+        .sv-stat-label { font-size: 12px; color: var(--text-muted); }
+        .sv-stat-value { font-size: 15px; font-weight: bold; color: var(--text); }
+        .sv-controls { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 10px; }
+        .sv-btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+        .sv-icon-btn { display: inline-flex; align-items: center; padding: 5px 8px; }
+        .sv-icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+        .sv-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+        .sv-groups .period-btn { padding: 4px 10px; font-size: 12px; }
+        .sv-note { font-size: 12px; color: var(--text-muted); margin: 4px 0; }
+        .sv-warn { font-size: 12px; color: var(--text-muted); margin: 2px 0; }
+        .sv-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .sv-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+        .sv-table th, .sv-table td { padding: 6px 10px; border-bottom: 1px solid var(--bg-panel); text-align: right; }
+        .sv-table th { color: var(--text-muted); font-weight: normal; background: var(--bg-card); vertical-align: bottom; }
+        .sv-table th small { display: block; font-size: 10px; color: var(--text-dim); }
+        .sv-table th:first-child, .sv-table td:first-child {
+            position: sticky; left: 0; z-index: 1; text-align: left; background: var(--bg-card);
+            border-right: 1px solid var(--border); min-width: 130px;
+        }
+        .sv-table td.sv-calc { font-style: italic; color: var(--text-muted); }
+        .sv-table tr.sv-key td { font-weight: bold; }
+        .sv-table tr.sv-lv1 td:first-child { padding-left: 22px; }
+        .sv-table tr.sv-lv2 td:first-child { padding-left: 36px; color: var(--text-muted); }
+        /* 요약 표 */
+        .sv-sum td, .sv-sum th { cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; }
+        .sv-sum td:first-child, .sv-sum th:first-child { cursor: default; border-left: none; }
+        .sv-sum .sv-sel { border-left-color: var(--text-muted); border-right-color: var(--text-muted); background: var(--bg-hover); }
+        .sv-sum thead .sv-sel { border-top: 2px solid var(--text-muted); }
+        .sv-sum tbody tr:last-child .sv-sel { border-bottom: 2px solid var(--text-muted); }
+        .sv-sum td small, .sv-sum td:first-child small { display: block; font-size: 10px; color: var(--text-dim); font-weight: normal; }
+        .sv-sum td small.sv-up { color: var(--up); }
+        .sv-sum td small.sv-down { color: var(--accent); }
+        /* 차트 카드 */
+        .sv-top { display: grid; grid-template-columns: 55fr 45fr; gap: 14px; align-items: stretch; margin-bottom: 8px; }
+        .sv-top-left { min-width: 0; }
+        .sv-top-left .sv-sum { width: 100%; table-layout: fixed; }
+        .sv-top-left .sv-sum th:first-child, .sv-top-left .sv-sum td:first-child { position: static; min-width: 0; width: 20%; border-right: 1px solid var(--border); }
+        .sv-top-left .sv-sum td, .sv-top-left .sv-sum th { white-space: normal; padding: 6px 6px; }
+        .sv-top-right { position: relative; min-width: 0; display: flex; flex-direction: column; }
+        .sv-wf-wrap { position: relative; flex: 1; min-height: 240px; }
+        .sv-group-title { font-size: 14px; font-weight: bold; color: var(--text); margin: 18px 0 8px; scroll-margin-top: 12px; }
+        .sv-chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .sv-chart-card { background: var(--bg-panel); border-radius: 8px; padding: 10px 12px 6px; }
+        .sv-chart-card .sv-chart-wrap { position: relative; height: 260px; }
+        .sv-chart-wrap { position: relative; height: 260px; }
+        .sv-band-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .sv-empty { color: var(--text-muted); font-size: 13px; padding: 16px 0; text-align: center; }
+        /* 나의 판단 */
+        .sv-notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+        .sv-notes-label { font-size: 13px; font-weight: bold; color: var(--text); margin-bottom: 4px; }
+        .sv-ta { width: 100%; box-sizing: border-box; min-height: 72px; resize: none; overflow: hidden; line-height: 1.5;
+                 background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+                 color: var(--text); font-size: 13px; font-family: inherit; outline: none; }
+        .sv-ta:focus { border-color: var(--accent); }
+        .sv-guard, .sv-conflict { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
+        .sv-guard .sv-btn-group, .sv-conflict .sv-btn-group { margin-top: 8px; }
+        .sv-conflict-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 8px; }
+        .sv-conflict-box { white-space: pre-wrap; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; min-height: 36px; }
+        .sv-memo-row { display: flex; gap: 8px; margin: 14px 0 8px; }
+        .sv-memo-row .keyword-input { flex: 1; }
+        .sv-memo-item { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--bg-panel); font-size: 13px; }
+        .sv-memo-date { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+        .sv-memo-text { flex: 1; white-space: pre-wrap; }
+        .sv-memo-del { color: var(--text-dim); cursor: pointer; font-size: 12px; white-space: nowrap; }
+        .sv-memo-del:hover, .sv-memo-del.confirm { color: var(--up); }
+        .sv-hist { margin-top: 12px; font-size: 13px; }
+        .sv-hist summary { cursor: pointer; color: var(--text-muted); }
+        .sv-hist-item { padding: 6px 0; border-bottom: 1px solid var(--bg-panel); }
+        .sv-hist-item .sv-hist-when { color: var(--text-muted); font-size: 12px; }
+        .sv-hist-item pre { margin: 4px 0 0; white-space: pre-wrap; font-family: inherit; font-size: 12px; color: var(--text-muted); }
+        .sv-wl-chips .sv-chip-note::after { content: " ✎"; color: var(--accent); }
+        .sv-wl-chips .sv-chip-sep { color: var(--text-dim); font-size: 12px; align-self: center; padding: 0 4px; }
+        .sv-disc-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--bg-panel); font-size: 13px; }
+        .sv-disc-date { color: var(--text-muted); min-width: 84px; }
+        .sv-disc-item a { color: var(--text); text-decoration: none; flex: 1; }
+        .sv-disc-item a:hover { color: var(--accent); text-decoration: underline; }
+        .sv-disc-filer { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+        @media (max-width: 1024px) {
+            .sv-chart-grid { grid-template-columns: 1fr; }
+            .sv-band-grid { grid-template-columns: 1fr; }
+            .sv-top { grid-template-columns: 1fr; }
+            .sv-wf-wrap { height: 260px; flex: none; }
+        }
+        @media (max-width: 768px) {
+            .sv-notes-grid { grid-template-columns: 1fr; }
+            .sv-conflict-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+            .sv-disc-filer { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -1570,6 +1683,7 @@
     <div class="tab-group">
         <div class="tab-group-name">종목분석</div>
         <div class="tab-group-tabs">
+            <div class="tab" data-tab="stockview" onclick="switchTab('stockview')">재무정보</div>
             <div class="tab" data-tab="report" onclick="switchTab('report')">증권사 Report</div>
             <div class="tab" data-tab="edgar" onclick="switchTab('edgar')">보고서 다운로드</div>
         </div>
@@ -2084,6 +2198,105 @@
     </div>
 </div>
 
+<!-- 재무정보 탭 (내부 식별자 stockview) -->
+<div class="tab-content" id="tab-stockview">
+    <div class="sv-search-wrap">
+        <input type="text" id="sv-search" class="keyword-input" placeholder="종목명, 종목코드 또는 티커 검색 (한국·미국)" autocomplete="off">
+        <div class="cal-dropdown" id="sv-search-dd"></div>
+    </div>
+    <div class="sv-wl-chips" id="sv-wl-chips"></div>
+
+    <div id="sv-empty" class="sv-empty">종목을 검색하거나 워치리스트에서 고르세요.</div>
+    <div id="sv-body" style="display:none;">
+        <div class="data-table sv-section" id="sv-summary"></div>
+
+        <div class="data-table sv-section" id="sv-notes">
+            <div class="section-title">나의 판단</div>
+            <div class="sv-guard" id="sv-notes-guard" style="display:none;"></div>
+            <div class="sv-conflict" id="sv-notes-conflict" style="display:none;"></div>
+            <div class="sv-notes-grid">
+                <div><div class="sv-notes-label">투자아이디어</div><textarea class="sv-ta" data-f="idea"></textarea></div>
+                <div><div class="sv-notes-label">핵심가정</div><textarea class="sv-ta" data-f="assumptions"></textarea></div>
+                <div><div class="sv-notes-label">Follow-up 포인트</div><textarea class="sv-ta" data-f="followup"></textarea></div>
+                <div><div class="sv-notes-label">Risk 포인트</div><textarea class="sv-ta" data-f="risks"></textarea></div>
+            </div>
+            <div class="sv-controls" style="margin-top:10px;">
+                <span class="btn" id="sv-notes-save">저장</span>
+                <span class="sv-note" id="sv-notes-dirty"></span>
+                <span class="sv-note" id="sv-notes-updated"></span>
+            </div>
+            <div class="sv-memo-row">
+                <input type="text" id="sv-memo-input" class="keyword-input" placeholder="메모 한 줄 (Enter 또는 추가)" autocomplete="off">
+                <span class="period-btn" id="sv-memo-add">추가</span>
+            </div>
+            <div id="sv-memo-list"></div>
+            <details class="sv-hist" id="sv-hist"><summary>변경 이력</summary><div id="sv-hist-list"></div></details>
+        </div>
+
+        <div class="data-table sv-section">
+            <div class="section-title">재무정보</div>
+            <div id="sv-fin-na" class="sv-empty" style="display:none;">다음 단계에서 제공</div>
+            <div id="sv-fin">
+                <div class="sv-controls">
+                    <div class="sv-btn-group" id="sv-fin-table">
+                        <span class="period-btn active" data-v="IS">손익계산서</span>
+                        <span class="period-btn" data-v="BS">재무상태표</span>
+                        <span class="period-btn" data-v="CF">현금흐름표</span>
+                    </div>
+                    <div class="sv-btn-group" id="sv-fin-view">
+                        <span class="period-btn active" data-v="ttm">4분기누적</span>
+                        <span class="period-btn" data-v="quarter">분기</span>
+                        <span class="period-btn" data-v="annual">연도</span>
+                    </div>
+                    <div class="sv-btn-group" id="sv-fin-years">
+                        <span class="period-btn active" data-v="5">5년</span>
+                        <span class="period-btn" data-v="10">10년</span>
+                    </div>
+                    <div class="sv-btn-group" id="sv-fin-mode">
+                        <span class="period-btn sv-icon-btn active" data-v="chart" title="차트 보기"><svg viewBox="0 0 16 16"><path d="M1 14h14v1H1zM2 8h2v5H2zm4-4h2v9H6zm4 2h2v7h-2zm4-4h1v11h-1z"/></svg></span>
+                        <span class="period-btn sv-icon-btn" data-v="table" title="표 보기"><svg viewBox="0 0 16 16"><path d="M1 2h14v12H1zm1 1v3h4V3zm5 0v3h7V3zM2 7v3h4V7zm5 0v3h7V7zm-5 4v2h4v-2zm5 0v2h7v-2z"/></svg></span>
+                    </div>
+                </div>
+                <div class="sv-groups" id="sv-groups"></div>
+                <div id="sv-fin-status"></div>
+                <div id="sv-fin-notes"></div>
+                <div id="sv-fin-content" style="display:none;">
+                    <div class="sv-top">
+                        <div class="sv-top-left"><table class="sv-table sv-sum" id="sv-sum"></table></div>
+                        <div class="sv-top-right">
+                            <div class="sv-wf-wrap"><canvas id="sv-wf"></canvas></div>
+                            <div id="sv-wf-note" class="sv-note"></div>
+                        </div>
+                    </div>
+                    <div id="sv-chart-view"></div>
+                    <div id="sv-table-view" style="display:none;">
+                        <div style="display:flex; justify-content:flex-end; margin:10px 0 6px;"><span class="period-btn" id="sv-copy">표 복사하기</span></div>
+                        <div class="sv-scroll" style="margin-bottom:6px;"><table class="sv-table" id="sv-detail"></table></div>
+                        <div class="sv-note">굵은 글씨는 핵심 항목, 기울임 글씨는 계산값입니다 (마우스를 올리면 계산식). 금액 단위: 원 (조·억 표기)</div>
+                        <div class="section-title" style="margin-top:14px;">지표</div>
+                        <div class="sv-scroll"><table class="sv-table" id="sv-metrics"></table></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-table sv-section">
+            <div class="section-title">밸류에이션</div>
+            <div id="sv-band-na" class="sv-empty" style="display:none;"></div>
+            <div class="sv-band-grid" id="sv-band">
+                <div id="sv-per-band-section"><div class="sv-chart-wrap"><canvas id="sv-per-band"></canvas></div></div>
+                <div id="sv-pbr-band-section"><div class="sv-chart-wrap"><canvas id="sv-pbr-band"></canvas></div></div>
+            </div>
+        </div>
+
+        <div class="data-table sv-section">
+            <div class="section-title">공시 (최근 1년)</div>
+            <div id="sv-disc"></div>
+            <div style="text-align:center; margin-top:10px;"><span class="period-btn" id="sv-disc-more" style="display:none;">20개 더 보기</span></div>
+        </div>
+    </div>
+</div>
+
 <!-- 캘린더 탭 -->
 <div class="tab-content" id="tab-calendar">
     <div class="cal-nav">
@@ -2507,6 +2720,7 @@
     let reportLoaded = false;
     let leadersLoaded = false;
     let stocksLoaded = false;
+    let stockviewLoaded = false;
     function switchTab(tabName, programmatic) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -2546,6 +2760,10 @@
         if (tabName === 'stocks' && !stocksLoaded) {
             stocksLoaded = true;
             loadStockLeaders();
+        }
+        if (tabName === 'stockview' && !stockviewLoaded) {
+            stockviewLoaded = true;
+            initStockView();
         }
         if (tabName === 'valuation' && !valuationLoaded) {
             valuationLoaded = true;
@@ -7931,6 +8149,1097 @@
     }
 
     // 기본 탭: 텔레 인박스 (모든 Loaded 플래그 let 선언 이후에 호출)
+
+    // ===== 재무정보 탭 (내부 식별자 stockview) =====
+    const SV_KEYS = {
+        IS: [['revenue', '매출액'], ['operating_income', '영업이익'], ['net_income', '순이익']],
+        BS: [['total_assets', '자산총계'], ['total_liabilities', '부채총계'], ['total_equity', '자본총계']],
+        CF: [['cfo', '영업현금흐름'], ['capex', 'CAPEX'], ['fcf', 'FCF']],
+    };
+    const SV_EPS = new Set(['eps_basic', 'eps_diluted']);
+    const sv = { market: null, code: null, name: '', table: 'IS', view: 'ttm', years: '5', mode: 'chart', fin: null, flat: {},
+                 prices: null, selLb: null, charts: [], summary: null, token: 0, pollTimer: null, disc: [], discShown: 0,
+                 searchTimer: null, results: [],
+                 unit: 'eok', unitMax: 0,
+                 notes: null, notesBase: null, notesDirty: false, notesToken: 0, pendingOpen: null, notesList: [], memoConfirm: null };
+    const SV_NOTE_FIELDS = [['idea', '투자아이디어'], ['assumptions', '핵심가정'], ['followup', 'Follow-up 포인트'], ['risks', 'Risk 포인트']];
+
+    function svEsc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function svWon(v) {
+        if (v == null) return '-';
+        const sign = v < 0 ? '-' : '';
+        const a = Math.abs(v);
+        const eok = Math.round(a / 1e8);
+        if (eok === 0) return a === 0 ? '0' : sign + Math.round(a / 1e4).toLocaleString() + '만';
+        const jo = Math.floor(eok / 10000), rest = eok % 10000;
+        return sign + (jo ? `${jo.toLocaleString()}조 ${rest.toLocaleString()}억` : `${rest.toLocaleString()}억`);
+    }
+    function svUsd(v) {
+        if (v == null) return '-';
+        const a = Math.abs(v);
+        if (a >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T';
+        if (a >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+        if (a >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+        return '$' + v.toLocaleString();
+    }
+    function svVal(key, v) {
+        if (v == null) return '-';
+        return SV_EPS.has(key) ? Math.round(v).toLocaleString() + '원' : svWon(v);
+    }
+    function svPct(v, colored) {
+        if (v == null) return '-';
+        const s = (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+        if (!colored) return v.toFixed(1) + '%';
+        return `<span class="${v > 0 ? 'sv-up' : v < 0 ? 'sv-down' : ''}">${s}</span>`;
+    }
+    function svStore(k, v) {
+        try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
+    }
+
+    function initStockView() {
+        const input = document.getElementById('sv-search');
+        input.addEventListener('input', () => {
+            clearTimeout(sv.searchTimer);
+            const q = input.value.trim();
+            if (!q) { document.getElementById('sv-search-dd').style.display = 'none'; return; }
+            sv.searchTimer = setTimeout(() => svSearch(q), 250);
+        });
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && sv.results.length) { e.preventDefault(); svPick(0); }
+            if (e.key === 'Escape') document.getElementById('sv-search-dd').style.display = 'none';
+        });
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.sv-search-wrap')) document.getElementById('sv-search-dd').style.display = 'none';
+        });
+        const bindGroup = (id, field) => document.getElementById(id).addEventListener('click', e => {
+            const b = e.target.closest('.period-btn');
+            if (!b) return;
+            document.querySelectorAll('#' + id + ' .period-btn').forEach(x => x.classList.toggle('active', x === b));
+            const prevYears = sv.years;
+            sv[field] = b.dataset.v;
+            if (field === 'years' && sv.years !== prevYears) svLoadFinancials();
+            else svRenderFinancials();
+        });
+        bindGroup('sv-fin-table', 'table');
+        bindGroup('sv-fin-view', 'view');
+        bindGroup('sv-fin-years', 'years');
+        bindGroup('sv-fin-mode', 'mode');
+        document.getElementById('sv-copy').addEventListener('click', svCopyTable);
+        document.getElementById('sv-disc-more').addEventListener('click', () => { sv.discShown += 20; svRenderDisc(); });
+        svInitNotes();
+        document.getElementById('sv-wl-chips').addEventListener('click', e => {
+            const b = e.target.closest('.period-btn[data-c]');
+            if (b) svOpen(b.dataset.m, b.dataset.c, b.dataset.n);
+        });
+        svLoadWatchlistChips();
+        let last = null;
+        try { last = JSON.parse(svStore('sv_last') || 'null'); } catch (e) { last = null; }
+        if (last && last.market && last.code) svOpen(last.market, last.code, last.name || '');
+    }
+
+    async function svSearch(q) {
+        try {
+            const res = await fetch(API_BASE + '/api/stock/search?q=' + encodeURIComponent(q));
+            const list = await res.json();
+            if (document.getElementById('sv-search').value.trim() !== q) return;
+            sv.results = list.filter(r => r.wl_market === 'KR' || r.wl_market === 'US');
+            const dd = document.getElementById('sv-search-dd');
+            dd.innerHTML = sv.results.length ? sv.results.map((r, i) => `
+                <div class="cal-dropdown-item" onclick="svPick(${i})">
+                    <span class="cal-dropdown-code">${svEsc(r.wl_code)}</span>
+                    <span class="cal-dropdown-name">${svEsc(r.name)}</span>
+                    ${r.in_watchlist ? '<span class="cal-dropdown-market">★</span>' : ''}
+                    <span class="cal-dropdown-market">${r.wl_market === 'KR' ? '한국' : '미국'}</span>
+                </div>`).join('') : '<div class="cal-dropdown-item">결과 없음</div>';
+            dd.style.display = 'block';
+        } catch (e) { console.error('종목 검색 실패:', e); }
+    }
+
+    function svPick(i) {
+        const r = sv.results[i];
+        if (!r) return;
+        document.getElementById('sv-search').value = '';
+        document.getElementById('sv-search-dd').style.display = 'none';
+        svOpen(r.wl_market, r.wl_code, r.name);
+    }
+
+    async function svLoadWatchlistChips() {
+        try {
+            const [wl, nl] = await Promise.all([
+                fetch(API_BASE + '/api/watchlist').then(r => r.json()),
+                fetch(API_BASE + '/api/stock/notes/list').then(r => r.json()).catch(() => ({ items: [] })),
+            ]);
+            sv.notesList = nl.items || [];
+            const noted = new Set(sv.notesList.map(n => n.market + ':' + n.code));
+            const chip = i => `<span class="period-btn${i.market === sv.market && i.code === sv.code ? ' active' : ''}${noted.has(i.market + ':' + i.code) ? ' sv-chip-note' : ''}"
+                       title="${svEsc(i.code)}" data-m="${svEsc(i.market)}" data-c="${svEsc(i.code)}" data-n="${svEsc(i.name)}">${svEsc(i.market === 'KR' ? (i.name || i.code) : i.code)}</span>`;
+            const items = wl.items || [];
+            const inWl = new Set(items.map(i => i.market + ':' + i.code));
+            const extra = sv.notesList.filter(n => !inWl.has(n.market + ':' + n.code));
+            let html = items.map(chip).join('') || '<span class="sv-note">워치리스트가 비어 있습니다.</span>';
+            if (extra.length) html += '<span class="sv-chip-sep">| 판단만 있음:</span>' + extra.map(chip).join('');
+            document.getElementById('sv-wl-chips').innerHTML = html;
+        } catch (e) { console.error('워치리스트 로드 실패:', e); }
+    }
+
+    function svOpen(market, code, name, force) {
+        if (sv.notesDirty && !force && !(market === sv.market && code === sv.code)) {
+            svShowGuard(market, code, name);
+            return;
+        }
+        svHideGuard();
+        sv.token += 1;
+        clearTimeout(sv.pollTimer);
+        (sv.charts || []).forEach(c => c.destroy());
+        Object.assign(sv, { market, code, name, fin: null, flat: {}, prices: null, selLb: null, charts: [], summary: null, disc: [], discShown: 0 });
+        svStore('sv_last', JSON.stringify({ market, code, name }));
+        document.getElementById('sv-empty').style.display = 'none';
+        document.getElementById('sv-body').style.display = 'block';
+        document.querySelectorAll('#sv-wl-chips .period-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.c === code && b.dataset.m === market));
+        svRenderSummary();
+        svLoadSummary();
+        svLoadNotes();
+        const kr = market === 'KR';
+        document.getElementById('sv-fin').style.display = kr ? '' : 'none';
+        document.getElementById('sv-fin-na').style.display = kr ? 'none' : 'block';
+        document.getElementById('sv-band').style.display = kr ? '' : 'none';
+        const bandNa = document.getElementById('sv-band-na');
+        bandNa.style.display = kr ? 'none' : 'block';
+        bandNa.textContent = kr ? '' : '다음 단계에서 제공';
+        if (kr) {
+            svLoadFinancials();
+            svLoadPrices();
+            svLoadBand();
+            svLoadDisc();
+        } else {
+            ['sv-per-band', 'sv-pbr-band'].forEach(id => { const c = Chart.getChart(id); if (c) c.destroy(); });
+            document.getElementById('sv-disc').innerHTML = '<div class="sv-empty">다음 단계에서 제공</div>';
+            document.getElementById('sv-disc-more').style.display = 'none';
+        }
+    }
+
+    // --- 종목 요약 ---
+    async function svLoadSummary() {
+        const t = sv.token;
+        try {
+            const res = await fetch(API_BASE + `/api/stock/summary?market=${sv.market}&code=${encodeURIComponent(sv.code)}`);
+            const d = await res.json();
+            if (t !== sv.token) return;
+            sv.summary = res.ok ? d : { error: d.message || d.error || '요약을 불러오지 못했습니다' };
+        } catch (e) {
+            if (t !== sv.token) return;
+            sv.summary = { error: '요약을 불러오지 못했습니다' };
+        }
+        svRenderSummary();
+        if (sv.fin && sv.mode === 'chart' && sv.market === 'KR' && sv.summary.shares) svRenderCharts();
+    }
+
+    function svRenderSummary() {
+        const s = sv.summary;
+        const box = document.getElementById('sv-summary');
+        const head = `<div class="sv-head"><span class="sv-name">${svEsc((s && s.name) || sv.name || sv.code)}</span>
+            <span class="sv-sub">${svEsc(sv.code)} · ${sv.market === 'KR' ? '한국' : '미국'}${s && s.exchange ? ' · ' + svEsc(s.exchange) : ''}</span>`;
+        if (!s) { box.innerHTML = head + '</div><div class="sv-note">불러오는 중...</div>'; return; }
+        if (s.error) { box.innerHTML = head + `</div><div class="sv-note">${svEsc(s.error)}</div>`; return; }
+        const usd = s.currency && s.currency !== 'KRW';
+        const price = s.price == null ? '-' : (usd ? '$' + s.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : s.price.toLocaleString() + '원');
+        const ch = s.change_pct == null ? '' : svPct(s.change_pct, true);
+        const stat = (label, value, title) => `<div title="${svEsc(title || '')}"><div class="sv-stat-label">${label}</div><div class="sv-stat-value">${value}</div></div>`;
+        box.innerHTML = head + `<span class="sv-price">${price}</span> ${ch}
+            <span class="period-btn" id="sv-wl-btn" onclick="svToggleWatchlist()">${s.in_watchlist ? '★ 워치리스트에서 빼기' : '☆ 워치리스트에 추가'}</span></div>
+            <div class="sv-stats">
+                ${stat('시가총액', usd ? svUsd(s.market_cap) : svWon(s.market_cap), s.market_cap_basis)}
+                ${stat('PER', s.per == null ? '-' : s.per.toFixed(1) + '배', s.valuation_basis)}
+                ${stat('PBR', s.pbr == null ? '-' : s.pbr.toFixed(2) + '배', s.valuation_basis)}
+                ${stat('ROE', s.roe == null ? '-' : s.roe.toFixed(1) + '%', sv.market === 'KR' ? '4분기누적 지배주주순이익 / 평균 지배주주지분' : 'yfinance')}
+                ${stat('결산월', s.fiscal_month ? s.fiscal_month + '월' : '-')}
+                ${stat('연결/별도', s.fs_div_label || '-')}
+            </div>
+            ${sv.market === 'KR' && !s.financials_ready ? '<div class="sv-note">재무 3표를 받아오는 중이라 PER·PBR·ROE가 비어 있을 수 있습니다.</div>' : ''}`;
+    }
+
+    async function svToggleWatchlist() {
+        const s = sv.summary;
+        if (!s || s.error) return;
+        const btn = document.getElementById('sv-wl-btn');
+        if (btn) btn.textContent = '처리 중...';
+        try {
+            const res = await fetch(API_BASE + '/api/watchlist', {
+                method: s.in_watchlist ? 'DELETE' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ market: sv.market, code: sv.code }),
+            });
+            const d = await res.json();
+            if (res.ok) s.in_watchlist = !s.in_watchlist;
+            else alert(d.error || '워치리스트 변경 실패');
+        } catch (e) { alert('워치리스트 변경 실패'); }
+        svRenderSummary();
+        svLoadWatchlistChips();
+    }
+
+    // --- 재무정보 ---
+    async function svLoadFinancials() {
+        const t = sv.token;
+        clearTimeout(sv.pollTimer);
+        const status = document.getElementById('sv-fin-status');
+        if (!sv.fin) { status.innerHTML = '<div class="sv-note">불러오는 중...</div>'; document.getElementById('sv-fin-content').style.display = 'none'; }
+        let d;
+        try {
+            const res = await fetch(API_BASE + `/api/stock/financials?market=KR&code=${encodeURIComponent(sv.code)}&years=${sv.years}`);
+            d = await res.json();
+            if (!res.ok) d = { status: 'failed', error: d.message || d.error || ('HTTP ' + res.status) };
+        } catch (e) {
+            d = { status: 'failed', error: '서버에 연결하지 못했습니다' };
+        }
+        if (t !== sv.token) return;
+        if (d.status === 'fetching') {
+            const p = d.progress || {};
+            const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
+            status.innerHTML = `<div class="sv-note">DART에서 재무제표를 받아오는 중... ${p.total ? `${p.done} / ${p.total} 보고서 (${pct}%)` : '준비 중'}</div>`;
+            sv.pollTimer = setTimeout(svLoadFinancials, 3000);
+            return;
+        }
+        if (d.status === 'failed') {
+            status.innerHTML = `<div class="sv-note">재무제표를 받아오지 못했습니다: ${svEsc(d.error || '')}
+                <span class="period-btn" onclick="svLoadFinancials()">다시 시도</span></div>`;
+            return;
+        }
+        sv.fin = d;
+        sv.flat = {};
+        Object.values(d.statements).forEach(st => Object.entries(st.items).forEach(([k, it]) => { sv.flat[k] = it; }));
+        if (d.updating) {
+            const p = d.updating;
+            status.innerHTML = `<div class="sv-note">최신 보고서 확인 중... ${p.total ? `${p.done} / ${p.total}` : ''}</div>`;
+            sv.pollTimer = setTimeout(svLoadFinancials, 3000);
+        } else {
+            status.innerHTML = '';
+        }
+        svRenderFinancials();
+        if (sv.summary && !sv.summary.error && !sv.summary.financials_ready) svLoadSummary();
+    }
+
+    async function svLoadPrices() {
+        const t = sv.token;
+        try {
+            const res = await fetch(API_BASE + '/api/stock/prices?market=KR&code=' + encodeURIComponent(sv.code));
+            const d = await res.json();
+            if (t !== sv.token) return;
+            sv.prices = res.ok && d.prices && Object.keys(d.prices).length ? d.prices : null;
+        } catch (e) {
+            if (t === sv.token) sv.prices = null;
+        }
+        if (sv.fin && sv.mode === 'chart') svRenderCharts();
+    }
+
+    // 값 꺼내기와 계산 (성장률·비율은 화면에서 계산)
+    function svPeriods() { return sv.fin ? (sv.fin.periods[sv.view] || []) : []; }
+    function svPrevLabel(lb) { const [y, m] = lb.split('.'); return `${+y - 1}.${m}`; }
+    function svV(key, lb) { const it = sv.flat && sv.flat[key]; return it ? it[sv.view][lb] ?? null : null; }
+    function svSub(a, b) { return a == null || b == null ? null : a - b; }
+    function svAddN(...xs) { return xs.some(x => x == null) ? null : xs.reduce((s, x) => s + x, 0); }
+    function svRatio(a, b) { return a == null || b == null || b <= 0 ? null : a / b * 100; }
+    function svGrowth(cur, prev) { return cur == null || prev == null || prev <= 0 ? null : (cur - prev) / prev * 100; }
+    function svYoY(fn) { return lb => svGrowth(fn(lb), fn(svPrevLabel(lb))); }
+    function svK(key) { return lb => svV(key, lb); }
+    function svPrice(lb) { return sv.prices ? (sv.prices[lb] ?? null) : null; }
+    function svPriceRet(lb) {
+        const a = svPrice(lb), b = svPrice(svPrevLabel(lb));
+        return a == null || b == null || b <= 0 ? null : (a / b - 1) * 100;
+    }
+    function svIsCalc(key, lb) {
+        const c = sv.fin && sv.fin.calculated && sv.fin.calculated[key];
+        return c && (c.periods[sv.view] || []).includes(lb) ? c.formula : null;
+    }
+    const svOtherNet = lb => svSub(svV('other_income', lb), svV('other_expense', lb));
+    const svFinNet = lb => svSub(svV('finance_income', lb), svV('finance_cost', lb));
+
+    // 표 보기 행 꾸밈: 부호 (+)/(-), 들여쓰기 수준, 핵심 행, 계산 행(앞에 끼워 넣음)
+    const SV_LAYOUT = {
+        IS: {
+            revenue: { key: 1 }, cogs: { sign: '-' }, gross_profit: { key: 1 }, sga: { sign: '-' }, operating_income: { key: 1 },
+            other_income: { lv: 2, before: { id: 'other_net', label: '기타손익', sign: '+', lv: 1, fn: svOtherNet, formula: '기타수익 - 기타비용' } },
+            other_expense: { lv: 2 },
+            finance_income: { lv: 2, before: { id: 'finance_net', label: '금융손익', sign: '+', lv: 1, fn: svFinNet, formula: '금융수익 - 금융비용' } },
+            finance_cost: { lv: 2 },
+            equity_method: { sign: '+', lv: 1 },
+            pretax_income: { key: 1 }, income_tax: { sign: '-' }, net_income: { key: 1 },
+            net_income_owner: { lv: 1 }, net_income_minority: { lv: 1 },
+        },
+        BS: {
+            cash: { lv: 1 }, st_fin: { lv: 1 }, cur_fin_assets: { lv: 1 }, lt_fin: { lv: 1 }, noncur_fin_assets: { lv: 1 }, fin_assets_total: { lv: 1 },
+            trade_receivables: { lv: 1 }, inventories: { lv: 1 }, nwc: { lv: 1 },
+            cur_fin_liab: { lv: 1 }, noncur_fin_liab: { lv: 1 }, fin_liab_total: { lv: 1 }, net_fin_assets: { lv: 1 }, retained_earnings: { lv: 1 },
+            ppe: { lv: 1 }, intangibles: { lv: 1 }, investment_property: { lv: 1 }, associates: { lv: 1 },
+            total_assets: { key: 1 }, trade_payables: { lv: 1 }, total_liabilities: { key: 1 },
+            equity_owner: { lv: 1 }, equity_minority: { lv: 1 }, total_equity: { key: 1 },
+        },
+        CF: {
+            cfo: { key: 1 }, depreciation: { lv: 1 }, amortization: { lv: 1 },
+            cfi: { key: 1 }, capex_ppe: { lv: 1 }, capex_intangible: { lv: 1 }, capex: { lv: 1 },
+            cff: { key: 1 }, dividends_paid: { lv: 1 }, treasury_purchase: { lv: 1 }, fcf: { key: 1 },
+        },
+    };
+
+    function svRows(sheet) {
+        const f = sv.fin;
+        const order = (f.order && f.order[sheet]) || Object.keys(f.statements[sheet].items);
+        const items = f.statements[sheet].items;
+        const deco = SV_LAYOUT[sheet] || {};
+        const rows = [];
+        order.forEach(k => {
+            const d = deco[k] || {};
+            if (d.before) {
+                const b = d.before;
+                rows.push({ id: b.id, label: b.label, sign: b.sign, lv: b.lv || 0, key: false,
+                            get: b.fn, calc: lb => (b.fn(lb) == null ? null : b.formula) });
+            }
+            if (!items[k]) return;
+            rows.push({ id: k, label: items[k].label, sign: d.sign || '', lv: d.lv || 0, key: !!d.key,
+                        get: lb => svV(k, lb), calc: lb => svIsCalc(k, lb) });
+        });
+        return rows;
+    }
+
+    function svFmtCell(id, v) { return v == null ? '-' : (SV_EPS.has(id) ? Math.round(v).toLocaleString() + '원' : svWon(v)); }
+    function svQLabel(lb) {
+        const f = sv.fin;
+        const [y, m] = lb.split('.').map(Number);
+        const mt = f.fiscal_month || 12;
+        const fy = m <= mt ? y : y + 1;
+        const fs = ((f.fs_div_by_period || {})[sv.view === 'annual' ? 'annual' : 'quarter'] || {})[lb];
+        const fsl = fs === 'CFS' ? '연결' : fs === 'OFS' ? '별도' : '';
+        const q = Math.floor(((m - mt - 1 + 24) % 12) / 3) + 1;
+        const name = sv.view === 'annual' ? `FY${String(fy).slice(2)}` : `${String(fy).slice(2)}Q${q}`;
+        return `(${name}${fsl ? ', ' + fsl : ''})`;
+    }
+
+    function svRenderFinancials() {
+        const f = sv.fin;
+        const content = document.getElementById('sv-fin-content');
+        if (!f || f.status !== 'ready') { content.style.display = 'none'; return; }
+        // 경고·안내
+        const notes = [];
+        if (f.fs_div_label) notes.push(`${f.fs_div_label} 기준 · 결산 ${f.fiscal_month}월 · 단위 원`);
+        const missing = (f.missing || []).filter(m => m.sheet === sv.table);
+        if ((f.missing || []).length >= 10)
+            notes.push('금융회사 등 일반 기업과 양식이 달라 빈 항목이 많습니다 (빈 칸은 "-").');
+        if (missing.length) notes.push('이 표에서 공시되지 않은 항목: ' + missing.map(m => m.label).join(', '));
+        const partial = (f.partial_missing || []).filter(p => p.sheet === sv.table && p.view === sv.view);
+        if (partial.length) notes.push('일부 기간만 빈 항목: ' + partial.map(p => `${p.label} (${p.ranges.join(', ')})`).join(' · '));
+        (f.warnings || []).forEach(w => notes.push('⚠ ' + w));
+        document.getElementById('sv-fin-notes').innerHTML = notes.map(n => `<div class="sv-warn">${svEsc(n)}</div>`).join('');
+
+        const periods = svPeriods();
+        if (!periods.length) {
+            content.style.display = 'none';
+            document.getElementById('sv-fin-notes').innerHTML += '<div class="sv-empty">표시할 기간이 없습니다.</div>';
+            return;
+        }
+        content.style.display = 'block';
+        if (!sv.selLb || !periods.includes(sv.selLb)) sv.selLb = periods[periods.length - 1];
+        svPickUnit();
+        svRenderSumTable();
+        svRenderWaterfall();
+        const chartMode = sv.mode === 'chart';
+        document.getElementById('sv-chart-view').style.display = chartMode ? '' : 'none';
+        document.getElementById('sv-table-view').style.display = chartMode ? 'none' : '';
+        document.getElementById('sv-groups').style.display = chartMode ? '' : 'none';
+        if (chartMode) svRenderCharts(); else svRenderTable();
+    }
+
+    // 금액 단위: 선택한 표의 최대 금액이 1조 이상이면 "조", 아니면 "억" (요약 표·차트 축·툴팁·범례 공통)
+    function svPickUnit() {
+        const f = sv.fin;
+        let mx = 0;
+        if (f) Object.entries(f.statements[sv.table].items).forEach(([k, it]) => {
+            if (SV_EPS.has(k)) return;
+            Object.values(it[sv.view] || {}).forEach(v => { if (v != null && Math.abs(v) > mx) mx = Math.abs(v); });
+        });
+        sv.unitMax = mx;
+        sv.unit = mx >= 1e12 ? 'jo' : 'eok';
+    }
+    function svUnitName() { return sv.unit === 'jo' ? '조원' : '억원'; }
+    function svAmt(v, digits) {   // 단위에 맞춘 금액 표기 (툴팁·요약 표)
+        if (v == null) return '-';
+        if (sv.unit === 'jo') return (v / 1e12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '조';
+        return Math.round(v / 1e8).toLocaleString() + '억';
+    }
+    function svAxisAmt(v) {       // 축 눈금
+        if (sv.unit === 'jo') return (v / 1e12).toLocaleString(undefined, { maximumFractionDigits: 1 }) + '조';
+        return Math.round(v / 1e8).toLocaleString() + '억';
+    }
+    function svFmtUnit(unit, v) {
+        if (v == null) return '-';
+        if (unit === 'pct') return v.toFixed(1) + '%';
+        if (unit === 'turn') return v.toFixed(2) + '회';
+        if (unit === 'price') return Math.round(v).toLocaleString() + '원';
+        return svAmt(v);
+    }
+    function svColors() {
+        const el = document.getElementById('tab-stockview');
+        const g = n => getComputedStyle(el).getPropertyValue(n).trim();
+        return { c1: g('--sv-c1'), c2: g('--sv-c2'), c3: g('--sv-c3'), c4: g('--sv-c4'), c5: g('--sv-c5'), c6: g('--sv-c6'),
+                 text: g('--text'), muted: g('--text-muted'), grid: g('--border') };
+    }
+    // 직전 기간: 분기·4분기누적 보기는 3개월 전, 연도 보기는 1년 전
+    function svPrevPeriodLabel(lb) {
+        if (sv.view === 'annual') return svPrevLabel(lb);
+        let [y, m] = lb.split('.').map(Number);
+        m -= 3; if (m <= 0) { m += 12; y -= 1; }
+        return `${y}.${String(m).padStart(2, '0')}`;
+    }
+    function svQoQ(fn) { return lb => svGrowth(fn(lb), fn(svPrevPeriodLabel(lb))); }
+    function svQoQName() { return sv.view === 'quarter' ? 'QoQ' : '전기 대비'; }
+    function svMcapInfo(lb) {     // 기간 말 시가총액 = 기간 말 종가 × 그 기간의 유통주식수(DART). 없으면 현재 주식수로 근사
+        const px = svPrice(lb);
+        if (px == null) return { v: null, approx: false };
+        const byP = (sv.fin && sv.fin.shares_by_period && sv.fin.shares_by_period[sv.view === 'annual' ? 'annual' : 'quarter']) || {};
+        const d = byP[lb];
+        if (d && d.common) return { v: px * d.common, approx: false };
+        const cur = sv.summary && !sv.summary.error ? sv.summary.shares : null;
+        return cur ? { v: px * cur, approx: true } : { v: null, approx: false };
+    }
+    function svMcap(lb) { return svMcapInfo(lb).v; }
+    function svMcapLabel() {      // 근사한 기간이 하나라도 있으면 "(근사)"
+        return svPeriods().some(lb => { const i = svMcapInfo(lb); return i.v != null && i.approx; }) ? '시가총액(근사)' : '시가총액';
+    }
+    function svTtm(key, lb) {     // 4분기누적 값 (연도 보기는 연간)
+        const it = sv.flat[key];
+        if (!it) return null;
+        return (sv.view === 'annual' ? it.annual[lb] : it.ttm[lb]) ?? null;
+    }
+    function svDelta(fn) { return lb => svSub(fn(lb), fn(svPrevPeriodLabel(lb))); }   // 전분기말 대비 증감
+    function svTurnover(ttmKey, stockKey) {   // 회전율(회) = 4분기누적 / 시점 값
+        return lb => { const d = svV(stockKey, lb), n = svTtm(ttmKey, lb); return d == null || n == null || d <= 0 ? null : n / d; };
+    }
+    function svTtmRev(lb) {       // 운전자본 회전용 4분기누적 매출액 (연도 보기는 연간)
+        const it = sv.flat.revenue;
+        if (!it) return null;
+        return (sv.view === 'annual' ? it.annual[lb] : it.ttm[lb]) ?? null;
+    }
+    function svRoe(lb) {          // 서버 ROE 가 비면(분기 보기) 4분기누적 지배주주순이익 / 평균 지배주주지분
+        const m = ((sv.fin.metrics[sv.view] || {})[lb] || {}).roe;
+        if (m != null) return m;
+        const ni = sv.flat.net_income_owner, eq = sv.flat.equity_owner;
+        if (!ni || !eq) return null;
+        const n = sv.view === 'annual' ? ni.annual[lb] : ni.ttm[lb];
+        const e1 = eq[sv.view][lb], e0 = eq[sv.view][svPrevLabel(lb)];
+        if (n == null || e1 == null || e0 == null || e0 + e1 <= 0) return null;
+        return n / ((e0 + e1) / 2) * 100;
+    }
+
+    // 요약 표: 행 = 핵심 3개, 열 = 최근 5개 기간(최신이 왼쪽), 칸 = 값 + 전년 대비
+    function svRenderSumTable() {
+        const periods = svPeriods().slice(-5).reverse();
+        const keys = SV_KEYS[sv.table];
+        let h = `<thead><tr><th><small>단위 ${svUnitName()}</small></th>` + periods.map(lb =>
+            `<th data-lb="${lb}" class="${lb === sv.selLb ? 'sv-sel' : ''}">${lb}</th>`).join('') + '</tr></thead><tbody>';
+        keys.forEach(([k, label]) => {
+            h += `<tr><td><b>${label}</b><small>YOY</small></td>` + periods.map(lb => {
+                const v = svV(k, lb);
+                const g = svGrowth(v, svV(k, svPrevLabel(lb)));
+                const gs = g == null ? '<small>-</small>'
+                    : `<small class="${g > 0 ? 'sv-up' : g < 0 ? 'sv-down' : ''}">${g > 0 ? '▲' : g < 0 ? '▼' : ''} ${Math.abs(g).toFixed(1)}%</small>`;
+                return `<td data-lb="${lb}" class="${lb === sv.selLb ? 'sv-sel' : ''}${svIsCalc(k, lb) ? ' sv-calc' : ''}">${svAmt(v)}${gs}</td>`;
+            }).join('') + '</tr>';
+        });
+        const tbl = document.getElementById('sv-sum');
+        tbl.innerHTML = h + '</tbody>';
+        tbl.onclick = e => {
+            const c = e.target.closest('[data-lb]');
+            if (!c) return;
+            sv.selLb = c.dataset.lb;
+            svRenderSumTable();
+            svRenderWaterfall();
+        };
+    }
+
+    // 폭포 차트: 합계는 바닥부터, 차감·증감은 앞 합계에서 떠 있는 막대
+    function svRenderWaterfall() {
+        const lb = sv.selLb;
+        const V = k => svV(k, lb);
+        const steps = {
+            IS: [['매출액', 'total', V('revenue')], ['매출원가', 'minus', V('cogs')], ['매출총이익', 'total', V('gross_profit')],
+                 ['판매관리비', 'minus', V('sga')], ['영업이익', 'total', V('operating_income')],
+                 ['영업외손익', 'delta', svSub(V('pretax_income'), V('operating_income'))],
+                 ['법인세차감전순이익', 'total', V('pretax_income')], ['법인세', 'minus', V('income_tax')], ['순이익', 'total', V('net_income')]],
+            BS: [['자산총계', 'total', V('total_assets')], ['부채총계', 'minus', V('total_liabilities')], ['자본총계', 'total', V('total_equity')]],
+            CF: [['영업현금흐름', 'total', V('cfo')], ['CAPEX', 'minus', V('capex')], ['FCF', 'total', V('fcf')]],
+        }[sv.table];
+        const C = svColors();
+        const labels = [], data = [], colors = [], amounts = [];
+        let last = null;
+        steps.forEach(([name, kind, v]) => {
+            if (v == null) return;
+            if (kind === 'total') {
+                labels.push(name); data.push([0, v]); colors.push(C.c1); amounts.push(v); last = v;
+            } else if (last != null) {
+                const to = kind === 'minus' ? last - v : last + v;
+                labels.push(name); data.push([Math.min(last, to), Math.max(last, to)]);
+                colors.push(to < last ? C.c2 : C.c3); amounts.push(kind === 'minus' ? -v : v); last = to;
+            }
+        });
+        const old = Chart.getChart('sv-wf');
+        if (old) old.destroy();
+        const note = document.getElementById('sv-wf-note');
+        const wrap = document.getElementById('sv-wf').parentNode;
+        if (labels.length < 2) {
+            note.textContent = `${lb} 폭포 차트에 필요한 항목이 없습니다.`;
+            wrap.style.visibility = 'hidden';
+            return;
+        }
+        wrap.style.visibility = '';
+        note.textContent = '';
+        // 항목당 가로 폭이 좁으면 긴 이름을 두 줄로 (Chart.js 는 배열 라벨을 여러 줄로 그림)
+        const perLabel = (wrap.clientWidth || 600) / labels.length;
+        const narrow = perLabel < 80;
+        const wfLabels = labels.map(n => (narrow && n.length >= 5) ? [n.slice(0, Math.ceil(n.length / 2)), n.slice(Math.ceil(n.length / 2))] : n);
+        new Chart(document.getElementById('sv-wf'), {
+            type: 'bar',
+            data: { labels: wfLabels, datasets: [{ label: lb, data, backgroundColor: colors, borderWidth: 0, maxBarThickness: 48 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: `${lb} ${{ IS: '손익 흐름', BS: '자산 = 부채 + 자본', CF: '현금흐름' }[sv.table]} (${svUnitName()})`, font: { weight: 'bold', size: 13 }, color: C.text },
+                    tooltip: { callbacks: { title: items => items.length ? labels[items[0].dataIndex] : '', label: c => svAmt(amounts[c.dataIndex]) } },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: C.text, font: { size: perLabel < 60 ? 9 : narrow ? 10 : 11 }, maxRotation: 0, autoSkip: false } },
+                    y: { ticks: { color: C.muted, font: { size: 10 }, callback: v => svAxisAmt(v) },
+                         grid: { color: ctx => ctx.tick.value === 0 ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.06)', lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1 } },
+                },
+            },
+        });
+    }
+
+    // 차트 목록: 묶음별. s = 계열 {label, fn, type: bar|line, axis: L|R, unit: won|pct|price, color, stack}
+    //   need: 전부 있어야 그림 / needAny: 하나라도 있으면 그림
+    function svChartDefs(C) {
+        const K = svK, Y = svYoY, Q = svQoQ, qn = svQoQName();
+        const rev = K('revenue');
+        const B = (label, fn, color, extra) => Object.assign({ label, fn, type: 'bar', axis: 'L', unit: 'won', color }, extra || {});
+        const L = (label, fn, color, extra) => Object.assign({ label, fn, type: 'line', axis: 'L', unit: 'won', color }, extra || {});
+        const P = { unit: 'pct' }, R = { axis: 'R' }, RP = { axis: 'R', unit: 'pct' };
+        const priceOn = !!sv.prices;
+        const mcapOn = priceOn && !!(sv.summary && !sv.summary.error && sv.summary.shares);
+        const ratio = (a, b) => lb => svRatio(svV(a, lb), svV(b, lb));
+        const margin = k => lb => svRatio(svV(k, lb), rev(lb));
+        const absK = k => lb => { const v = svV(k, lb); return v == null ? null : Math.abs(v); };
+        const hasAny = k => svPeriods().some(lb => svV(k, lb) != null);
+        return {
+            IS: [
+                { group: '실적', title: '실적', need: ['revenue'], s: [
+                    B('매출액', rev, C.c1), L('매출총이익', K('gross_profit'), C.c4), L('영업이익', K('operating_income'), C.c3),
+                    L('순이익', K('net_income'), C.c2),
+                    ...(mcapOn ? [L(svMcapLabel(), svMcap, C.c6, R)] : [])] },
+                { group: '실적', title: '매출액', need: ['revenue'], s: [
+                    B('매출액', rev, C.c1), L('매출액 성장률(YoY)', Y(rev), C.c6, RP), L(`매출액 성장률(${qn})`, Q(rev), C.c2, RP),
+                    L('매출총이익률', margin('gross_profit'), C.c4, RP)] },
+                { group: '실적', title: '영업이익', need: ['operating_income', 'revenue'], s: [
+                    B('영업이익', K('operating_income'), C.c3), L('영업이익 성장률(YoY)', Y(K('operating_income')), C.c6, RP),
+                    L(`영업이익 성장률(${qn})`, Q(K('operating_income')), C.c2, RP), L('영업이익률', margin('operating_income'), C.c4, RP)] },
+                { group: '매출액', title: '매출액 구성', need: ['cogs', 'sga'], stacked: true, s: [
+                    B('매출원가', K('cogs'), C.c5, { stack: 's' }), B('판매관리비', K('sga'), C.c4, { stack: 's' }),
+                    B('영업이익', K('operating_income'), C.c3, { stack: 's' })] },
+                { group: '매출액', title: '매출액 구성비중', need: ['cogs', 'sga', 'revenue'], stacked: true, max100: true, s: [
+                    B('매출원가율', margin('cogs'), C.c5, { stack: 's', unit: 'pct' }),
+                    B('판매관리비율', margin('sga'), C.c4, { stack: 's', unit: 'pct' }),
+                    B('영업이익률', margin('operating_income'), C.c3, { stack: 's', unit: 'pct' })] },
+                { group: '매출액', title: '매출액 성장률 (YoY)', need: ['revenue'], s: [
+                    B('매출액 성장률(YoY)', Y(rev), C.c1, P),
+                    ...(priceOn ? [L('주가수익률', svPriceRet, C.c6, RP)] : [])] },
+                { group: '매출액', title: `매출액 성장률 (${qn})`, need: ['revenue'], s: [B(`매출액 성장률(${qn})`, Q(rev), C.c1, P)] },
+                { group: '이익', title: '이익률', need: ['revenue', 'operating_income'], s: [
+                    L('매출총이익률', margin('gross_profit'), C.c4, P), L('영업이익률', margin('operating_income'), C.c3, P),
+                    L('순이익률', margin('net_income'), C.c2, P), B('매출액', rev, C.c1, R)] },
+                { group: '이익', title: '이익 성장률 (YoY)', need: ['revenue'], s: [
+                    L('매출액', Y(rev), C.c1, P), L('매출총이익', Y(K('gross_profit')), C.c4, P),
+                    L('영업이익', Y(K('operating_income')), C.c3, P), L('순이익', Y(K('net_income')), C.c2, P)] },
+                { group: '이익', title: '매출총이익', need: ['gross_profit', 'revenue'], s: [
+                    B('매출총이익', K('gross_profit'), C.c4), L('매출총이익률', margin('gross_profit'), C.c6, RP)] },
+                { group: '이익', title: '매출총이익 성장률 (YoY)', need: ['gross_profit'], s: [
+                    B('매출총이익 성장률(YoY)', Y(K('gross_profit')), C.c4, P), ...(priceOn ? [L('주가수익률', svPriceRet, C.c6, RP)] : [])] },
+                { group: '이익', title: '영업이익', need: ['operating_income', 'revenue'], s: [
+                    B('영업이익', K('operating_income'), C.c3), L('영업이익률', margin('operating_income'), C.c6, RP)] },
+                { group: '이익', title: '영업이익 성장률 (YoY)', need: ['operating_income'], s: [
+                    B('영업이익 성장률(YoY)', Y(K('operating_income')), C.c3, P), ...(priceOn ? [L('주가수익률', svPriceRet, C.c6, RP)] : [])] },
+                { group: '이익', title: '순이익', need: ['net_income'], s: [
+                    B('순이익', K('net_income'), C.c2), B('지배주주순이익', K('net_income_owner'), C.c5),
+                    L('순이익률', margin('net_income'), C.c6, RP)] },
+                { group: '이익', title: '순이익 성장률 (YoY)', need: ['net_income'], s: [
+                    B('순이익 성장률(YoY)', Y(K('net_income')), C.c2, P), ...(priceOn ? [L('주가수익률', svPriceRet, C.c6, RP)] : [])] },
+                { group: '비용', title: '비용률', need: ['cogs', 'sga', 'revenue'], s: [
+                    L('매출원가율', margin('cogs'), C.c5, P), L('판매관리비율', margin('sga'), C.c4, P),
+                    L('총비용률', lb => svRatio(svAddN(svV('cogs', lb), svV('sga', lb)), rev(lb)), C.c6, P),
+                    B('매출액', rev, C.c1, R)] },
+                { group: '비용', title: '매출원가', need: ['cogs', 'revenue'], s: [
+                    B('매출액', rev, C.c1), B('매출원가', K('cogs'), C.c5), L('매출원가율', margin('cogs'), C.c6, RP)] },
+                { group: '비용', title: '판매관리비', need: ['sga', 'revenue'], s: [
+                    B('매출액', rev, C.c1), B('판매관리비', K('sga'), C.c4), L('판매관리비율', margin('sga'), C.c6, RP)] },
+                { group: '비용', title: '비용 증가율 (YoY)', need: ['cogs', 'sga', 'revenue'], s: [
+                    L('매출액 성장률', Y(rev), C.c1, P), L('매출원가 증가율', Y(K('cogs')), C.c5, P), L('판매관리비 증가율', Y(K('sga')), C.c4, P)] },
+                { group: '영업외손익', title: '영업외손익', need: ['pretax_income'], s: [
+                    B('기타손익', svOtherNet, C.c4), B('금융손익', svFinNet, C.c5), B('지분법손익', K('equity_method'), C.c3),
+                    L('법인세차감전순이익', K('pretax_income'), C.c6)] },
+                { group: '법인세', title: '법인세', need: ['income_tax', 'pretax_income'], s: [
+                    B('법인세', K('income_tax'), C.c2),
+                    L('유효세율', lb => { const r = svRatio(svV('income_tax', lb), svV('pretax_income', lb)); return r == null || r < 0 || r > 100 ? null : r; }, C.c6, RP)] },
+                { group: '법인세', title: '법인세차감전순이익', need: ['pretax_income', 'revenue'], s: [
+                    B('법인세차감전순이익', K('pretax_income'), C.c1), L('법인세차감전순이익률', margin('pretax_income'), C.c6, RP)] },
+            ],
+            BS: [
+                { group: '자산', title: '자산의 구성', need: ['current_assets', 'noncurrent_assets'], stacked: true, s: [
+                    B('유동자산', K('current_assets'), C.c1, { stack: 's' }), B('비유동자산', K('noncurrent_assets'), C.c4, { stack: 's' }),
+                    L('자산총계', K('total_assets'), C.c6)] },
+                { group: '자산', title: '매출액 vs 자본 vs 시가총액', need: ['revenue', 'total_equity'], s: [
+                    B('매출액(4분기누적)', lb => svTtm('revenue', lb), C.c1), L('자본총계', K('total_equity'), C.c3),
+                    ...(mcapOn ? [L(svMcapLabel(), svMcap, C.c6)] : [])] },
+                { group: '자산', title: '재무현황', need: ['total_equity', 'total_liabilities'], stacked: true, s: [
+                    B('자본총계', K('total_equity'), C.c3, { stack: 's' }), B('부채총계', K('total_liabilities'), C.c2, { stack: 's' }),
+                    L('부채비율', ratio('total_liabilities', 'total_equity'), C.c6, RP)] },
+                { group: '자산', title: '자산의 배치', need: ['ppe'], stacked: true, s: [
+                    B('유형자산', K('ppe'), C.c1, { stack: 's' }), B('무형자산', K('intangibles'), C.c4, { stack: 's' }),
+                    B('관계기업 투자자산', K('associates'), C.c5, { stack: 's' })] },
+                { group: '자산', title: '유형자산', need: ['ppe'], s: [
+                    B('유형자산', K('ppe'), C.c1), L('유형자산 취득', absK('capex_ppe'), C.c5),
+                    L('취득 비율', lb => svRatio(absK('capex_ppe')(lb), svV('ppe', lb)), C.c2, RP),
+                    ...(hasAny('depreciation') ? [L('유형자산 감가상각비', absK('depreciation'), C.c4),
+                                                   L('상각비 비율', lb => svRatio(absK('depreciation')(lb), svV('ppe', lb)), C.c6, RP)] : [])] },
+                { group: '자산', title: '무형자산', need: ['intangibles'], s: [
+                    B('무형자산', K('intangibles'), C.c4), L('무형자산 취득', absK('capex_intangible'), C.c5),
+                    L('취득 비율', lb => svRatio(absK('capex_intangible')(lb), svV('intangibles', lb)), C.c2, RP),
+                    ...(hasAny('amortization') ? [L('무형자산 상각비', absK('amortization'), C.c1),
+                                                   L('상각비 비율', lb => svRatio(absK('amortization')(lb), svV('intangibles', lb)), C.c6, RP)] : [])] },
+                { group: '금융자산', title: '금융자산', need: ['cash'], stacked: true, s: [
+                    B('현금및현금성자산', K('cash'), C.c1, { stack: 's' }), B('단기금융상품', K('st_fin'), C.c4, { stack: 's' }),
+                    B('장기금융상품', K('lt_fin'), C.c5, { stack: 's' }), L('금융자산 합계', K('fin_assets_total'), C.c6)] },
+                { group: '금융자산', title: '금융자산·부채', need: ['fin_assets_total'], needAny: ['cur_fin_liab', 'noncur_fin_liab'], stacked: true, s: [
+                    B('유동금융자산', K('cur_fin_assets'), C.c1, { stack: 'a' }), B('비유동금융자산', K('noncur_fin_assets'), C.c4, { stack: 'a' }),
+                    B('유동금융부채', lb => { const v = svV('cur_fin_liab', lb); return v == null ? null : -v; }, C.c2, { stack: 'a' }),
+                    B('비유동금융부채', lb => { const v = svV('noncur_fin_liab', lb); return v == null ? null : -v; }, C.c5, { stack: 'a' }),
+                    L('순금융자산', K('net_fin_assets'), C.c6)] },
+                { group: '금융자산', title: '순금융자산 추이', need: ['net_fin_assets'], s: [
+                    B('전분기말 대비 증감', svDelta(K('net_fin_assets')), C.c4), L('순금융자산', K('net_fin_assets'), C.c6),
+                    ...(mcapOn ? [L('시가총액 대비 비율', lb => svRatio(svV('net_fin_assets', lb), svMcap(lb)), C.c2, RP)] : [])] },
+                { group: '운전자본', title: '운전자본', need: ['revenue', 'trade_receivables', 'inventories', 'trade_payables'], s: [
+                    B('매출액(4분기누적)', lb => svTtm('revenue', lb), C.c1), L('매출채권', K('trade_receivables'), C.c3),
+                    L('재고자산', K('inventories'), C.c4), L('매입채무', K('trade_payables'), C.c2)] },
+                { group: '운전자본', title: '순운전자본 추이', need: ['nwc'], s: [
+                    B('전분기말 대비 증감', svDelta(K('nwc')), C.c4), L('순운전자본', K('nwc'), C.c6)] },
+                { group: '운전자본', title: '회전율', need: ['revenue', 'trade_receivables'], s: [
+                    L('매출채권회전율', svTurnover('revenue', 'trade_receivables'), C.c3, { unit: 'turn' }),
+                    L('재고자산회전율', svTurnover('cogs', 'inventories'), C.c4, { unit: 'turn' }),
+                    L('매입채무회전율', svTurnover('cogs', 'trade_payables'), C.c2, { unit: 'turn' })] },
+                { group: '자본', title: '자본', need: ['equity_owner'], stacked: true, s: [
+                    B('지배주주지분', K('equity_owner'), C.c5, { stack: 's' }), B('비지배주주지분', K('equity_minority'), C.c4, { stack: 's' }),
+                    L('ROE', svRoe, C.c6, RP)] },
+                { group: '자본', title: '이익잉여금', need: ['retained_earnings'], s: [
+                    B('전분기말 대비 변동', svDelta(K('retained_earnings')), C.c4), L('이익잉여금', K('retained_earnings'), C.c6)] },
+                { group: '부채', title: '부채', need: ['current_liabilities', 'noncurrent_liabilities'], stacked: true, s: [
+                    B('유동부채', K('current_liabilities'), C.c1, { stack: 's' }), B('비유동부채', K('noncurrent_liabilities'), C.c4, { stack: 's' }),
+                    L('부채비율', lb => ((sv.fin.metrics[sv.view] || {})[lb] || {}).debt_ratio ?? null, C.c6, RP)] },
+            ],
+            CF: [
+                { group: '현금흐름', title: '현금흐름', need: ['fcf', 'cfo'], s: [
+                    B('FCF', K('fcf'), C.c5), L('영업현금흐름', K('cfo'), C.c3), L('투자현금흐름', K('cfi'), C.c2), L('재무현금흐름', K('cff'), C.c4)] },
+                { group: '현금흐름', title: '현금흐름 vs 실적', need: ['cfo', 'operating_income', 'net_income'], s: [
+                    L('영업현금흐름', K('cfo'), C.c3), L('영업이익', K('operating_income'), C.c1), L('순이익', svNetIncome, C.c2)] },
+                { group: '현금흐름', title: '현금전환비율 (CCR)', need: ['cfo', 'net_income'], s: [
+                    L('영업현금흐름', K('cfo'), C.c3), L('순이익', svNetIncome, C.c2),
+                    L('CCR (영업현금흐름 / 순이익)', lb => { const n = svNetIncome(lb); return n == null || n <= 0 ? null : svRatio(svV('cfo', lb), n); }, C.c6, RP)] },
+                { group: '현금흐름', title: 'FCF 전환율', need: ['fcf'], s: [
+                    B('순이익', svNetIncome, C.c2), L('FCF 전환율 (FCF / 순이익)', lb => { const n = svNetIncome(lb); return n == null || n <= 0 ? null : svRatio(svV('fcf', lb), n); }, C.c6, RP)] },
+                { group: '자본지출', title: '자본지출 (CAPEX)', need: ['capex_ppe'], stacked: true, s: [
+                    B('유형자산 취득', absK('capex_ppe'), C.c5, { stack: 's' }), B('무형자산 취득', absK('capex_intangible'), C.c4, { stack: 's' }),
+                    L('매출액 대비 CAPEX', lb => svRatio(svV('capex', lb), rev(lb)), C.c6, RP)] },
+                { group: '자본지출', title: 'CAPEX vs 현금흐름', need: ['capex', 'fcf', 'cfo'], stacked: true, s: [
+                    B('CAPEX', absK('capex'), C.c5, { stack: 's' }), B('FCF', K('fcf'), C.c1, { stack: 's' }), L('영업현금흐름', K('cfo'), C.c3)] },
+                { group: '자본지출', title: 'CAPEX vs 실적', need: ['capex', 'revenue', 'operating_income'], s: [
+                    B('CAPEX', K('capex'), C.c5), L('영업이익(4분기누적)', lb => svTtm('operating_income', lb), C.c3),
+                    L('매출액(4분기누적)', lb => svTtm('revenue', lb), C.c1),
+                    ...(mcapOn ? [L(svMcapLabel(), svMcap, C.c6)] : [])] },
+                { group: '자본지출', title: 'CAPEX 대비 감가상각', need: ['capex'], needAny: ['depreciation', 'amortization'], s: [
+                    B('CAPEX', K('capex'), C.c5),
+                    B('감가상각비 + 무형자산상각비', lb => { const d = svV('depreciation', lb), a = svV('amortization', lb); return d == null && a == null ? null : Math.abs(d || 0) + Math.abs(a || 0); }, C.c4)] },
+                { group: '재무활동', title: '주주환원', needAny: ['dividends_paid', 'treasury_purchase'], stacked: true, s: [
+                    B('배당금 지급', absK('dividends_paid'), C.c1, { stack: 's' }), B('자기주식 취득', absK('treasury_purchase'), C.c4, { stack: 's' }),
+                    L('순이익 대비 주주환원', lb => { const n = svNetIncome(lb); const d = svV('dividends_paid', lb), t = svV('treasury_purchase', lb);
+                        return n == null || n <= 0 || (d == null && t == null) ? null : (Math.abs(d || 0) + Math.abs(t || 0)) / n * 100; }, C.c6, RP)] },
+            ],
+        }[sv.table];
+    }
+    function svNetIncome(lb) {    // 현금흐름 차트용 순이익 (손익계산서 값)
+        const it = sv.flat.net_income;
+        return it ? it[sv.view][lb] ?? null : null;
+    }
+
+    function svRenderCharts() {
+        (sv.charts || []).forEach(c => c.destroy());
+        sv.charts = [];
+        const C = svColors();
+        const periods = svPeriods();
+        const defs = svChartDefs(C);
+        const box = document.getElementById('sv-chart-view');
+        const hasData = k => periods.some(lb => svV(k, lb) != null);
+        const groups = [], byGroup = {}, skipped = [];
+        defs.forEach(d => {
+            if (!(d.need || []).every(hasData) || (d.needAny && !d.needAny.some(hasData))) { skipped.push(d.title); return; }
+            if (!byGroup[d.group]) { byGroup[d.group] = []; groups.push(d.group); }
+            byGroup[d.group].push(d);
+        });
+        document.getElementById('sv-groups').innerHTML = groups.map((g, i) =>
+            `<span class="period-btn" data-g="${i}">${svEsc(g)}</span>`).join('');
+        document.getElementById('sv-groups').onclick = e => {
+            const b = e.target.closest('[data-g]');
+            if (b) document.getElementById('sv-grp-' + b.dataset.g).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        let html = '';
+        groups.forEach((g, gi) => {
+            html += `<div class="sv-group-title" id="sv-grp-${gi}">${svEsc(g)}</div><div class="sv-chart-grid">`;
+            byGroup[g].forEach((d, ci) => { html += `<div class="sv-chart-card"><div class="sv-chart-wrap"><canvas id="sv-ch-${gi}-${ci}"></canvas></div></div>`; });
+            html += '</div>';
+        });
+        if (skipped.length) html += `<div class="sv-note" style="margin-top:10px;">필요한 항목이 없어 그리지 않은 차트: ${svEsc(skipped.join(', '))}</div>`;
+        if (!groups.length) html = '<div class="sv-empty">이 표로 그릴 수 있는 차트가 없습니다.</div>' + html;
+        box.innerHTML = html;
+        const short = periods.map(lb => lb.slice(2));
+        // 가로축: 분기를 건너뛰지 않고 전부 표시. 많으면 글자를 줄이고 45도 기울임
+        const n = periods.length;
+        const xTicks = { color: C.text, autoSkip: false, maxRotation: 45, minRotation: n > 12 ? 45 : 0,
+                         font: { size: n > 30 ? 8 : n > 16 ? 9 : 10 } };
+        const unitSuffix = ` (${svUnitName()})`;
+        const zeroGrid = { color: ctx => ctx.tick.value === 0 ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.06)',
+                           lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1 };
+        const zeroOnly = { color: ctx => ctx.tick.value === 0 ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0)',
+                           lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1 };
+        groups.forEach((g, gi) => byGroup[g].forEach((d, ci) => {
+            const units = { L: (d.s.find(s => s.axis === 'L') || {}).unit, R: (d.s.find(s => s.axis === 'R') || {}).unit };
+            const datasets = d.s.map((s, i) => ({
+                label: s.label + (s.unit === 'won' ? unitSuffix : '') + (s.axis === 'R' ? ' (우)' : ''),
+                data: periods.map(lb => { const v = s.fn(lb); return v == null || !isFinite(v) ? null : v; }),
+                type: s.type,
+                yAxisID: s.axis === 'R' ? 'y1' : 'y',
+                // 음수 막대는 반투명 + 테두리로 양수와 구분 (아래로 뻗음)
+                backgroundColor: s.type === 'bar' ? (ctx => (ctx.raw != null && ctx.raw < 0) ? s.color + '66' : s.color) : s.color,
+                borderColor: s.color,
+                borderWidth: s.type === 'line' ? 2 : (ctx => (ctx.raw != null && ctx.raw < 0) ? 1.5 : 0),
+                pointRadius: s.type === 'line' ? 2.5 : 0, pointBackgroundColor: s.color,
+                tension: 0.1, spanGaps: false,
+                stack: s.stack || ('solo-' + i),
+                order: s.type === 'line' ? 0 : 1,
+                unit: s.unit,
+            }));
+            const axisTick = unit => v => unit === 'pct' ? v + '%' : unit === 'turn' ? v + '회' : unit === 'price' ? Math.round(v).toLocaleString() + '원' : svAxisAmt(v);
+            const scales = {
+                x: { stacked: !!d.stacked, grid: { display: false }, ticks: xTicks },
+                y: { stacked: !!d.stacked, position: 'left', ticks: { color: C.muted, font: { size: 10 }, callback: axisTick(units.L) },
+                     grid: zeroGrid, ...(d.max100 ? { max: 100, min: 0 } : {}) },
+            };
+            if (units.R) scales.y1 = { position: 'right', grid: zeroOnly, ticks: { color: C.muted, font: { size: 10 }, callback: axisTick(units.R) } };
+            sv.charts.push(new Chart(document.getElementById(`sv-ch-${gi}-${ci}`), {
+                type: 'bar',
+                data: { labels: short, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        title: { display: true, text: d.title, font: { weight: 'bold', size: 13 }, color: C.text, align: 'center' },
+                        legend: { position: 'bottom', labels: { color: C.muted, font: { size: 11 }, boxWidth: 12 } },
+                        tooltip: { callbacks: {
+                            title: items => items.length ? periods[items[0].dataIndex] : '',
+                            label: c => `${c.dataset.label}: ${svFmtUnit(c.dataset.unit, c.parsed.y)}`,
+                        } },
+                    },
+                    scales,
+                },
+            }));
+        }));
+    }
+
+    // 표 보기: 오래된 기간이 왼쪽
+    function svRenderTable() {
+        const f = sv.fin;
+        const periods = svPeriods();
+        const rows = svRows(sv.table);
+        let html = '<thead><tr><th>항목</th>' + periods.map(lb => `<th>${lb}<small>${svQLabel(lb)}</small></th>`).join('') + '</tr></thead><tbody>';
+        rows.forEach(r => {
+            const cls = [r.key ? 'sv-key' : '', r.lv ? 'sv-lv' + r.lv : ''].filter(Boolean).join(' ');
+            html += `<tr${cls ? ` class="${cls}"` : ''}><td>${r.sign ? `(${r.sign}) ` : ''}${svEsc(r.label)}</td>` + periods.map(lb => {
+                const formula = r.calc(lb);
+                return `<td${formula ? ` class="sv-calc" title="계산값: ${svEsc(formula)}"` : ''}>${svFmtCell(r.id, r.get(lb))}</td>`;
+            }).join('') + '</tr>';
+        });
+        document.getElementById('sv-detail').innerHTML = html + '</tbody>';
+        const m = f.metrics[sv.view] || {};
+        const mrows = [['operating_margin', '영업이익률', false], ['net_margin', '순이익률', false], ['roe', 'ROE', false],
+                       ['debt_ratio', '부채비율', false], ['revenue_yoy', '매출액 증감률 (YoY)', true],
+                       ['operating_income_yoy', '영업이익 증감률 (YoY)', true], ['net_income_yoy', '순이익 증감률 (YoY)', true]];
+        let mh = '<thead><tr><th>지표</th>' + periods.map(lb => `<th>${lb}</th>`).join('') + '</tr></thead><tbody>';
+        mrows.forEach(([k, label, colored]) => {
+            if (k === 'roe' && sv.view === 'quarter') return;
+            mh += `<tr><td>${label}</td>` + periods.map(lb => `<td>${svPct((m[lb] || {})[k], colored)}</td>`).join('') + '</tr>';
+        });
+        document.getElementById('sv-metrics').innerHTML = mh + '</tbody>';
+    }
+
+    function svCopyTable() {
+        const f = sv.fin;
+        if (!f || f.status !== 'ready') return;
+        const periods = svPeriods();
+        const lines = [['항목(억원)', ...periods].join('\t')];
+        svRows(sv.table).forEach(r => {
+            const name = '  '.repeat(r.lv) + (r.sign ? `(${r.sign}) ` : '') + r.label + (SV_EPS.has(r.id) ? '(원)' : '');
+            lines.push([name, ...periods.map(lb => {
+                const v = r.get(lb);
+                if (v == null) return '';
+                return SV_EPS.has(r.id) ? Math.round(v) : Math.round(v / 1e8);
+            })].join('\t'));
+        });
+        const text = lines.join('\n');
+        const done = () => { const b = document.getElementById('sv-copy'); b.textContent = '복사됨'; setTimeout(() => b.textContent = '표 복사하기', 1500); };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done).catch(() => svCopyFallback(text, done));
+        } else {
+            svCopyFallback(text, done);
+        }
+    }
+    function svCopyFallback(text, done) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed; left:-9999px; top:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { alert('복사하지 못했습니다'); }
+        document.body.removeChild(ta);
+    }
+
+    // --- 나의 판단 ---
+    function svNoteApi(path, method, body) {
+        return fetch(API_BASE + path, { method, headers: { 'Content-Type': 'application/json' },
+                                        body: body ? JSON.stringify(Object.assign({ market: sv.market, code: sv.code }, body)) : undefined })
+            .then(async res => ({ ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }));
+    }
+    function svTa(f) { return document.querySelector(`#sv-notes .sv-ta[data-f="${f}"]`); }
+    function svGrow(ta) { ta.style.height = 'auto'; ta.style.height = Math.max(72, ta.scrollHeight + 2) + 'px'; }
+    function svFieldsFromScreen() {
+        const o = {};
+        SV_NOTE_FIELDS.forEach(([f]) => { o[f] = svTa(f).value; });
+        return o;
+    }
+    function svDt(ts) { return (ts || '').replace('T', ' ').slice(0, 16); }
+
+    function svInitNotes() {
+        SV_NOTE_FIELDS.forEach(([f]) => {
+            const ta = svTa(f);
+            ta.addEventListener('input', () => { svGrow(ta); svUpdateDirty(); });
+        });
+        document.getElementById('sv-notes-save').addEventListener('click', () => svSaveNotes());
+        const memoIn = document.getElementById('sv-memo-input');
+        document.getElementById('sv-memo-add').addEventListener('click', svAddMemo);
+        memoIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); svAddMemo(); } });
+        document.getElementById('sv-memo-list').addEventListener('click', e => {
+            const b = e.target.closest('.sv-memo-del');
+            if (b) svDeleteMemo(b.dataset.id, b);
+        });
+        window.addEventListener('beforeunload', e => { if (sv.notesDirty) { e.preventDefault(); e.returnValue = ''; } });
+    }
+
+    function svUpdateDirty() {
+        const base = sv.notesBase || {};
+        const cur = svFieldsFromScreen();
+        sv.notesDirty = !!sv.notes && SV_NOTE_FIELDS.some(([f]) => (cur[f] || '').replace(/\r\n/g, '\n').trim() !== (base[f] || ''));
+        document.getElementById('sv-notes-dirty').textContent = sv.notesDirty ? '저장 안 됨' : '';
+    }
+
+    function svShowGuard(market, code, name) {
+        sv.pendingOpen = { market, code, name };
+        const g = document.getElementById('sv-notes-guard');
+        g.innerHTML = `저장하지 않은 판단이 있습니다. <b>${svEsc(name || code)}</b>(으)로 이동하면 지금 쓴 내용이 사라집니다.
+            <div class="sv-btn-group">
+                <span class="period-btn" onclick="svGuardSaveAndGo()">저장하고 이동</span>
+                <span class="period-btn" onclick="svGuardGo()">저장 안 하고 이동</span>
+                <span class="period-btn" onclick="svHideGuard()">취소</span>
+            </div>`;
+        g.style.display = 'block';
+        g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    function svHideGuard() { document.getElementById('sv-notes-guard').style.display = 'none'; sv.pendingOpen = null; }
+    function svGuardGo() {
+        const p = sv.pendingOpen;
+        sv.notesDirty = false;
+        svHideGuard();
+        if (p) svOpen(p.market, p.code, p.name, true);
+    }
+    async function svGuardSaveAndGo() {
+        const p = sv.pendingOpen;
+        const ok = await svSaveNotes();
+        if (ok && p) { svHideGuard(); svOpen(p.market, p.code, p.name, true); }
+    }
+
+    async function svLoadNotes() {
+        const t = ++sv.notesToken;
+        sv.notes = null; sv.notesBase = null; sv.notesDirty = false; sv.memoConfirm = null;
+        document.getElementById('sv-notes-conflict').style.display = 'none';
+        document.getElementById('sv-notes-dirty').textContent = '';
+        document.getElementById('sv-notes-updated').textContent = '불러오는 중...';
+        SV_NOTE_FIELDS.forEach(([f]) => { const ta = svTa(f); ta.value = ''; ta.disabled = true; svGrow(ta); });
+        document.getElementById('sv-memo-list').innerHTML = '';
+        document.getElementById('sv-hist-list').innerHTML = '';
+        const r = await svNoteApi(`/api/stock/notes?market=${sv.market}&code=${encodeURIComponent(sv.code)}`, 'GET');
+        if (t !== sv.notesToken) return;
+        SV_NOTE_FIELDS.forEach(([f]) => { svTa(f).disabled = false; });
+        if (!r.ok) { document.getElementById('sv-notes-updated').textContent = '불러오지 못했습니다: ' + (r.data.message || r.data.error || r.status); return; }
+        svApplyNote(r.data.note);
+    }
+
+    function svApplyNote(note, keepScreen) {
+        sv.notes = note;
+        sv.notesBase = Object.assign({}, note.fields);
+        if (!keepScreen) SV_NOTE_FIELDS.forEach(([f]) => { const ta = svTa(f); ta.value = note.fields[f] || ''; svGrow(ta); });
+        svUpdateDirty();
+        document.getElementById('sv-notes-updated').textContent = note.updated_at
+            ? `마지막 수정 ${svDt(note.updated_at)} · ${note.version}판` : '아직 저장된 판단이 없습니다';
+        svRenderMemos();
+        svRenderHistory();
+    }
+
+    async function svSaveNotes() {
+        if (!sv.notes) return false;
+        const btn = document.getElementById('sv-notes-save');
+        btn.textContent = '저장 중...';
+        const r = await svNoteApi('/api/stock/notes', 'PUT', { version: sv.notes.version, fields: svFieldsFromScreen() });
+        btn.textContent = '저장';
+        if (r.status === 409) { svShowConflict(r.data.note); return false; }
+        if (!r.ok) { alert('저장 실패: ' + (r.data.message || r.data.error || r.status)); return false; }
+        document.getElementById('sv-notes-conflict').style.display = 'none';
+        svApplyNote(r.data.note);
+        if (r.data.export && r.data.export.ok === false) document.getElementById('sv-notes-updated').textContent += ' · Drive 내보내기 실패';
+        svLoadWatchlistChips();
+        return true;
+    }
+
+    function svShowConflict(latest) {
+        const box = document.getElementById('sv-notes-conflict');
+        const mine = svFieldsFromScreen();
+        box.innerHTML = `<b>다른 곳에서 먼저 수정됐습니다</b> (서버 ${latest.version}판, ${svDt(latest.updated_at)}). 내가 쓴 내용은 그대로 두었습니다. 어느 쪽을 쓸지 고르세요.
+            <div class="sv-conflict-grid">${SV_NOTE_FIELDS.map(([f, label]) => `
+                <div><div class="sv-notes-label">${label} · 내 내용</div><div class="sv-conflict-box">${svEsc(mine[f] || '(비어 있음)')}</div></div>
+                <div><div class="sv-notes-label">${label} · 최신 내용</div><div class="sv-conflict-box">${svEsc(latest.fields[f] || '(비어 있음)')}</div></div>`).join('')}
+            </div>
+            <div class="sv-btn-group">
+                <span class="period-btn" onclick="svConflictKeepMine()">내 내용으로 저장 (최신 판 위에 덮어씀)</span>
+                <span class="period-btn" onclick="svConflictTakeLatest()">최신 내용 쓰기 (내 내용 버림)</span>
+            </div>`;
+        box.style.display = 'block';
+        sv.notes.version = latest.version;      // 다음 저장은 최신 판 번호로
+        sv.notesLatest = latest;
+        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    function svConflictKeepMine() { svSaveNotes(); }
+    function svConflictTakeLatest() {
+        document.getElementById('sv-notes-conflict').style.display = 'none';
+        svApplyNote(sv.notesLatest);
+    }
+
+    async function svAddMemo() {
+        const input = document.getElementById('sv-memo-input');
+        const text = input.value.trim();
+        if (!text || !sv.notes) return;
+        const r = await svNoteApi('/api/stock/notes/memo', 'POST', { text, source: '대시보드' });
+        if (!r.ok) { alert('메모 추가 실패: ' + (r.data.message || r.data.error || r.status)); return; }
+        input.value = '';
+        svApplyNote(r.data.note, true);
+        svLoadWatchlistChips();
+    }
+    async function svDeleteMemo(id, el) {
+        if (sv.memoConfirm !== id) {          // 한 번 더 눌러 확인
+            sv.memoConfirm = id;
+            el.textContent = '삭제 확인?';
+            el.classList.add('confirm');
+            setTimeout(() => { if (sv.memoConfirm === id) { sv.memoConfirm = null; el.textContent = '삭제'; el.classList.remove('confirm'); } }, 4000);
+            return;
+        }
+        sv.memoConfirm = null;
+        const r = await svNoteApi('/api/stock/notes/memo', 'DELETE', { id });
+        if (!r.ok) { alert('메모 삭제 실패: ' + (r.data.message || r.data.error || r.status)); return; }
+        svApplyNote(r.data.note, true);
+        svLoadWatchlistChips();
+    }
+    function svRenderMemos() {
+        const memos = (sv.notes && sv.notes.memos) || [];
+        document.getElementById('sv-memo-list').innerHTML = memos.length ? memos.map(m => `
+            <div class="sv-memo-item"><span class="sv-memo-date">${svDt(m.at)}</span>
+                <span class="sv-memo-text">${svEsc(m.text)}</span>
+                <span class="sv-memo-del" data-id="${svEsc(m.id)}">삭제</span></div>`).join('')
+            : '<div class="sv-note">메모가 없습니다.</div>';
+    }
+    function svRenderHistory() {
+        const hist = (sv.notes && sv.notes.history) || [];
+        document.getElementById('sv-hist').querySelector('summary').textContent = `변경 이력 (${hist.length})`;
+        document.getElementById('sv-hist-list').innerHTML = hist.length ? hist.map(h => `
+            <div class="sv-hist-item"><span class="sv-hist-when">${svDt(h.at)}</span> · <b>${svEsc(h.label || h.field)}</b>
+                <pre>이전: ${svEsc(h.before || '(비어 있음)')}\n이후: ${svEsc(h.after || '(비어 있음)')}</pre></div>`).join('')
+            : '<div class="sv-note">변경 이력이 없습니다.</div>';
+    }
+
+    // --- 밸류에이션 ---
+    async function svLoadBand() {
+        const t = sv.token;
+        const na = document.getElementById('sv-band-na');
+        const grid = document.getElementById('sv-band');
+        let band = null;
+        try {
+            const res = await fetch(API_BASE + '/api/valuation/band/' + encodeURIComponent(sv.code));
+            band = res.ok ? await res.json() : null;
+        } catch (e) { band = null; }
+        if (t !== sv.token) return;
+        ['sv-per-band', 'sv-pbr-band'].forEach(id => { const c = Chart.getChart(id); if (c) c.destroy(); });
+        if (!band || !band.series) {
+            grid.style.display = 'none';
+            na.style.display = 'block';
+            na.textContent = '밴드 자료 없음';
+            return;
+        }
+        na.style.display = 'none';
+        grid.style.display = '';
+        const s = sv.summary && !sv.summary.error ? sv.summary : {};
+        drawBandChart('sv-per-band', 'sv-per-band-section', band.series, 'per', band.per_band, s.per, null, 'PER');
+        drawBandChart('sv-pbr-band', 'sv-pbr-band-section', band.series, 'pbr', band.pbr_band, s.pbr, null, 'PBR');
+    }
+
+    // --- 공시 ---
+    async function svLoadDisc() {
+        const t = sv.token;
+        const box = document.getElementById('sv-disc');
+        box.innerHTML = '<div class="sv-note">불러오는 중...</div>';
+        document.getElementById('sv-disc-more').style.display = 'none';
+        try {
+            const res = await fetch(API_BASE + '/api/stock/disclosures?market=KR&code=' + encodeURIComponent(sv.code));
+            const d = await res.json();
+            if (t !== sv.token) return;
+            if (!res.ok) { box.innerHTML = `<div class="sv-empty">${svEsc(d.message || d.error || '공시를 불러오지 못했습니다')}</div>`; return; }
+            sv.disc = d.items || [];
+            sv.discShown = 20;
+            svRenderDisc();
+        } catch (e) {
+            if (t === sv.token) box.innerHTML = '<div class="sv-empty">공시를 불러오지 못했습니다</div>';
+        }
+    }
+    function svRenderDisc() {
+        const box = document.getElementById('sv-disc');
+        if (!sv.disc.length) { box.innerHTML = '<div class="sv-empty">최근 1년 공시가 없습니다.</div>'; return; }
+        box.innerHTML = sv.disc.slice(0, sv.discShown).map(it => `
+            <div class="sv-disc-item"><span class="sv-disc-date">${svEsc(it.date)}</span>
+                <a href="${svEsc(it.url)}" target="_blank" rel="noopener noreferrer">${svEsc(it.title)}</a>
+                <span class="sv-disc-filer">${svEsc(it.filer)}</span></div>`).join('');
+        const more = document.getElementById('sv-disc-more');
+        more.style.display = sv.discShown < sv.disc.length ? 'inline-block' : 'none';
+        more.textContent = `20개 더 보기 (${Math.min(sv.discShown, sv.disc.length)} / ${sv.disc.length})`;
+    }
+
     switchTab('inbox', true);
 </script>
 

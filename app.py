@@ -17,6 +17,10 @@ import xml.etree.ElementTree as ET
 from datetime import date, timedelta, datetime
 import pandas as pd
 import telegram_report
+import watchlist as watchlist_store
+import kr_financials
+import stock_profile
+import stock_notes
 import tg_inbox
 import dart_report
 import earnings_tracker
@@ -1812,8 +1816,7 @@ def load_cal_watchlist():
 
 def save_cal_watchlist(data):
     global _cal_cache
-    with open(CALENDAR_WATCHLIST_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    watchlist_store.atomic_write_json(CALENDAR_WATCHLIST_FILE, data)
     _cal_cache = {}
 
 
@@ -1948,8 +1951,242 @@ def set_cal_watchlist_api():
     data = request.get_json()
     if not isinstance(data, dict):
         return jsonify({"error": "invalid format"}), 400
+    # 실적 추적 목록은 통합 워치리스트에서 고친 뒤 세 파일에 반영. 배당 목록은 기존대로 이 파일에만.
+    old = load_cal_watchlist()
     save_cal_watchlist(data)
+    added, removed = [], []
+    for key, market in (("kr_earnings", "KR"), ("us_earnings", "US")):
+        if key not in data:
+            continue
+        before = [c for c in (watchlist_store.normalize_code(market, x) for x in old.get(key, [])) if c]
+        after = [c for c in (watchlist_store.normalize_code(market, x) for x in data.get(key, [])) if c]
+        added += [(market, c) for c in after if c not in before]
+        removed += [(market, c) for c in before if c not in after]
+    watchlist_store.apply_changes(added, removed)
+    _watchlist_sync()
     return jsonify({"ok": True})
+
+
+# ===== 통합 워치리스트 API =====
+def _watchlist_payload():
+    items = watchlist_store.load_watchlist()
+    kr = sum(1 for i in items if i["market"] == "KR")
+    return {"items": items, "count": {"total": len(items), "KR": kr, "US": len(items) - kr}}
+
+
+def _watchlist_args():
+    body = request.get_json(silent=True) or {}
+    market = (body.get("market") or request.args.get("market") or "").strip().upper()
+    code = body.get("code") or request.args.get("code") or ""
+    if market not in watchlist_store.MARKETS:
+        return None, None, "market 은 KR 또는 US"
+    c = watchlist_store.normalize_code(market, code)
+    if not c:
+        return None, None, "code 형식 오류 (KR: 6자리 종목코드, US: 티커)"
+    return market, c, None
+
+
+@app.route("/api/watchlist", methods=["GET"])
+def get_watchlist_api():
+    return jsonify(_watchlist_payload())
+
+
+@app.route("/api/watchlist", methods=["POST"])
+def add_watchlist_api():
+    market, code, err = _watchlist_args()
+    if err:
+        return jsonify({"error": err}), 400
+    if market == "KR":
+        info = load_dart_corp_map().get(code)
+        name = (info.get("name") if isinstance(info, dict) else info) if info else None
+    else:
+        info = load_us_stock_map().get(code)
+        name = info.get("name") if isinstance(info, dict) else None
+    if not name:
+        return jsonify({"error": f"종목을 찾을 수 없음: {market} {code}"}), 404
+    item, created = watchlist_store.add(market, code, name)
+    _watchlist_sync()
+    return jsonify({"ok": True, "added": created, "item": item, **_watchlist_payload()})
+
+
+@app.route("/api/watchlist", methods=["DELETE"])
+def delete_watchlist_api():
+    market, code, err = _watchlist_args()
+    if err:
+        return jsonify({"error": err}), 400
+    removed = watchlist_store.remove(market, code)
+    _watchlist_sync()
+    return jsonify({"ok": True, "removed": removed, **_watchlist_payload()})
+
+
+@app.route("/api/stock/financials", methods=["GET"])
+def stock_financials_api():
+    """재무 3표 (KR: DART fnlttSinglAcntAll). 기다리지 않음: 저장본이 없으면 뒤에서 받아오며
+    status=fetching + progress 를 바로 돌려준다 (status: ready | fetching | failed)."""
+    market = request.args.get("market", "KR").strip().upper()
+    code = request.args.get("code", "").strip().upper().replace(".KS", "").replace(".KQ", "")
+    years = request.args.get("years", "5")
+    if market != "KR":
+        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
+    if years not in ("5", "10"):
+        return jsonify({"error": "years 는 5 또는 10"}), 400
+    info = load_dart_corp_map().get(code)
+    if not info:
+        return jsonify({"error": "not_found", "message": f"종목코드를 찾을 수 없음: {code}"}), 404
+    return jsonify(kr_financials.get_financials_nowait(code, info["corp_code"], info.get("name", ""), int(years)))
+
+
+def _resolve_stock(market, code):
+    """(market, 정규화 코드, 이름, corp_code) 또는 오류 응답"""
+    market = (market or "").strip().upper()
+    if market not in ("KR", "US"):
+        return None, (jsonify({"error": "market 은 KR 또는 US"}), 400)
+    c = watchlist_store.normalize_code(market, code)
+    if not c:
+        return None, (jsonify({"error": "code 형식 오류"}), 400)
+    if market == "KR":
+        info = load_dart_corp_map().get(c)
+        if not info:
+            return None, (jsonify({"error": "not_found", "message": f"종목코드를 찾을 수 없음: {c}"}), 404)
+        return (market, c, info.get("name", ""), info["corp_code"]), None
+    info = load_us_stock_map().get(c)
+    if not info:
+        return None, (jsonify({"error": "not_found", "message": f"티커를 찾을 수 없음: {c}"}), 404)
+    return (market, c, info.get("name", ""), None), None
+
+
+@app.route("/api/stock/summary", methods=["GET"])
+def stock_summary_api():
+    """종목 요약: 현재가·등락률·시가총액·PER·PBR·ROE·결산월·연결/별도·워치리스트 여부"""
+    r, err = _resolve_stock(request.args.get("market", ""), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    return jsonify(stock_profile.get_summary(market, code, name, corp_code))
+
+
+# ===== 나의 판단 (stock_notes) =====
+def _notes_target(body=None):
+    body = body or {}
+    market = body.get("market") or request.args.get("market", "")
+    code = body.get("code") or request.args.get("code", "")
+    r, err = _resolve_stock(market, code)
+    if err:
+        return None, err
+    return r, None
+
+
+def _notes_payload(note, **extra):
+    out = {"note": stock_notes.public(note)}
+    out.update(extra)
+    return out
+
+
+@app.route("/api/stock/notes", methods=["GET"])
+def stock_notes_get():
+    r, err = _notes_target()
+    if err:
+        return err
+    market, code, name, _ = r
+    note = stock_notes.get_note(market, code, name)
+    extra = {}
+    if request.args.get("include_export") == "1":   # 검증용: Drive 파일 존재 여부와 내용
+        extra["export"] = stock_notes.export_status(note)
+    return jsonify(_notes_payload(note, **extra))
+
+
+@app.route("/api/stock/notes", methods=["PUT"])
+def stock_notes_put():
+    body = request.get_json(silent=True) or {}
+    r, err = _notes_target(body)
+    if err:
+        return err
+    market, code, name, _ = r
+    fields = body.get("fields")
+    if not isinstance(fields, dict) or "version" not in body:
+        return jsonify({"error": "fields(dict) 와 version 이 필요"}), 400
+    try:
+        note, changed, export = stock_notes.save_fields(market, code, fields, body["version"], name)
+    except stock_notes.Conflict as c:
+        return jsonify(_notes_payload(c.note, error="conflict", message="다른 곳에서 먼저 수정됨")), 409
+    except (TypeError, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(_notes_payload(note, changed=changed, export=export))
+
+
+@app.route("/api/stock/notes", methods=["DELETE"])
+def stock_notes_delete():
+    """종목 판단 전체 삭제 (원본 + Drive 파일 + 인덱스 줄)"""
+    body = request.get_json(silent=True) or {}
+    r, err = _notes_target(body)
+    if err:
+        return err
+    market, code, name, _ = r
+    removed, export = stock_notes.delete_note(market, code)
+    return jsonify({"ok": True, "removed": removed, "export": export})
+
+
+@app.route("/api/stock/notes/memo", methods=["POST"])
+def stock_notes_memo_add():
+    body = request.get_json(silent=True) or {}
+    r, err = _notes_target(body)
+    if err:
+        return err
+    market, code, name, _ = r
+    try:
+        note, memo, export = stock_notes.add_memo(market, code, body.get("text", ""), body.get("source", "대시보드"), name)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(_notes_payload(note, memo=memo, export=export))
+
+
+@app.route("/api/stock/notes/memo", methods=["DELETE"])
+def stock_notes_memo_delete():
+    body = request.get_json(silent=True) or {}
+    r, err = _notes_target(body)
+    if err:
+        return err
+    market, code, name, _ = r
+    memo_id = body.get("id") or request.args.get("id", "")
+    note, removed, export = stock_notes.delete_memo(market, code, memo_id)
+    if note is None:
+        return jsonify({"error": "not_found", "message": "판단 기록 없음"}), 404
+    return jsonify(_notes_payload(note, removed=removed, export=export))
+
+
+@app.route("/api/stock/notes/list", methods=["GET"])
+def stock_notes_list():
+    items = stock_notes.list_notes()
+    return jsonify({"count": len(items), "items": items})
+
+
+@app.route("/api/stock/prices", methods=["GET"])
+def stock_prices_api():
+    """월말 종가 10년 (KR, 재무정보 차트의 주가·주가수익률 선)"""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    if market != "KR":
+        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
+    return jsonify(stock_profile.kr_monthly_prices(code))
+
+
+@app.route("/api/stock/disclosures", methods=["GET"])
+def stock_disclosures_api():
+    """최근 1년 공시 목록 (KR). AI 요약 없음."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    if market != "KR":
+        return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
+    try:
+        out = stock_profile.kr_disclosures(code, corp_code)
+    except kr_financials.TransientError as e:
+        return jsonify({"error": "unavailable", "message": str(e)}), 503
+    out["name"] = name
+    return jsonify(out)
 
 
 @app.route("/api/dart/company", methods=["GET"])
@@ -1965,48 +2202,77 @@ def dart_company_lookup():
 
 @app.route("/api/stock/search", methods=["GET"])
 def stock_search():
-    """종목 검색 (이름/코드) - MARKET_STOCKS + US 전체 + DART 전체"""
+    """종목 검색 (이름/코드) - MARKET_STOCKS + US 전체 + DART 전체
+    한국·미국 각각 최대 8개 보장, 한쪽이 8개보다 적으면 다른 쪽으로 채워 합계 16개까지 (남으면 일본·유럽).
+    기존 필드(code, name, market=us/kr/jp/eu)는 그대로, wl_market(KR/US), wl_code, in_watchlist 추가."""
     q = request.args.get("q", "").strip().lower()
     if len(q) < 1:
         return jsonify([])
+    q_us = watchlist_store.normalize_us_ticker(q).lower()   # BRK-B → brk.b
 
-    results = []
-    seen = set()
+    def rank(code, name):
+        if code == q or code == q_us or name == q or code.split(".")[0] == q:   # BRK → BRK.A/BRK.B
+            return 0
+        if code.startswith(q) or code.startswith(q_us) or name.startswith(q):
+            return 1
+        return 2
 
-    # 1. MARKET_STOCKS (US, KR, JP, EU) - 우선 매칭
+    buckets = {"kr": [], "us": [], "other": []}
+    seen = set()   # ("KR", 6자리) / ("US", 점 표기) / ("", 원래 티커)
+
+    def put(bucket, src, r, wl_market, wl_code, item):
+        key = (wl_market or "", wl_code or item["code"])
+        if key in seen:
+            return
+        seen.add(key)
+        item["wl_market"] = wl_market
+        item["wl_code"] = wl_code
+        buckets[bucket].append(((r, src, len(item["name"])), item))
+
+    # 1. MARKET_STOCKS (US, KR, JP, EU) - 같은 순위 안에서 우선
     for market, stocks in MARKET_STOCKS.items():
         for ticker, name, sector, industry in stocks:
-            if q in ticker.lower() or q in name.lower():
-                seen.add(ticker.lower().replace(".ks", "").replace(".kq", ""))
-                results.append({"code": ticker, "name": name, "market": market})
+            tl, nl = ticker.lower(), name.lower()
+            if market == "kr":
+                code6 = tl.replace(".ks", "").replace(".kq", "")
+                if q in code6 or q in nl:
+                    put("kr", 0, rank(code6, nl), "KR", code6, {"code": ticker, "name": name, "market": market})
+            elif market == "us":
+                if q in tl or q_us in tl or q in nl:
+                    put("us", 0, rank(tl, nl), "US", watchlist_store.normalize_us_ticker(ticker),
+                        {"code": ticker, "name": name, "market": market})
+            elif q in tl or q in nl:
+                put("other", 0, rank(tl, nl), None, None, {"code": ticker, "name": name, "market": market})
 
     # 2. US 전체 종목 (나스닥 + NYSE)
-    us_map = load_us_stock_map()
-    us_extra = 0
-    for symbol, info in us_map.items():
-        if us_extra >= 15 or symbol.lower() in seen:
-            continue
-        if q in symbol.lower() or q in info["name"].lower():
-            seen.add(symbol.lower())
-            results.append({"code": symbol, "name": info["name"], "market": "us"})
-            us_extra += 1
+    for symbol, info in load_us_stock_map().items():
+        sl, nl = symbol.lower(), info["name"].lower()
+        if q in sl or q_us in sl or q in nl:
+            put("us", 1, rank(sl, nl), "US", watchlist_store.normalize_us_ticker(symbol),
+                {"code": symbol, "name": info["name"], "market": "us"})
 
     # 3. DART corp map (추가 한국 종목)
-    corp_map = load_dart_corp_map()
-    kr_extra = 0
-    for stock_code, info in corp_map.items():
-        if kr_extra >= 10 or stock_code in seen:
-            continue
-        if q in stock_code or q in info["name"].lower():
-            results.append({"code": stock_code, "name": info["name"], "market": "kr"})
-            seen.add(stock_code)
-            kr_extra += 1
+    for stock_code, info in load_dart_corp_map().items():
+        nl = info["name"].lower()
+        if q in stock_code or q in nl:
+            put("kr", 1, rank(stock_code, nl), "KR", stock_code,
+                {"code": stock_code, "name": info["name"], "market": "kr"})
 
-    # 접두사 매칭 우선 정렬
-    results.sort(key=lambda r: (
-        0 if r["code"].lower().startswith(q) or r["name"].lower().startswith(q) else 1
-    ))
-    return jsonify(results[:15])
+    # 한국·미국 각 8개, 한쪽이 모자라면 남는 자리를 다른 쪽으로 채워 합계 16개, 그 뒤 남는 자리에 일본·유럽
+    kr_s, us_s = (sorted(buckets[b], key=lambda x: x[0]) for b in ("kr", "us"))
+    n_kr = min(len(kr_s), max(8, 16 - min(len(us_s), 8)))
+    n_us = min(len(us_s), 16 - n_kr)
+    picked = kr_s[:n_kr] + us_s[:n_us]
+    picked += sorted(buckets["other"], key=lambda x: x[0])[:max(0, 16 - len(picked))]
+    # 접두사 매칭 우선 정렬 (시장 간)
+    picked.sort(key=lambda x: x[0])
+
+    wl_keys = watchlist_store.watchlist_keys()
+    results = []
+    for _, item in picked:
+        item["in_watchlist"] = (item["wl_market"], item["wl_code"]) in wl_keys
+        results.append(item)
+    return jsonify(results)
 
 
 # ===== DART 공시 모니터링 =====
@@ -2066,43 +2332,35 @@ def load_dm_cfg():
 
 
 def save_dm_cfg(cfg):
-    _sj(DART_MON_CFG_FILE, cfg)
+    watchlist_store.atomic_write_json(DART_MON_CFG_FILE, cfg)
+
+
+def _watchlist_sync():
+    """통합 워치리스트 → 세 파일 반영 (캘린더 캐시도 비움).
+    watchlist_store.add/remove/apply_changes 가 이미 반영했을 수 있어 캐시는 항상 비운다."""
+    global _cal_cache
+    try:
+        written = watchlist_store.sync_legacy()
+        _cal_cache = {}
+        _krfin_prefetch_new()
+        return written
+    except Exception as e:
+        print(f"[watchlist] sync failed: {e}", flush=True)
+        return []
 
 
 def _sync_dart_to_others(added_codes, removed_codes):
-    try:
-        cal = load_cal_watchlist()
-        kr = cal.get("kr_earnings", [])
-        for c in added_codes:
-            if c not in kr:
-                kr.append(c)
-        for c in removed_codes:
-            if c in kr:
-                kr.remove(c)
-        cal["kr_earnings"] = kr
-        save_cal_watchlist(cal)
-    except Exception as e:
-        print(f"[cross-tab-sync] calendar sync failed: {e}", flush=True)
-    try:
-        corp_map = load_dart_corp_map()
-        rcfg = telegram_report.get_config()
-        rwl = rcfg.get("watchlist", [])
-        for c in added_codes:
-            info = corp_map.get(c)
-            if info:
-                name = info.get("name") if isinstance(info, dict) else info
-                if name and name not in rwl:
-                    rwl.append(name)
-        for c in removed_codes:
-            info = corp_map.get(c)
-            if info:
-                name = info.get("name") if isinstance(info, dict) else info
-                if name and name in rwl:
-                    rwl.remove(name)
-        rcfg["watchlist"] = rwl
-        telegram_report.save_config(rcfg)
-    except Exception as e:
-        print(f"[cross-tab-sync] report sync failed: {e}", flush=True)
+    """(기존 이름 유지) DART 탭 변경을 통합 워치리스트에 반영한 뒤 세 파일에 반영."""
+    corp_map = load_dart_corp_map()
+
+    def _name(c):
+        info = corp_map.get(c)
+        return (info.get("name") if isinstance(info, dict) else info) or ""
+
+    added = [("KR", c) for c in added_codes]
+    watchlist_store.apply_changes(added, [("KR", c) for c in removed_codes],
+                                  names={k: _name(k[1]) for k in added})
+    _watchlist_sync()
 
 
 def _migrate_cross_tab_sync():
@@ -2923,6 +3181,97 @@ def _earnings_tracker_loop():
 threading.Thread(target=_earnings_tracker_loop, daemon=True).start()
 
 
+# --- 재무 3표 미리 받기: 워치리스트 한국 종목, 매일 05:30 (시작 시 catch-up 포함) ---
+_KRFIN_PREFETCH_HOUR, _KRFIN_PREFETCH_MIN = 5, 30
+_KRFIN_PREFETCH_STATE = os.path.join(_CACHE_DIR, "kr_financials_prefetch.json")
+
+
+def _krfin_prefetch_state():
+    return _lj(_KRFIN_PREFETCH_STATE, {})
+
+
+def _krfin_prefetch_run(reason):
+    st = _krfin_prefetch_state()
+    st.update(last_start=datetime.now().isoformat(timespec="seconds"), last_reason=reason)
+    watchlist_store.atomic_write_json(_KRFIN_PREFETCH_STATE, st)
+    cmap = load_dart_corp_map()
+    codes = [i["code"] for i in watchlist_store.load_watchlist() if i["market"] == "KR"]
+    results = {}
+    t0 = time.time()
+    for code in codes:
+        info = cmap.get(code)
+        if not info:
+            results[code] = "corp_code 없음"
+            continue
+        job = kr_financials.fetch_blocking(code, info["corp_code"])
+        results[code] = job["state"] + (f" ({job['error']})" if job.get("error") else "") + f" {job.get('done', 0)}/{job.get('total')}"
+        try:   # 공시 목록도 함께 (종목 탭에서 바로 보이게)
+            disc = stock_profile.kr_disclosures(code, info["corp_code"], refresh=True)
+            results[code] += f", 공시 {disc['count']}건"
+        except Exception as e:
+            results[code] += f", 공시 실패({type(e).__name__})"
+    st = _krfin_prefetch_state()
+    st.update(last_run_date=date.today().isoformat(), last_run_at=datetime.now().isoformat(timespec="seconds"),
+              last_results=results)
+    watchlist_store.atomic_write_json(_KRFIN_PREFETCH_STATE, st)
+    print(f"[kr_financials] 미리 받기 완료({reason}): {len(codes)}종목 {time.time() - t0:.0f}s "
+          f"실패 {sum(1 for v in results.values() if not v.startswith('done') or '공시 실패' in v)}건", flush=True)
+
+
+def _krfin_prefetch_loop():
+    """매일 05:30 워치리스트 한국 종목 재무 3표와 공시 목록 미리 받기. 05:30 이후 시작했고 그날 안 돌았으면 시작 후 한 번."""
+    time.sleep(60)   # 서버 시작 직후 다른 작업과 겹치지 않게
+    try:
+        conv = kr_financials.migrate_all_legacy()
+        if conv:
+            b, a = sum(x[0] for x in conv.values()), sum(x[1] for x in conv.values())
+            print(f"[kr_financials] 저장 형식 변환: {len(conv)}개 {b:,} → {a:,} bytes", flush=True)
+    except Exception as e:
+        print(f"[kr_financials] 저장 형식 변환 에러: {type(e).__name__}: {e}", flush=True)
+    try:
+        now = datetime.now()
+        due = now.replace(hour=_KRFIN_PREFETCH_HOUR, minute=_KRFIN_PREFETCH_MIN, second=0, microsecond=0)
+        if now >= due and _krfin_prefetch_state().get("last_run_date") != date.today().isoformat():
+            _krfin_prefetch_run("catch-up")
+    except Exception as e:
+        print(f"[kr_financials] 미리 받기 catch-up 에러: {type(e).__name__}: {e}", flush=True)
+    while True:
+        try:
+            now = datetime.now()
+            target = now.replace(hour=_KRFIN_PREFETCH_HOUR, minute=_KRFIN_PREFETCH_MIN, second=0, microsecond=0)
+            if now >= target:
+                target += timedelta(days=1)
+            st = _krfin_prefetch_state()
+            st["next_run"] = target.isoformat(timespec="seconds")
+            watchlist_store.atomic_write_json(_KRFIN_PREFETCH_STATE, st)
+            print(f"[kr_financials] 미리 받기 다음 실행: {target}", flush=True)
+            time.sleep((target - now).total_seconds())
+            _krfin_prefetch_run("daily")
+        except Exception as e:
+            print(f"[kr_financials] 미리 받기 에러: {type(e).__name__}: {e}", flush=True)
+            time.sleep(3600)
+
+
+threading.Thread(target=_krfin_prefetch_loop, daemon=True).start()
+
+
+def _krfin_prefetch_new():
+    """워치리스트 한국 종목 중 저장본이 없는 종목을 뒤에서 받기 시작 (추가 직후)."""
+    try:
+        cmap = load_dart_corp_map()
+        for i in watchlist_store.load_watchlist():
+            if i["market"] != "KR":
+                continue
+            if os.path.exists(kr_financials._cache_path(i["code"])) or os.path.exists(kr_financials._legacy_path(i["code"])):
+                continue
+            info = cmap.get(i["code"])
+            if info:
+                kr_financials.start_fetch(i["code"], info["corp_code"])
+                print(f"[kr_financials] 워치리스트 추가 종목 받기 시작: {i['code']}", flush=True)
+    except Exception as e:
+        print(f"[kr_financials] 추가 종목 받기 에러: {type(e).__name__}: {e}", flush=True)
+
+
 # --- 장중 스케줄러: 히트맵 15분 갱신(us/jp) + 미국시황 장중/마감 2회 ---
 # 야후 차단 회피가 최우선: 히트맵 갱신 간격을 15분보다 짧게 하지 말 것.
 _LIVE_SCHED_LOG = os.path.join(_CACHE_DIR, "live_scheduler.log")
@@ -3019,6 +3368,14 @@ def _live_scheduler_loop():
 
 
 threading.Thread(target=_live_scheduler_loop, daemon=True).start()
+
+try:
+    _wl_mig = watchlist_store.migrate_once()
+    if _wl_mig:
+        print(f"[watchlist] 최초 이관 완료: {_wl_mig}", flush=True)
+    _watchlist_sync()
+except Exception as e:
+    print("watchlist migration failed:", e, flush=True)
 
 try:
     _migrate_cross_tab_sync()
@@ -3394,14 +3751,14 @@ def get_dm_cfg():
 
 @app.route("/api/dart/monitor/config", methods=["POST"])
 def set_dm_cfg():
-    old_wl = set(load_dm_cfg().get("watchlist", []))
+    old_wl = load_dm_cfg().get("watchlist", [])
     new_cfg = request.get_json()
-    new_wl = set(new_cfg.get("watchlist", []))
+    new_wl = new_cfg.get("watchlist", [])
     save_dm_cfg(new_cfg)
-    added = new_wl - old_wl
-    removed = old_wl - new_wl
-    if added or removed:
-        _sync_dart_to_others(added, removed)
+    added = [c for c in new_wl if c not in old_wl]
+    removed = [c for c in old_wl if c not in new_wl]
+    # 워치리스트는 통합본에서 고친 뒤 세 파일에 반영 (DART 파일의 watchlist 도 통합본 기준으로 다시 맞춰짐)
+    _sync_dart_to_others(added, removed)
     return jsonify({"ok": True})
 
 
@@ -3616,15 +3973,25 @@ def update_report_watchlist():
     body = request.json
     action = body.get("action")
     stock = body.get("stock", "").strip()
-    cfg = telegram_report.get_config()
-    wl = cfg.get("watchlist", [])
-    if action == "add" and stock and stock not in wl:
-        wl.append(stock)
-    elif action == "remove" and stock in wl:
-        wl.remove(stock)
-    cfg["watchlist"] = wl
-    telegram_report.save_config(cfg)
-    return jsonify(wl)
+    # 종목명(또는 6자리 코드)을 코드로 바꿔 통합 워치리스트에서 고친 뒤 세 파일에 반영.
+    # 코드로 대응되지 않는 이름은 통합본에 넣을 수 없어 변경 없이 현재 목록을 돌려준다.
+    code = watchlist_store.normalize_code("KR", stock)
+    if not code and stock:
+        for c, info in load_dart_corp_map().items():
+            if (info.get("name") if isinstance(info, dict) else info) == stock:
+                code = c
+                break
+        if not code:
+            code = next((i["code"] for i in watchlist_store.load_watchlist()
+                         if i["market"] == "KR" and i.get("name") == stock), None)
+    if not code:
+        print(f"[watchlist] 리포트 워치리스트: 코드 대응 안 되는 종목명 '{stock}' ({action}) 무시", flush=True)
+    elif action == "add":
+        watchlist_store.add("KR", code, stock if not stock.isdigit() else None)
+    elif action == "remove":
+        watchlist_store.remove("KR", code)
+    _watchlist_sync()
+    return jsonify(telegram_report.get_config().get("watchlist", []))
 
 
 @app.route("/api/report/settings", methods=["GET"])
