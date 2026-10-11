@@ -27,7 +27,7 @@ DRIVE_SUBFOLDER = "리포트"       # 종목 폴더(기존 증권사 리포트 �
 SUMMARY_MD = "_요약.md"
 DRIVE_SKIP_SUBFOLDERS = ("사업보고서",)   # DART 보고서 폴더는 증권사 리포트 후보에서 제외
 MONTHS = 3
-MAX_PER_STOCK = 40
+MAX_PER_STOCK = None             # 4-E: 건수 상한 없음 (기간 3개월만). AI 정리는 ai_budget 한도
 AI_DAILY_LIMIT = ai_budget.DEFAULT_LIMITS["reports"]   # 300 — 공통 한도 모듈(ai_budget)에서 관리
 AI_MODEL = "claude-haiku-4-5-20251001"
 MIN_TEXT_CHARS = 200             # 이보다 적으면 이미지 PDF 로 보고 AI 를 부르지 않음
@@ -177,7 +177,7 @@ def search_reports(market, code, name, months=MONTHS, limit=MAX_PER_STOCK):
                    or v.lower().replace(" ", "_") in (fn or "").lower()]
         out.append({"channel": ch, "message_id": mid, "date": dt, "filename": fn or "", "text_preview": tp or "",
                     "matched": matched, "broker": guess_broker(fn, tp)})
-        if len(out) >= limit:
+        if limit and len(out) >= limit:
             break
     return out, stats
 
@@ -623,7 +623,7 @@ def _add_drive_candidates(market, code, name, found, stats, months=MONTHS, extra
                         "filename": telegram_report.nfc(fn), "text_preview": "", "matched": ["drive"], "broker": guess_broker(fn, ""), "drive_src": p, "drive": p})
             stats["drive"] += 1
     out.sort(key=lambda x: x.get("date") or "", reverse=True)
-    return out[:MAX_PER_STOCK + stats["drive"]], stats
+    return out, stats
 
 
 def fetch_single(market, code, name, channel, message_id):

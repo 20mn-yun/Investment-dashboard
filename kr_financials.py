@@ -232,6 +232,19 @@ def dart_paused_until():
 
 def _pause_msg():
     return f"DART 점검 중, {datetime.fromtimestamp(_dart_pause_until[0]).strftime('%H:%M')}까지 대기"
+
+
+def dart_is_paused():
+    """쉬는 중이면 'HH:MM'(끝나는 시각) 문자열, 아니면 None. earnings_tracker·dart_report 의 자체 requests 호출 전에 확인 (4-E)"""
+    u = dart_paused_until()
+    return datetime.fromtimestamp(u).strftime("%H:%M") if u else None
+
+
+def dart_mark_html_response(where=""):
+    """DART 가 JSON/ZIP 대신 안내 페이지(HTML)를 돌려줬을 때 호출: 10분간 모든 DART 호출을 쉰다 (4-E, 모듈 공용)"""
+    _dart_pause_until[0] = time.time() + DART_PAUSE_SEC
+    print(f"[kr_financials] DART 응답이 JSON/ZIP 이 아님{(' (' + where + ')') if where else ''} → {DART_PAUSE_SEC // 60}분간 호출 중단 ({_pause_msg()})", flush=True)
+    return _pause_msg()
 _code_locks = {}
 _code_locks_guard = threading.Lock()
 
@@ -279,8 +292,7 @@ def _dart_get(endpoint, params):
                 ct = (res.headers.get("Content-Type") or "").split(";")[0].strip().lower()
                 body_head = (res.content or b"")[:64].lstrip().lower()
                 if (ct and "json" not in ct) or body_head.startswith(b"<"):   # 4-C 차단기: JSON 이 아니면(점검 안내 HTML 등) 10분 쉼, 재시도 없음
-                    _dart_pause_until[0] = time.time() + DART_PAUSE_SEC
-                    print(f"[kr_financials] DART 응답이 JSON 이 아님({ct or '?'}, {len(res.content)}B) → {DART_PAUSE_SEC // 60}분간 호출 중단", flush=True)
+                    dart_mark_html_response(f"{endpoint} {ct or '?'} {len(res.content)}B")
                     raise TransientError(f"{endpoint} {params.get('bsns_year', '')} {params.get('reprt_code', '')}: {_pause_msg()}".strip())
                 try:
                     d = res.json()

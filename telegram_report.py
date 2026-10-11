@@ -622,6 +622,17 @@ def stock_folder_keyword(market, code, name=None):
     return _safe_name(name) or code
 
 
+ALIASES = {   # 검색어·폴더명 약칭 → 정식 종목명(한국) 또는 티커(미국). 비교는 소문자·공백 제거 (4-E)
+    "현대일렉트릭": "HD현대일렉트릭", "하이닉스": "SK하이닉스", "s-oil": "S-Oil", "lselectric": "엘에스일렉트릭",
+    "현대차": "현대자동차", "samg엔터": "SAMG엔터", "brk": "BRK.B",
+}
+_ALIAS_NORM = {re.sub(r"\s+", "", k.lower()): v for k, v in ALIASES.items()}
+
+
+def _alias(t):
+    return _ALIAS_NORM.get(re.sub(r"\s+", "", (t or "").lower()), t)
+
+
 def resolve_stock_keyword(keyword):
     """검색어 → {market, code, name, tail} 또는 None.
     종목명 완전 일치 / 6자리 코드 / 미국 티커 / '<종목명><꼬리>' (꼬리 = 공백·숫자·점·쉼표·대시·밑줄만). 쉼표가 든 복수 종목은 None."""
@@ -632,6 +643,7 @@ def resolve_stock_keyword(keyword):
     names = {v.get("name"): c for c, v in km.items() if v.get("name")}
 
     def exact(t):
+        t = _alias(t)
         if t in names:
             return {"market": "KR", "code": names[t], "name": t}
         if re.fullmatch(r"\d{6}", t) and t in km:

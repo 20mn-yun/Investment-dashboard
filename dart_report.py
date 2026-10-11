@@ -9,6 +9,29 @@ from uuid import uuid4
 import requests
 from dotenv import load_dotenv
 
+import telegram_report
+
+
+class DartPausedError(RuntimeError):
+    pass
+
+
+def _check_paused():
+    import kr_financials
+    p = kr_financials.dart_is_paused()
+    if p:
+        raise DartPausedError(f"DART 점검 중, {p}까지 대기")
+
+
+def _mark_html(where, res):
+    import kr_financials
+    return kr_financials.dart_mark_html_response(f"{where} {(res.headers.get('Content-Type') or '?').split(';')[0]} {len(res.content)}B")
+
+
+def _is_html(res):
+    ct = (res.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    return ct.startswith("text/html") or (res.content or b"")[:64].lstrip().lower().startswith(b"<!doctype html") or (res.content or b"")[:6].lstrip().lower().startswith(b"<html")
+
 load_dotenv()
 
 DART_API_KEY = os.environ.get("DART_API_KEY")
@@ -30,6 +53,7 @@ def list_periodic_filings(corp_code, bgn_de, end_de):
     page_no = 1
 
     while True:
+        _check_paused()
         try:
             res = requests.get(
                 "https://opendart.fss.or.kr/api/list.json",
@@ -44,7 +68,11 @@ def list_periodic_filings(corp_code, bgn_de, end_de):
                 },
                 timeout=15,
             )
+            if _is_html(res) or "json" not in (res.headers.get("Content-Type") or "").lower():
+                raise DartPausedError(_mark_html("list.json", res))
             data = res.json()
+        except DartPausedError:
+            raise
         except Exception:
             break
 
@@ -77,7 +105,7 @@ def list_periodic_filings(corp_code, bgn_de, end_de):
 def download_original(rcept_no, save_dir, filename_base):
     if not DART_API_KEY:
         return None
-
+    _check_paused()
     try:
         res = requests.get(
             "https://opendart.fss.or.kr/api/document.xml",
@@ -87,6 +115,8 @@ def download_original(rcept_no, save_dir, filename_base):
     except Exception:
         return None
 
+    if _is_html(res) or res.content[:2] != b"PK":
+        raise DartPausedError(_mark_html("document.xml", res))
     if res.status_code != 200 or len(res.content) <= 100:
         return None
 
@@ -120,6 +150,7 @@ def _extract_main_dcm_no(rcept_no):
 
 
 def download_pdf(rcept_no, save_dir, filename_base):
+    _check_paused()                      # 뷰어(dart.fss.or.kr)는 opendart 와 다른 호스트라 HTML 응답을 차단 사유로 쓰지는 않고, 쉬는 중에만 건너뛴다
     dcm_no = _extract_main_dcm_no(rcept_no)
     if not dcm_no:
         return None, None, None
@@ -169,8 +200,14 @@ def get_job(job_id):
     return _jobs.get(job_id)
 
 
+def report_dir_for(download_base, corp_name, market="KR", code=None):
+    """저장 폴더: <stock_folder(종목)>/사업보고서/ (4-E, 종목 폴더 키워드 공통 함수). code 가 없으면 corp_name 그대로 (이전과 동일)"""
+    kw = telegram_report.stock_folder_keyword(market, code, corp_name) if code else corp_name
+    return os.path.join(telegram_report.stock_folder(download_base, kw), "사업보고서")
+
+
 def start_download_job(corp_code, corp_name, date_from, date_to,
-                       download_base, want_xml=True, want_pdf=True):
+                       download_base, want_xml=True, want_pdf=True, market="KR", code=None):
     job_id = uuid4().hex[:8]
     _jobs[job_id] = {
         "status": "searching",
@@ -185,7 +222,7 @@ def start_download_job(corp_code, corp_name, date_from, date_to,
     t = threading.Thread(
         target=_run_download_job,
         args=(job_id, corp_code, corp_name, date_from, date_to,
-              download_base, want_xml, want_pdf),
+              download_base, want_xml, want_pdf, market, code),
         daemon=True,
     )
     t.start()
@@ -193,7 +230,7 @@ def start_download_job(corp_code, corp_name, date_from, date_to,
 
 
 def _run_download_job(job_id, corp_code, corp_name, date_from, date_to,
-                      download_base, want_xml, want_pdf):
+                      download_base, want_xml, want_pdf, market="KR", code=None):
     job = _jobs[job_id]
     try:
         bgn = date_from.replace("-", "")
@@ -204,8 +241,7 @@ def _run_download_job(job_id, corp_code, corp_name, date_from, date_to,
             job["status"] = "done"
             return
 
-        final_dir = os.path.join(os.path.expanduser(download_base),
-                                 corp_name, "사업보고서")
+        final_dir = report_dir_for(download_base, corp_name, market, code)
         staging_dir = os.path.join("downloads", "dart", corp_name, "사업보고서")
         os.makedirs(staging_dir, exist_ok=True)
 

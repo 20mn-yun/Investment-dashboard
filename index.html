@@ -5751,7 +5751,9 @@
             const res = await fetch(API_BASE + '/api/dart-report/download', {
                 method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
             });
-            const data = await res.json();
+            let data;
+            try { data = await res.json(); }
+            catch (e) { document.getElementById('dart-rpt-progress-text').textContent = `서버 오류(HTML 응답, HTTP ${res.status})`; stopBtn.style.display = 'none'; return; }
             if (data.error) { document.getElementById('dart-rpt-progress-text').textContent = '오류: ' + data.error; stopBtn.style.display='none'; return; }
             _dartRptJobId = data.job_id;
             pollDartReportStatus();

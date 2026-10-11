@@ -237,23 +237,51 @@ def _save_haiku_counter(state):
     save_state(full_state)
 
 
+class DartPausedError(RuntimeError):
+    """DART 점검 중 (차단기 작동). 메시지에 대기 시각이 들어 있다."""
+
+
 def _fetch_and_cache_corp_codes() -> dict:
+    """corpCode 매핑. 신선한 캐시 → 다운로드 → (실패·ZIP 아님·점검 중) 만료된 캐시 순 (batch_top_gainers._load_universe 와 같은 방식, 4-E)"""
+    import kr_financials
+    stale = None
     if os.path.exists(CORP_CODE_CACHE_FILE):
         try:
             mtime = datetime.fromtimestamp(os.path.getmtime(CORP_CODE_CACHE_FILE))
+            with open(CORP_CODE_CACHE_FILE, "r", encoding="utf-8") as f:
+                cached = json.load(f)
             if (datetime.now() - mtime).days < CORP_CODE_CACHE_TTL_DAYS:
-                with open(CORP_CODE_CACHE_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                return cached
+            stale = cached
         except Exception:
             pass
     if not DART_API_KEY:
-        return {}
+        return stale or {}
+    paused = kr_financials.dart_is_paused()
+    if paused:
+        if stale:
+            print(f"[earnings_tracker] DART 점검 중({paused}까지) → 만료된 corpCode 캐시 사용 ({len(stale)}건)", flush=True)
+            return stale
+        raise DartPausedError(f"DART 점검 중, {paused}까지 대기")
     print("[earnings_tracker] DART corpCode.xml 다운로드 중...")
-    res = requests.get(
-        "https://opendart.fss.or.kr/api/corpCode.xml",
-        params={"crtfc_key": DART_API_KEY},
-        timeout=30,
-    )
+    try:
+        res = requests.get(
+            "https://opendart.fss.or.kr/api/corpCode.xml",
+            params={"crtfc_key": DART_API_KEY},
+            timeout=30,
+        )
+        ok = res.status_code == 200 and res.content[:2] == b"PK"
+    except Exception as e:
+        res, ok = None, False
+        print(f"[earnings_tracker] corpCode.xml 요청 실패: {type(e).__name__}", flush=True)
+    if not ok:
+        msg = None
+        if res is not None:
+            msg = kr_financials.dart_mark_html_response(f"corpCode.xml {(res.headers.get('Content-Type') or '?').split(';')[0]} {len(res.content)}B")
+        if stale:
+            print(f"[earnings_tracker] corpCode.xml 이 ZIP 이 아님 → 만료된 캐시 사용 ({len(stale)}건)", flush=True)
+            return stale
+        raise DartPausedError(msg or "DART 응답 오류, corpCode 캐시 없음")
     with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
         with zf.open("CORPCODE.xml") as xf:
             tree = ET.parse(xf)

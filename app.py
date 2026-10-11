@@ -4250,15 +4250,22 @@ def start_dart_download():
     date_to = body.get("date_to", "")
     want_xml = body.get("want_xml", True)
     want_pdf = body.get("want_pdf", True)
-    corp_code = earnings_tracker.get_corp_code(code)
-    if not corp_code:
-        return jsonify({"error": "corp_code를 찾을 수 없습니다"}), 400
-    cfg = telegram_report.get_config()
-    download_base = cfg.get("download_base", telegram_report.DEFAULT_CONFIG["download_base"])
-    job_id = dart_report.start_download_job(
-        corp_code, name, date_from, date_to, download_base, want_xml, want_pdf,
-    )
-    return jsonify({"job_id": job_id})
+    try:                                   # DART 점검 중 등은 500 대신 JSON 으로 (4-E)
+        paused = kr_financials.dart_is_paused()
+        if paused:
+            return jsonify({"ok": False, "error": f"DART 점검 중, {paused}까지 대기"})
+        corp_code = earnings_tracker.get_corp_code(code)
+        if not corp_code:
+            return jsonify({"ok": False, "error": "corp_code를 찾을 수 없습니다"}), 400
+        download_base = telegram_report.report_download_base()
+        job_id = dart_report.start_download_job(
+            corp_code, name, date_from, date_to, download_base, want_xml, want_pdf, market="KR", code=code,
+        )
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        print(f"[dart_report] 시작 실패: {type(e).__name__}: {msg}", flush=True)
+        return jsonify({"ok": False, "error": msg})
+    return jsonify({"ok": True, "job_id": job_id})
 
 
 @app.route("/api/dart-report/status/<job_id>", methods=["GET"])
