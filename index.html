@@ -1745,7 +1745,7 @@
     <div class="tab-group">
         <div class="tab-group-name">종목분석</div>
         <div class="tab-group-tabs">
-            <div class="tab" data-tab="stockview" onclick="switchTab('stockview')">재무정보</div>
+            <div class="tab" data-tab="stockview" onclick="switchTab('stockview')">종목종합정보</div>
             <div class="tab" data-tab="report" onclick="switchTab('report')">증권사 Report</div>
             <div class="tab" data-tab="edgar" onclick="switchTab('edgar')">보고서 다운로드</div>
         </div>
@@ -9666,7 +9666,7 @@
             const id = `${it.source}-${it.channel}-${it.message_id}`;
             const open = sv.callOpen[id];
             return `<div class="sv-call-item" data-id="${svEsc(id)}">` +
-                `<span class="sv-call-meta">${svEsc(it.date || '')}</span><span class="sv-call-meta">${svEsc(it.source)}</span><span class="sv-call-meta">${svEsc(it.broker || '')}</span>${svEsc(it.title || '')}` +
+                `<span class="sv-call-meta">${svEsc(it.date || '')}</span><span class="sv-call-meta">${svEsc(it.source)}</span><span class="sv-call-meta">${svEsc(it.broker || '')}</span>${(it.file_url || it.fetch_url) ? `<a href="${svEsc(API_BASE + (it.file_url || it.fetch_url))}" target="_blank" rel="noopener noreferrer" title="${it.file_url ? '' : '원문을 받아서 엽니다 (몇 초)'}">${svEsc(it.title || '')}</a>` : svEsc(it.title || '')}` +
                 (it.opinion || it.target ? `<span class="sv-call-meta" style="margin-left:8px;">${svEsc(it.opinion || '')}${it.target ? ' ' + Number(it.target).toLocaleString() + '원' : ''}</span>` : '') +
                 (open ? ((it.summary || []).length ? '<ul>' + it.summary.map(x => `<li>${svEsc(x)}</li>`).join('') + '</ul>' : `<div class="sv-note">${it.source === '리포트' ? '요약 없음 (' + svEsc(it.ai_status || '') + ')' : '본문 없음'}</div>`) : '') +
                 `</div>`;
@@ -9828,7 +9828,7 @@
             if (c.market === 'KR') {
                 const its = c.kr_items || [];
                 return `<div class="sv-pr-call"><div class="sv-pr-call-head" data-id="${svEsc(id)}">${head} · 실적발표·컨콜 관련 자료 ${its.length}건</div>` +
-                    (open ? its.map(it => `<div style="padding:4px 0 0 12px;"><span class="sv-note" style="margin:0;">${svEsc(it.date || '')} ${svEsc(it.source)} ${svEsc(it.broker || '')}</span> ${svEsc(it.title || '')}${(it.summary || []).length ? '<ul style="margin:2px 0 4px;padding-left:18px;">' + it.summary.map(x => `<li>${svEsc(x)}</li>`).join('') + '</ul>' : ''}</div>`).join('') || '<div class="sv-note" style="padding-left:12px;">관련 자료 없음</div>' : '') + '</div>';
+                    (open ? its.map(it => `<div style="padding:4px 0 0 12px;"><span class="sv-note" style="margin:0;">${svEsc(it.date || '')} ${svEsc(it.source)} ${svEsc(it.broker || '')}</span> ${(it.file_url || it.fetch_url) ? `<a href="${svEsc(API_BASE + (it.file_url || it.fetch_url))}" target="_blank" rel="noopener noreferrer" title="${it.file_url ? '' : '원문을 받아서 엽니다 (몇 초)'}">${svEsc(it.title || '')}</a>` : svEsc(it.title || '')}${(it.summary || []).length ? '<ul style="margin:2px 0 4px;padding-left:18px;">' + it.summary.map(x => `<li>${svEsc(x)}</li>`).join('') + '</ul>' : ''}</div>`).join('') || '<div class="sv-note" style="padding-left:12px;">관련 자료 없음</div>' : '') + '</div>';
             }
             const s = c.summary;
             if (!s) return `<div class="sv-pr-call"><div class="sv-pr-call-head" data-id="${svEsc(id)}">${head} · ${c.quarter ? svEsc(c.quarter) + ' ' : ''}요약 없음 ${c.has_transcript ? `<span class="period-btn" data-act="summarize" data-c="${svEsc(c.code)}" data-q="${svEsc(c.quarter)}" style="padding:2px 8px;font-size:12px;">요약 만들기</span>` : '<small class="sv-note" style="margin:0;">(녹취록 없음 — 종목을 열면 받습니다)</small>'}</div></div>`;
@@ -9936,7 +9936,7 @@
             let row = `<div class="sv-rp-row${notext ? ' sv-rp-notext' : ''}" data-id="${it.message_id}">
                 <span class="sv-disc-date">${svEsc((it.date || '').slice(0, 10))}</span>
                 <span class="sv-rp-hide">${svEsc(it.broker || '-')}${it.analyst ? ' · ' + svEsc(it.analyst) : ''}</span>
-                <span class="sv-rp-title" title="${svEsc(it.title)}">${svEsc(it.title)}</span>
+                <span class="sv-rp-title" title="${svEsc(it.title)}">${it.file_url ? `<a href="${svEsc(API_BASE + it.file_url)}" target="_blank" rel="noopener noreferrer">${svEsc(it.title)}</a>` : svEsc(it.title)}</span>
                 <span class="sv-rp-hide">${svEsc(it.opinion || '-')}</span>
                 <span>${it.target ? svRpPrice(it.target) + ' ' + chg : '-'}</span>
                 <span class="sv-rp-hide" style="color:var(--text-muted)">${svEsc(stateTxt)}</span></div>`;

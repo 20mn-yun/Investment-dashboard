@@ -1,4 +1,4 @@
-from flask import send_from_directory, Flask, jsonify, request
+from flask import send_from_directory, send_file, Flask, jsonify, request, redirect, Response
 from flask_cors import CORS
 import yfinance as yf
 import requests
@@ -2239,6 +2239,41 @@ def stock_reports_api():
     return jsonify(stock_reports.status(market, code, name, start=request.args.get("start", "1") != "0", ai_limit=ai_limit))
 
 
+@app.route("/api/stock/reports/file", methods=["GET"])
+def stock_reports_file_api():
+    """리포트 PDF 원문을 브라우저에서 바로 열기. name 은 basename 만 (경로 구분자·'..' 금지), 실제 경로가 cache/reports/<MARKET>_<code>/pdf/ 안이어야 한다."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, _name, _corp = r
+    name = request.args.get("name", "")
+    if not name or "/" in name or "\\" in name or ".." in name or name != os.path.basename(name) or not name.lower().endswith(".pdf"):
+        return jsonify({"error": "bad_request", "message": "name 은 pdf 파일 이름만 허용"}), 400
+    pdf_dir = os.path.realpath(os.path.join(stock_reports._dir(market, code), "pdf"))
+    path = os.path.realpath(os.path.join(pdf_dir, name))
+    if os.path.dirname(path) != pdf_dir or not os.path.isfile(path):
+        return jsonify({"error": "not_found", "message": "파일 없음"}), 404
+    return send_file(path, mimetype="application/pdf", as_attachment=False, download_name=name, conditional=True)
+
+
+@app.route("/api/stock/reports/fetch", methods=["GET"])
+def stock_reports_fetch_api():
+    """PDF 가 없는 리포트 1건을 (채널, message_id) 로 받아(기존 download_message, 공유 클라이언트) 로컬 사본 + Drive 종목 폴더에 저장한 뒤
+    /api/stock/reports/file 로 302. AI 요약은 하지 않는다. 실패하면 텍스트 응답."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, _corp = r
+    channel = request.args.get("channel", "")
+    mid = request.args.get("message_id", "")
+    if not channel or not mid.isdigit():
+        return Response("원문을 받지 못함: channel·message_id 필요", status=400, mimetype="text/plain; charset=utf-8")
+    p, e = stock_reports.fetch_single(market, code, name, channel, mid)
+    if not p:
+        return Response(f"원문을 받지 못함: {e}", status=502, mimetype="text/plain; charset=utf-8")
+    return redirect(f"/api/stock/reports/file?market={market}&code={code}&name={os.path.basename(p)}", code=302)
+
+
 @app.route("/api/stock/reports/refresh", methods=["POST"])
 def stock_reports_refresh_api():
     """다시 검색·받기·정리 (새 리포트만). body: {market, code, ai_limit?}"""
@@ -3496,13 +3531,16 @@ def _krfin_prefetch_run(reason):
         if not info:
             results[code] = "corp_code 없음"
             continue
-        job = kr_financials.fetch_blocking(code, info["corp_code"])
-        results[code] = job["state"] + (f" ({job['error']})" if job.get("error") else "") + f" {job.get('done', 0)}/{job.get('total')}"
-        try:   # 공시 목록도 함께 (종목 탭에서 바로 보이게)
-            disc = stock_profile.kr_disclosures(code, info["corp_code"], refresh=True)
-            results[code] += f", 공시 {disc['count']}건"
-        except Exception as e:
-            results[code] += f", 공시 실패({type(e).__name__})"
+        if kr_financials.dart_paused_until():          # DART 점검 중이면 재무·공시는 건너뛰고(종목마다 몇 초씩 쓰지 않게) 리포트만
+            results[code] = f"DART 점검 중 건너뜀({datetime.fromtimestamp(kr_financials.dart_paused_until()).strftime('%H:%M')}까지)"
+        else:
+            job = kr_financials.fetch_blocking(code, info["corp_code"])
+            results[code] = job["state"] + (f" ({job['error']})" if job.get("error") else "") + f" {job.get('done', 0)}/{job.get('total')}"
+            try:   # 공시 목록도 함께 (종목 탭에서 바로 보이게)
+                disc = stock_profile.kr_disclosures(code, info["corp_code"], refresh=True)
+                results[code] += f", 공시 {disc['count']}건"
+            except Exception as e:
+                results[code] += f", 공시 실패({type(e).__name__})"
         try:   # 증권사 리포트: 새 리포트 검색·받기·AI 정리
             rj = stock_reports.run_blocking("KR", code, info.get("name", ""))
             results[code] += f", 리포트 {rj.get('stage')}"

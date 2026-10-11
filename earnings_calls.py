@@ -5,7 +5,7 @@
       저장: cache/calls/US_<티커>/<YYYYQn>.json(원문 그대로, 영구), <YYYYQn>_summary.json(Haiku 요약), <YYYYQn>_ko.json(국문 번역)
       Alpha Vantage 무료 한도: 하루 25건, 분당 5건 — cache/calls/_av_state.json 에 카운터. 넘으면 "대기"로 두고 05:30 미리 받기에서 이어서 받는다.
       AI: us_financials._call_ai(Haiku) 재사용. 한도는 ai_budget kind 'call_summary'(20/일), 'call_translate'(5/일, 녹취록 1건 = 1건).
-      Drive: Analysis/컨콜/<종목명>_<티커>/<YYYYQn>_요약.md, _국문.md, _원문.md  (telegram_report.drive_path 만 사용)
+      Drive: <종목 폴더>/컨콜/<YYYYQn>_요약.md, _국문.md, _원문.md  (종목 폴더 = telegram_report.stock_folder, 4-D)
 한국: 공식 녹취록이 없어 3-A 리포트 목록에서 제목이 컨콜·실적발표·Review·리뷰·NDR·기업설명회에 걸리는 것과
       텔레인박스(최근 6개월)에서 종목명+키워드가 같이 있는 글을 모아 보여준다. AI 호출 없음.
 """
@@ -24,7 +24,7 @@ import telegram_report
 _BD = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.join(_BD, "cache", "calls")
 AV_STATE_PATH = os.path.join(CACHE_DIR, "_av_state.json")
-DRIVE_SUBDIR = ("Analysis", "컨콜")
+DRIVE_SUBFOLDER = "컨콜"      # 종목 폴더 안의 하위 폴더 (4-D)
 AV_URL = "https://www.alphavantage.co/query"
 AV_DAY_LIMIT = 25
 AV_MINUTE_LIMIT = 5
@@ -447,8 +447,16 @@ def _summary_md(code, quarter, name, summ):
     return "\n".join(L)
 
 
+def call_dir(code, name=""):
+    """컨콜 md 저장 폴더: <stock_folder(종목)>/컨콜/. Drive 없으면 None"""
+    base = telegram_report.report_download_base()
+    if not base:
+        return None
+    return os.path.join(telegram_report.stock_folder(base, telegram_report.stock_folder_keyword("US", code, name or None)), DRIVE_SUBFOLDER)
+
+
 def export_drive(code, quarter, name=""):
-    folder = telegram_report.drive_path(*DRIVE_SUBDIR, code)          # 미국 종목은 티커만 (3-C 규칙, stock_reports.drive_folder_name 과 같음)
+    folder = call_dir(code, name)          # <종목 폴더>/컨콜/ (4-D, 종목 폴더 키워드는 telegram_report.stock_folder_keyword)
     if not folder:
         return None
     os.makedirs(folder, exist_ok=True)
@@ -546,7 +554,8 @@ def status_kr(code, name=""):
             seen.add((it.get("channel"), it.get("message_id")))
             items.append({"source": "리포트", "date": (it.get("date") or "")[:10], "broker": it.get("broker"), "title": it.get("title"),
                           "summary": it.get("summary") or [], "opinion": it.get("opinion"), "target": it.get("target"),
-                          "message_id": it.get("message_id"), "channel": it.get("channel"), "ai_status": it.get("ai_status")})
+                          "message_id": it.get("message_id"), "channel": it.get("channel"), "ai_status": it.get("ai_status"),
+                          "file_url": it.get("file_url")})
     # 3-A 의 40건 상한 밖도 리포트 DB 에서 직접 검색 (최근 6개월, 키워드 제목만). 요약은 없으므로 제목·증권사만
     try:
         found, _stats = stock_reports.search_reports("KR", code, name, months=TG_MONTHS, limit=400)
@@ -558,7 +567,8 @@ def status_kr(code, name=""):
             if is_call_related(title) and any(v in title.lower() for v in variants_t):     # 제목에 종목명이 있어야 (본문 언급만으로 잡힌 타사 리포트 제외)
                 seen.add((f["channel"], f["message_id"]))
                 items.append({"source": "리포트", "date": (f.get("date") or "")[:10], "broker": f.get("broker"), "title": title,
-                              "summary": [], "message_id": f["message_id"], "channel": f["channel"], "ai_status": "not_collected"})
+                              "summary": [], "message_id": f["message_id"], "channel": f["channel"], "ai_status": "not_collected",
+                              "fetch_url": f"/api/stock/reports/fetch?market=KR&code={code}&channel={urllib.parse.quote(f['channel'])}&message_id={f['message_id']}"})
     except Exception as e:
         print(f"[earnings_calls] 리포트 DB 검색 실패: {type(e).__name__}", flush=True)
     # 텔레인박스 (최근 6개월): 같은 문단 안에 종목명 + 키워드

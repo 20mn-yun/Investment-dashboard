@@ -18,7 +18,7 @@ import re
 import tempfile
 import threading
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import requests
 
@@ -34,6 +34,9 @@ MIN_INTERVAL = 0.25        # DART 호출 간격 (초, 0.2 이상)
 MAX_RETRIES = 3            # 실패 시 재시도 (간격 0.5 → 1 → 2초)
 ACC_MT_TTL_DAYS = 30       # 결산월 재확인 주기
 FILING_GRACE_DAYS = 15     # 법정 공시 기한 뒤 여유 (지연·정정 공시)
+EARLY_CHECK_DAYS = 20          # 4-C: 기간 말 + 20일 전에는 보고서를 요청하지 않음 (그 뒤로는 nodata 를 하루 1회 재확인, 조기 공시도 잡힘)
+DEFER_UNTIL_EARLY_CHECK = True # 위 규칙 on/off
+DART_PAUSE_SEC = 600           # 4-C: DART 가 JSON 대신 안내 페이지(HTML)를 돌려주면 10분간 호출을 쉰다
 
 # 보고서 종류: (키, reprt_code, 회계연도 말에서 몇 달 전에 끝나는지, 법정 공시 기한 일수)
 REPORTS = [
@@ -42,6 +45,7 @@ REPORTS = [
     ("Q3", "11014", 3, 45),
     ("FY", "11011", 0, 90),
 ]
+REPORT_NAMES = {"11013": "1분기", "11012": "반기", "11014": "3분기", "11011": "사업보고서"}
 # 저장할 필드 (자본변동표(SCE)를 뺀 모든 행을 남기되 이 필드만)
 ROW_FIELDS = ["sj_div", "account_id", "account_nm", "account_detail", "thstrm_amount", "thstrm_add_amount", "ord"]
 
@@ -218,6 +222,16 @@ class TransientError(Exception):
 # ===== 공통 =====
 _api_lock = threading.Lock()
 _last_call = [0.0]
+_dart_pause_until = [0.0]      # DART 안내 페이지(HTML) 응답 뒤 쉬는 시각 (epoch). 그 전까지 모든 호출은 즉시 TransientError
+
+
+def dart_paused_until():
+    """쉬는 중이면 끝나는 시각(epoch), 아니면 None"""
+    return _dart_pause_until[0] if time.time() < _dart_pause_until[0] else None
+
+
+def _pause_msg():
+    return f"DART 점검 중, {datetime.fromtimestamp(_dart_pause_until[0]).strftime('%H:%M')}까지 대기"
 _code_locks = {}
 _code_locks_guard = threading.Lock()
 
@@ -247,6 +261,8 @@ def _dart_get(endpoint, params):
     p = dict(params, crtfc_key=_api_key())
     delay = 0.5
     last = ""
+    if dart_paused_until():
+        raise TransientError(_pause_msg())
     for attempt in range(MAX_RETRIES + 1):
         with _api_lock:
             wait = MIN_INTERVAL - (time.time() - _last_call[0])
@@ -257,14 +273,32 @@ def _dart_get(endpoint, params):
             res = _session().get(DART_URL + endpoint, params=p, timeout=20)
             if res.status_code != 200:
                 last = f"HTTP {res.status_code}"
+            elif not (res.content or b"").strip():
+                last = "empty response"                       # 빈 응답도 재시도 (4-A)
             else:
-                d = res.json()
-                st = d.get("status")
+                ct = (res.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                body_head = (res.content or b"")[:64].lstrip().lower()
+                if (ct and "json" not in ct) or body_head.startswith(b"<"):   # 4-C 차단기: JSON 이 아니면(점검 안내 HTML 등) 10분 쉼, 재시도 없음
+                    _dart_pause_until[0] = time.time() + DART_PAUSE_SEC
+                    print(f"[kr_financials] DART 응답이 JSON 이 아님({ct or '?'}, {len(res.content)}B) → {DART_PAUSE_SEC // 60}분간 호출 중단", flush=True)
+                    raise TransientError(f"{endpoint} {params.get('bsns_year', '')} {params.get('reprt_code', '')}: {_pause_msg()}".strip())
+                try:
+                    d = res.json()
+                except ValueError:                            # JSONDecodeError (4-A)
+                    last = f"JSONDecodeError ({ct or 'no content-type'}, {len(res.content)}B)"
+                    d = None
+                if d is None:
+                    st = None
+                else:
+                    st = d.get("status")
                 if st in ("000", "013"):
                     return d
-                last = f"DART status {st} {d.get('message', '')}".strip()
-                if st in ("010", "011", "012", "020", "021", "101"):   # 키·권한·한도 문제는 재시도해도 같음
-                    break
+                if d is not None:
+                    last = f"DART status {st} {d.get('message', '')}".strip()
+                    if st in ("010", "011", "012", "020", "021", "101"):   # 키·권한·한도 문제는 재시도해도 같음
+                        break
+        except TransientError:
+            raise
         except Exception as e:   # requests 예외 문자열에는 키가 든 주소가 들어 있어 이름만 남긴다
             last = type(e).__name__
         if attempt < MAX_RETRIES:
@@ -458,9 +492,19 @@ def _ensure_acc_mt(cache, corp_code):
     return True
 
 
+def _not_due(entry, period_end, deadline_days, today):
+    """기간 말 + EARLY_CHECK_DAYS 전이면 요청하지 않음 (받은 적 없는 보고서만). 그 뒤로는 _need_fetch 의 하루 1회 재확인 규칙을 따른다.
+    사업보고서도 같은 방식(기간 말 + 20일 = 1/20)."""
+    if not DEFER_UNTIL_EARLY_CHECK or (entry and entry.get("status") == "ok"):
+        return False
+    return period_end < today <= period_end + timedelta(days=EARLY_CHECK_DAYS)
+
+
 def _need_fetch(entry, period_end, deadline_days, today):
     if period_end >= today:
         return False                        # 기간이 아직 끝나지 않음
+    if _not_due(entry, period_end, deadline_days, today):
+        return False                        # 제출 기한 전: 요청하지 않음 (4-A)
     if not entry:
         return True
     if entry.get("status") == "ok":
@@ -515,14 +559,16 @@ def refresh(code, corp_code, years=DEFAULT_YEARS, progress=None):
         done = 0
         if progress:
             progress(0, total)
-        try:
-            for rid, by, rc, pend, deadline in plan:
+        failed = {f"{f['year']}_{f['reprt_code']}": f for f in cache.get("fetch_failed", [])}
+        for rid, by, rc, pend, deadline in plan:          # 보고서 하나가 실패해도 나머지는 계속 받고, 실패 목록만 남긴다 (4-A)
+            try:
                 r = _fetch_report(corp_code, by, rc)
                 r["fetched_at"] = _now()
                 if r["status"] == "nodata":
                     r["checked"] = today.isoformat()
                     r["final"] = (today - pend).days > deadline + FILING_GRACE_DAYS
                 reports[rid] = r
+                failed.pop(rid, None)
                 changed = True
                 done += 1
                 if progress:
@@ -530,19 +576,30 @@ def refresh(code, corp_code, years=DEFAULT_YEARS, progress=None):
                 if r["status"] == "ok":
                     shares[rid] = _fetch_shares(corp_code, by, rc)
                     shares[rid]["fetched_at"] = _now()
-                done += 1
-                if progress:
-                    progress(done, total)
-            for rid in backlog:
-                by, rc = rid.split("_")
+            except TransientError as e:
+                failed[rid] = {"year": by, "reprt_code": rc, "error": str(e), "at": _now(), "tries": failed.get(rid, {}).get("tries", 0) + 1}
+                changed = True
+            done += 1
+            if progress:
+                progress(done, total)
+        for rid in backlog:
+            by, rc = rid.split("_")
+            try:
                 shares[rid] = _fetch_shares(corp_code, by, rc)
                 shares[rid]["fetched_at"] = _now()
                 changed = True
-                done += 1
-                if progress:
-                    progress(done, total)
-        except TransientError as e:
-            warnings.append(f"일부 보고서를 받지 못함(저장 안 함, 다음 조회 때 다시 시도): {e}")
+            except TransientError as e:
+                warnings.append(f"주식총수를 받지 못함(다음 조회 때 다시 시도): {e}")
+            done += 1
+            if progress:
+                progress(done, total)
+        if failed:
+            cache["fetch_failed"] = sorted(failed.values(), key=lambda f: (f["year"], f["reprt_code"]))
+            warnings.append("일부 보고서를 받지 못함(받은 것은 저장, 다음 조회 때 실패한 것만 다시 시도): "
+                            + ", ".join(f"{f['year']} {REPORT_NAMES.get(f['reprt_code'], f['reprt_code'])}({f['error'].split(': ')[-1]})" for f in cache["fetch_failed"]))
+        elif "fetch_failed" in cache:
+            cache.pop("fetch_failed", None)
+            changed = True
         if changed:
             cache["updated_at"] = _now()
             _atomic_write(_cache_path(code), cache)
@@ -624,7 +681,12 @@ def get_financials_nowait(code, corp_code, name="", years=5):
     out = compute(cache, years, name)
     out["status"] = "ready"
     out["updating"] = None
-    if failed:                                   # 받아둔 것으로 보여주되 실패 사유를 알림 (자동 재시도는 다음 요청에서)
+    if cache.get("fetch_failed"):                # 받지 못한 보고서가 남아 있을 때만 경고 (기한 전 보고서는 포함하지 않음)
+        out["fetch_failed"] = cache["fetch_failed"]
+        msg = "받지 못한 보고서: " + ", ".join(f"{f['year']} {REPORT_NAMES.get(f['reprt_code'], f['reprt_code'])}" for f in cache["fetch_failed"]) + " (다음 조회 때 다시 시도)"
+        if msg not in out["warnings"]:
+            out["warnings"] = [msg] + out["warnings"]
+    if failed and failed.get("error") and not cache.get("fetch_failed"):   # 주식총수 등 보고서 외 실패
         out["fetch_error"] = failed["error"]
         out["warnings"] = [failed["error"]] + out["warnings"]
     elif needs_fetch(code, years_fetch):

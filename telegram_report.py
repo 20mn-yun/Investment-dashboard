@@ -1,4 +1,6 @@
 import json
+import unicodedata
+import re
 import os
 import time
 import threading
@@ -506,6 +508,252 @@ async def download_message(channel_username, message_id, dest_path):
     return filename, os.path.getsize(dest_path)
 
 
+def report_download_base():
+    """기존 증권사 리포트 기능의 저장 루트 (report_config.json 의 download_base, 기본 Drive Analysis/)"""
+    cfg = get_config()
+    return cfg.get("download_base", DEFAULT_CONFIG["download_base"])
+
+
+def stock_folder(download_base, keyword):
+    """종목 폴더 규칙 (기존 _search_and_download 의 stock_root 와 같음): <download_base>/<keyword>"""
+    return os.path.join(os.path.expanduser(download_base), keyword)
+
+
+def _listdir_retry(path, attempts=2, wait=1.0):
+    last_err = None
+    for i in range(attempts):
+        try:
+            return os.listdir(path)
+        except OSError as e:
+            last_err = e
+            if i < attempts - 1:
+                time.sleep(wait)
+    print(f"[report] 폴더 나열 실패(건너뜀): {path} — {type(last_err).__name__}: {last_err}", flush=True)
+    return None
+
+
+def existing_report_files(stock_root):
+    """종목 폴더의 모든 하위 폴더에 있는 파일 {파일명: 경로} (기존 중복 검사 규칙: 하위 폴더 1단계만, 루트 바로 아래 파일은 제외).
+    기존 _search_and_download 와 stock_reports 가 같은 기준으로 중복을 거른다."""
+    existing = {}
+    if not os.path.exists(stock_root):
+        return existing
+    subs = _listdir_retry(stock_root)
+    if subs is None:
+        print(f"[report] 루트 나열 실패로 중복검사 생략: {stock_root}", flush=True)
+        return existing
+    for sub in subs:
+        sub_path = os.path.join(stock_root, sub)
+        try:
+            is_dir = os.path.isdir(sub_path)
+        except OSError:
+            is_dir = False
+        if not is_dir:
+            continue
+        files = _listdir_retry(sub_path)
+        if files is None:
+            continue
+        for f in files:
+            existing.setdefault(nfc(f), os.path.join(sub_path, f))
+    return existing
+
+
+# ===== 종목 판별 · 폴더 키워드 · 파일명 규칙 (stock_reports 와 공유, 4-D) =====
+_BD = os.path.dirname(os.path.abspath(__file__))
+_maps_cache = {}
+REPORT_SUBFOLDER = "리포트"
+REPORT_INDEX = ".index.json"          # 종목 폴더/리포트/.index.json : {message_id: 파일명} (두 기능이 공유하는 중복 기록)
+_TAIL_RE = re.compile(r"^(?P<name>.+?)(?P<tail>[\s\d.,\-_]+)$")
+ISSUER_EXTRAS = ("KB증권", "삼성증권", "한국투자증권", "NH투자증권", "현대차증권", "SK증권", "LS증권", "iM증권", "DS투자증권", "리딩투자증권",
+                 "한양증권", "유화증권", "KR투자증권", "코리아에셋투자증권", "삼성선물", "토스증권", "대신증권", "메리츠증권", "하나증권")
+
+
+def nfc(s):
+    """macOS 파일시스템은 한글을 NFD 로 돌려주므로 비교 전에 NFC 로 맞춘다"""
+    return unicodedata.normalize("NFC", s) if isinstance(s, str) else s
+
+
+def _json_map(name, path):
+    try:
+        mt = os.path.getmtime(path)
+    except OSError:
+        return {}
+    hit = _maps_cache.get(name)
+    if hit and hit[0] == mt:
+        return hit[1]
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return (hit[1] if hit else {})          # 읽기 실패(갱신 중 등)는 캐시하지 않음
+    if data:
+        _maps_cache[name] = (mt, data)
+    return data
+
+
+def kr_map():
+    """{종목코드: {corp_code, name}} (dart_corp_map.json)"""
+    return _json_map("kr", os.path.join(_BD, "dart_corp_map.json"))
+
+
+def us_map():
+    return _json_map("us", os.path.join(_BD, "us_stock_map.json"))
+
+
+def us_short_name(code, name=None):
+    """'Micron Technology, Inc. - Common Stock' → 'Micron Technology'"""
+    name = name if name is not None else (us_map().get(code) or {}).get("name", "")
+    short = re.sub(r"\s*-?\s*(Class [A-Z]\s+)?(Common Stock|Common Shares|Ordinary Shares|American Depositary Shares?|Depositary Shares?|ADS|ADR)(\s.*)?$", "", name or "", flags=re.I).strip()
+    short = re.sub(r"\s+-\s+.*$", "", short).strip()
+    short = re.sub(r",?\s+(Inc\.?|Incorporated|Corporation|Corp\.?|Ltd\.?|Limited|plc|N\.V\.|S\.A\.|Co\.?|Company|Holdings?)\s*$", "", short, flags=re.I).strip()
+    return short.rstrip(",. ") or code
+
+
+def _safe_name(name, limit=80):
+    return re.sub(r'[/\\:*?"<>|\n\r]', "_", (name or "").strip())[:limit].strip("._ ") or "종목"
+
+
+def stock_folder_keyword(market, code, name=None):
+    """종목 폴더 키워드: 한국 = 종목명(코드 없음), 미국 = <짧은 이름>_<티커> (예 NVIDIA_NVDA). 모든 기능이 이 함수를 쓴다."""
+    if market == "US":
+        return _safe_name(f"{us_short_name(code, name)}_{code}")
+    if name is None:
+        name = (kr_map().get(code) or {}).get("name", "")
+    return _safe_name(name) or code
+
+
+def resolve_stock_keyword(keyword):
+    """검색어 → {market, code, name, tail} 또는 None.
+    종목명 완전 일치 / 6자리 코드 / 미국 티커 / '<종목명><꼬리>' (꼬리 = 공백·숫자·점·쉼표·대시·밑줄만). 쉼표가 든 복수 종목은 None."""
+    k = nfc((keyword or "").strip())
+    if not k or "," in k:
+        return None
+    km, um = kr_map(), us_map()
+    names = {v.get("name"): c for c, v in km.items() if v.get("name")}
+
+    def exact(t):
+        if t in names:
+            return {"market": "KR", "code": names[t], "name": t}
+        if re.fullmatch(r"\d{6}", t) and t in km:
+            return {"market": "KR", "code": t, "name": km[t].get("name", "")}
+        if t.upper() in um and re.fullmatch(r"[A-Za-z.\-]{1,6}", t):
+            return {"market": "US", "code": t.upper(), "name": um[t.upper()].get("name", "")}
+        return None
+
+    r = exact(k)
+    if r:
+        return dict(r, tail="")
+    m = _TAIL_RE.match(k)
+    if m:
+        base, tail = m.group("name").rstrip(), m.group("tail")
+        if base != k:
+            r = exact(base)
+            if r:
+                return dict(r, tail=tail)
+    return None
+
+
+def split_keywords(keyword):
+    """'삼성전자, 하이닉스' → 판별된 종목 목록 (판별 안 되는 조각은 빼고). 쉼표 없으면 1개 또는 빈 목록"""
+    out = []
+    for part in [p.strip() for p in (keyword or "").split(",") if p.strip()]:
+        r = resolve_stock_keyword(part)
+        if r:
+            out.append(r)
+    return out
+
+
+def guess_broker(filename, preview=""):
+    """파일명·본문에서 증권사 이름 추정 (없으면 None)"""
+    text = f"{filename or ''} {preview or ''}"
+    for b in sorted(set(BROKERAGES) | set(ISSUER_EXTRAS), key=len, reverse=True):
+        if b in text:
+            return b
+    m = re.search(r"([가-힣A-Za-z&]{2,10}(?:투자증권|증권|금융투자))", text)
+    return m.group(1) if m else None
+
+
+def _yymmdd(d):
+    """'2026-10-08 11:23' / '2026-10-08T..' / datetime / '20261008' → '261008'. 모르면 None"""
+    if not d:
+        return None
+    if isinstance(d, datetime):
+        return d.strftime("%y%m%d")
+    s = str(d)
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s) or re.match(r"(\d{4})(\d{2})(\d{2})$", s)
+    return (m.group(1)[2:] + m.group(2) + m.group(3)) if m else None
+
+
+def report_filename(stock_name, msg_date, broker, original_filename, limit=120):
+    """저장 파일명 규칙: <종목명>_<yymmdd>_<증권사|미확인>_<레포트명>.pdf
+    레포트명 = 원본 stem 에서 종목명·증권사·날짜(6/8자리)·밑줄 중복을 뺀 나머지(비면 원본 stem)."""
+    stem = nfc(re.sub(r"\.pdf$", "", os.path.basename(original_filename or ""), flags=re.I))
+    stock_name = nfc(stock_name)
+    broker = nfc((broker or "").strip()) or "미확인"
+    rest = stem
+    for tok in (stock_name, broker if broker != "미확인" else ""):
+        if tok:
+            rest = rest.replace(tok, "_").replace(tok.replace(" ", "_"), "_")
+    rest = re.sub(r"(?<!\d)(?:20)?\d{6}(?!\d)", "_", rest)          # 날짜 6/8자리
+    rest = re.sub(r'[/\\:*?"<>|\n\r]', "_", rest)
+    rest = re.sub(r"[_\s]+", "_", rest).strip("_ .")
+    if not rest:
+        rest = re.sub(r"[_\s]+", "_", re.sub(r'[/\\:*?"<>|\n\r]', "_", stem)).strip("_ .") or "리포트"
+    name = f"{_safe_name(stock_name, 40)}_{_yymmdd(msg_date) or '000000'}_{_safe_name(broker, 20)}_{rest}"
+    name = re.sub(r"_+", "_", name)
+    if len(name) > limit - 4:
+        name = name[:limit - 4].rstrip("_ .")
+    return name + ".pdf"
+
+
+def report_dir(stock_root):
+    return os.path.join(stock_root, REPORT_SUBFOLDER)
+
+
+def load_report_index(stock_root):
+    p = os.path.join(report_dir(stock_root), REPORT_INDEX)
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_report_index(stock_root, index):
+    d = report_dir(stock_root)
+    os.makedirs(d, exist_ok=True)
+    p = os.path.join(d, REPORT_INDEX)
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, p)
+
+
+def record_report(stock_root, message_id, filename):
+    if message_id is None:
+        return
+    idx = load_report_index(stock_root)
+    idx[str(message_id)] = filename
+    save_report_index(stock_root, idx)
+
+
+def find_duplicate(stock_root, message_id=None, new_name=None, original_name=None, existing=None):
+    """중복이면 기존 파일 경로, 아니면 None. (a) .index.json 의 message_id (b) 새 규칙 파일명 (c) 원본 파일명 — 하나라도 맞으면 중복"""
+    if not stock_root:
+        return None
+    existing = existing if existing is not None else existing_report_files(stock_root)
+    if message_id is not None:
+        fn = nfc(load_report_index(stock_root).get(str(message_id)))
+        if fn and fn in existing:
+            return existing[fn]
+    for nm in (new_name, original_name):
+        nm = nfc(nm)
+        if nm and nm in existing:
+            return existing[nm]
+    return None
+
+
 def _unique_path(directory, filename):
     base, ext = os.path.splitext(filename)
     path = os.path.join(directory, filename)
@@ -528,7 +776,12 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
 
         date_from_str = date_from.strftime("%Y-%m-%d")
         date_to_str = date_to.strftime("%Y-%m-%d")
-        results = search_index(keyword, date_from_str, date_to_str, channel_username)
+        _one = resolve_stock_keyword(keyword)
+        search_term = _one["name"] if (_one and _one["tail"] and _one["market"] == "KR") else keyword   # '삼아알미늄 26.04' 는 종목명으로 검색 (4-D)
+        results = search_index(search_term, date_from_str, date_to_str, channel_username)
+        if _one or split_keywords(keyword):
+            _stocks0 = split_keywords(keyword)
+            job["download_path"] = ", ".join(report_dir(stock_folder(download_base, stock_folder_keyword(s0["market"], s0["code"], s0["name"]))) for s0 in _stocks0)
         job["found"] = len(results)
         job["total_found"] = len(results)
         job["msg_count"] = len(results)
@@ -537,50 +790,24 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             job["status"] = "done"
             return
 
-        stock_root = os.path.join(os.path.expanduser(download_base), keyword)
-        subfolder_name = f"{date_from.strftime('%y%m%d')}~{date_to.strftime('%y%m%d')}"
-        final_path = os.path.join(stock_root, subfolder_name)
-        local_staging = os.path.join("downloads", keyword, subfolder_name)
+        stocks = split_keywords(keyword)            # 검색어가 종목(복수 가능)이면 종목 폴더/리포트/ 로 고정 (4-D)
+        if stocks:
+            roots = {s["code"]: stock_folder(download_base, stock_folder_keyword(s["market"], s["code"], s["name"])) for s in stocks}
+            final_path = report_dir(roots[stocks[0]["code"]])
+            local_staging = os.path.join("downloads", _safe_name(keyword, 40), "리포트")
+            job["download_path"] = final_path if len(stocks) == 1 else ", ".join(report_dir(roots[s["code"]]) for s in stocks)
+            job["stock_folders"] = [report_dir(roots[s["code"]]) for s in stocks]
+            existing_by_code = {s["code"]: await asyncio.to_thread(existing_report_files, roots[s["code"]]) for s in stocks}
+        else:
+            stock_root = stock_folder(download_base, keyword)
+            subfolder_name = f"{date_from.strftime('%y%m%d')}~{date_to.strftime('%y%m%d')}"
+            final_path = os.path.join(stock_root, subfolder_name)
+            local_staging = os.path.join("downloads", keyword, subfolder_name)
+            job["download_path"] = final_path
+            existing_files = set(await asyncio.to_thread(existing_report_files, stock_root))   # 공통 함수 (stock_reports 와 같은 기준)
         os.makedirs(local_staging, exist_ok=True)
-        job["download_path"] = final_path
-
-        def _listdir_retry(path, attempts=2, wait=1.0):
-            last_err = None
-            for i in range(attempts):
-                try:
-                    return os.listdir(path)
-                except OSError as e:
-                    last_err = e
-                    if i < attempts - 1:
-                        time.sleep(wait)
-            print(f"[report] 폴더 나열 실패(건너뜀): {path} — {type(last_err).__name__}: {last_err}", flush=True)
-            return None
-
-        def _collect_existing_filenames(root):
-            existing = set()
-            if not os.path.exists(root):
-                return existing
-            subs = _listdir_retry(root)
-            if subs is None:
-                print(f"[report] 루트 나열 실패로 중복검사 생략: {root}", flush=True)
-                return existing
-            for sub in subs:
-                sub_path = os.path.join(root, sub)
-                try:
-                    is_dir = os.path.isdir(sub_path)
-                except OSError:
-                    is_dir = False
-                if not is_dir:
-                    continue
-                files = _listdir_retry(sub_path)
-                if files is None:
-                    continue
-                for f in files:
-                    existing.add(f)
-            return existing
-
-        existing_files = await asyncio.to_thread(_collect_existing_filenames, stock_root)
         job["skipped"] = 0
+        staged = []     # (로컬 경로, 최종 폴더, 종목 루트, message_id, 저장 파일명)
 
         channel = await client.get_entity(channel_username)
 
@@ -602,12 +829,27 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             if not filename:
                 filename = r["filename"]
 
-            if filename in existing_files:
-                job["skipped"] += 1
-                continue
-
-            file_path = _unique_path(local_staging, filename)
-            await client.download_media(msg, file=file_path)
+            if stocks:
+                target = stocks[0]
+                if len(stocks) > 1:            # 복수 종목: 파일명·본문에 나오는 종목 폴더로, 없으면 첫 종목
+                    hay = f"{filename} {r.get('text_preview') or ''}"
+                    target = next((s for s in stocks if s["name"] and s["name"] in hay or s["code"] in hay), stocks[0])
+                root = roots[target["code"]]
+                new_name = report_filename(target["name"] if target["market"] == "KR" else us_short_name(target["code"], target["name"]),
+                                           r["date"], guess_broker(filename, r.get("text_preview")), filename)
+                if find_duplicate(root, r["message_id"], new_name, filename, existing_by_code[target["code"]]):
+                    job["skipped"] += 1
+                    continue
+                file_path = _unique_path(local_staging, new_name)
+                await client.download_media(msg, file=file_path)
+                existing_by_code[target["code"]][new_name] = os.path.join(report_dir(root), new_name)
+                staged.append((file_path, report_dir(root), root, r["message_id"], os.path.basename(file_path)))
+            else:
+                if filename in existing_files:
+                    job["skipped"] += 1
+                    continue
+                file_path = _unique_path(local_staging, filename)
+                await client.download_media(msg, file=file_path)
 
             size_kb = round(os.path.getsize(file_path) / 1024, 1)
             job["downloaded"] += 1
@@ -630,6 +872,18 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             return
 
         def _copy_to_drive():
+            if stocks:                      # 종목 폴더: 파일마다 자기 종목 폴더/리포트/ 로 옮기고 .index.json 에 기록
+                for lp, dest_dir, root, mid, fn in staged:
+                    os.makedirs(dest_dir, exist_ok=True)
+                    dst = os.path.join(dest_dir, fn)
+                    if not os.path.exists(dst):
+                        shutil.move(lp, dst)
+                    record_report(root, mid, fn)
+                shutil.rmtree(local_staging, ignore_errors=True)
+                parent = os.path.dirname(local_staging)
+                if os.path.isdir(parent) and not os.listdir(parent):
+                    shutil.rmtree(parent, ignore_errors=True)
+                return
             result_mkdir = subprocess.run(["/bin/mkdir", "-p", final_path], capture_output=True, text=True)
             if result_mkdir.returncode != 0:
                 raise RuntimeError(f"mkdir 실패: {result_mkdir.stderr}")

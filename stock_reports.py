@@ -12,6 +12,7 @@ import re
 import shutil
 import sqlite3
 import threading
+import hashlib
 import time
 from datetime import date, datetime, timedelta
 
@@ -22,9 +23,9 @@ import watchlist as watchlist_store
 _BD = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.join(_BD, "cache", "reports")
 AI_STATE_PATH = os.path.join(CACHE_DIR, "_ai_state.json")
-DRIVE_SUBDIR = ("Analysis", "리포트")
-INDEX_NAME = "리포트_인덱스.md"
+DRIVE_SUBFOLDER = "리포트"       # 종목 폴더(기존 증권사 리포트 기능과 같은 Analysis/<종목>/) 안의 하위 폴더 이름
 SUMMARY_MD = "_요약.md"
+DRIVE_SKIP_SUBFOLDERS = ("사업보고서",)   # DART 보고서 폴더는 증권사 리포트 후보에서 제외
 MONTHS = 3
 MAX_PER_STOCK = 40
 AI_DAILY_LIMIT = ai_budget.DEFAULT_LIMITS["reports"]   # 300 — 공통 한도 모듈(ai_budget)에서 관리
@@ -62,7 +63,7 @@ def _load_json(path, default):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError):
         return default
 
 
@@ -75,9 +76,17 @@ def _now():
     return datetime.now().isoformat(timespec="seconds")
 
 
-def drive_folder_name(market, code, name):
-    """Drive 폴더명: 미국은 티커만, 한국은 <종목명>_<코드> (3-C 규칙. 리포트·컨콜 공통)"""
-    return code if market == "US" else f"{_safe(name) or code}_{code}"
+def stock_folder_keyword(market, code, name):
+    """종목 폴더 키워드 — telegram_report.stock_folder_keyword (모든 기능 공통)"""
+    return telegram_report.stock_folder_keyword(market, code, name or None)
+
+
+def stock_root(market, code, name):
+    """종목 폴더 절대 경로 (telegram_report.stock_folder 재사용). Drive 없으면 None"""
+    base = telegram_report.report_download_base()
+    if not base:
+        return None
+    return telegram_report.stock_folder(base, stock_folder_keyword(market, code, name))
 
 
 def _safe(name):
@@ -174,12 +183,8 @@ def search_reports(market, code, name, months=MONTHS, limit=MAX_PER_STOCK):
 
 
 def guess_broker(filename, preview=""):
-    text = f"{filename or ''} {preview or ''}"
-    for b in sorted(set(ISSUERS), key=len, reverse=True):
-        if b in text:
-            return b
-    m = re.search(r"([가-힣A-Za-z&]{2,10}(?:투자증권|증권|금융투자))", text)
-    return m.group(1) if m else None
+    """증권사 추정 — telegram_report.guess_broker (두 기능 공통)"""
+    return telegram_report.guess_broker(filename, preview)
 
 
 # ===== 2. 받기 =====
@@ -187,31 +192,93 @@ def _pdf_path(market, code, message_id):
     return os.path.join(_dir(market, code), "pdf", f"{message_id}.pdf")
 
 
-def _drive_dir(name, code):
-    market = "KR" if re.fullmatch(r"\d{6}", code or "") else "US"     # 6자리 숫자 = 한국 종목코드
-    return telegram_report.drive_path(*DRIVE_SUBDIR, drive_folder_name(market, code, name))
+def _drive_dir(name, code, market=None):
+    """Drive 저장 폴더 = 종목 폴더/리포트 (종목 폴더는 기존 기능과 같은 규칙)"""
+    market = market or ("KR" if re.fullmatch(r"\d{6}", code or "") else "US")
+    root = stock_root(market, code, name)
+    return os.path.join(root, DRIVE_SUBFOLDER) if root else None
 
 
-def _copy_to_drive(local_pdf, name, code, item):
-    d = _drive_dir(name, code)
+def _copy_to_drive(local_pdf, name, code, item, market=None):
+    """로컬 사본 → Drive 종목 폴더/리포트/<종목명>_<yymmdd>_<증권사|미확인>_<레포트명>.pdf (공통 규칙). 중복이면 기존 파일을 쓴다.
+    .index.json 에 {message_id: 파일명} 기록 (기존 증권사 리포트 기능과 공유)."""
+    d = _drive_dir(name, code, market)
     if not d:
         return None, "Drive 를 찾지 못함"
+    root = os.path.dirname(d)
     try:
+        fname = _drive_filename(item, name, market)
+        mid = item["message_id"] if str(item.get("channel")) != "drive" else None
+        dup = telegram_report.find_duplicate(root, mid, fname, item.get("filename"))
+        if dup:
+            if mid is not None:
+                telegram_report.record_report(root, mid, os.path.basename(dup))
+            return dup, None
         os.makedirs(d, exist_ok=True)
-        title = re.sub(r"\.pdf$", "", item.get("filename") or str(item["message_id"]), flags=re.I)
-        dst = os.path.join(d, _safe(f"{(item.get('date') or '')[:10]}_{item.get('broker') or '증권사'}_{title}") + ".pdf")
-        if not os.path.exists(dst):
-            shutil.copy2(local_pdf, dst)
+        dst = os.path.join(d, fname)
+        shutil.copy2(local_pdf, dst)
+        if mid is not None:
+            telegram_report.record_report(root, mid, fname)
         return dst, None
     except OSError as e:
         return None, f"{type(e).__name__}"
 
 
+def _stock_label(name, code, market=None):
+    market = market or ("KR" if re.fullmatch(r"\d{6}", code or "") else "US")
+    return telegram_report.us_short_name(code, name or None) if market == "US" else (name or code)
+
+
+def _drive_filename(item, name=None, market=None, broker=None):
+    """공통 파일명 규칙 (telegram_report.report_filename). 증권사는 받을 때 아는 값, 모르면 '미확인'"""
+    code = item.get("_code") or ""
+    return telegram_report.report_filename(_stock_label(name, code, market), item.get("date"), broker or item.get("broker"),
+                                           item.get("filename") or f"{item['message_id']}.pdf")
+
+
+def rename_if_broker_found(market, code, name, item, broker):
+    """'미확인' 으로 저장된 Drive 파일을 AI 요약이 알아낸 증권사 이름으로 바꾼다 (로컬 message_id.pdf 는 그대로). 반환 새 경로 또는 None"""
+    old = item.get("drive")
+    if not broker or not old or "_미확인_" not in os.path.basename(old) or not os.path.isfile(old):
+        return None
+    new_name = _drive_filename(item, name, market, broker)
+    dst = os.path.join(os.path.dirname(old), new_name)
+    if os.path.exists(dst):
+        return None
+    try:
+        os.rename(old, dst)
+    except OSError:
+        return None
+    item["drive"] = dst
+    item["broker"] = broker
+    root = stock_root(market, code, name)
+    if root and str(item.get("channel")) != "drive":
+        telegram_report.record_report(root, item["message_id"], new_name)
+    return dst
+
+
 def download_one(market, code, name, item, timeout=180):
-    """공유 루프에서 download_message 실행. 반환 (로컬 경로 또는 None, 오류)"""
+    """공유 루프에서 download_message 실행. 반환 (로컬 경로 또는 None, 오류).
+    받기 전에 Drive 종목 폴더에 같은 파일명이 있으면(기존 기능이 받아둔 것 포함) Drive→로컬 복사만 하고 다시 받지 않는다."""
     dest = _pdf_path(market, code, item["message_id"])
     if os.path.exists(dest) and os.path.getsize(dest) > 1000:
         return dest, None
+    root = stock_root(market, code, name)
+    src = item.get("drive_src")
+    if not src and root:
+        src = telegram_report.find_duplicate(root, item["message_id"] if str(item.get("channel")) != "drive" else None,
+                                             _drive_filename(item, name, market), item.get("filename"))
+    if src and os.path.isfile(src):
+        try:
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            shutil.copy2(src, dest)
+            item["drive"] = src
+            item["from_drive"] = True
+            return dest, None
+        except OSError as e:
+            return None, f"Drive 복사 실패 {type(e).__name__}"
+    if str(item.get("channel")) == "drive":
+        return None, "Drive 원본 없음"
     if telegram_report._shared_client is None or telegram_report._shared_loop is None:
         return None, "Telethon 클라이언트 준비 중"
     fut = asyncio.run_coroutine_threadsafe(telegram_report.download_message(item["channel"], item["message_id"], dest),
@@ -471,7 +538,7 @@ def _render_summary_md(name, code, items, summaries):
 
 
 def export_drive(market, code, name, state, summaries):
-    d = _drive_dir(name, code)
+    d = _drive_dir(name, code, market)
     if not d:
         return {"ok": False, "error": "Drive 를 찾지 못함"}
     try:
@@ -481,36 +548,125 @@ def export_drive(market, code, name, state, summaries):
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(_render_summary_md(name, code, list(state["items"].values()), summaries))
         os.replace(tmp, p)
-        _write_index()
         return {"ok": True, "dir": d}
     except OSError as e:
         return {"ok": False, "error": f"{type(e).__name__}"}
 
 
-def _write_index():
-    root = telegram_report.drive_path(*DRIVE_SUBDIR)
-    if not root:
-        return
-    rows = []
-    if os.path.isdir(CACHE_DIR):
-        for k in sorted(os.listdir(CACHE_DIR)):
-            if "_" not in k or k.startswith("_"):
+def _drive_id(filename):
+    return "d_" + hashlib.sha1(filename.encode("utf-8")).hexdigest()[:12]
+
+
+def _db_row_by_mid(mid):
+    db = os.path.join(_BD, telegram_report.REPORT_DB) if not os.path.isabs(telegram_report.REPORT_DB) else telegram_report.REPORT_DB
+    if not os.path.exists(db):
+        return None
+    conn = sqlite3.connect(db)
+    try:
+        return conn.execute("SELECT channel, message_id, date, filename, text_preview FROM messages WHERE message_id=? ORDER BY date DESC LIMIT 1", (int(mid),)).fetchone()
+    except (ValueError, sqlite3.Error):
+        return None
+    finally:
+        conn.close()
+
+
+def _add_drive_candidates(market, code, name, found, stats, months=MONTHS, extra_names=(), extra_mids=()):
+    """종목 Drive 폴더(하위 폴더 1단계, 사업보고서 폴더 제외)의 PDF 중 최근 months 개월(수정 시각) 것을 후보에 넣는다.
+    같은 파일명이 텔레그램 후보에 이미 있으면 건너뜀. 항목 키는 d_<sha1(파일명)>, channel 'drive'."""
+    root = stock_root(market, code, name)
+    stats = dict(stats or {}, drive=0)
+    if not root or not os.path.isdir(root):
+        return found, stats
+    since = time.time() - 30 * months * 86400
+    norm_ = lambda x: re.sub(r"[\s_]+", "", telegram_report.nfc(x or "").lower())
+    have = {norm_(it.get("filename")) for it in found}
+    have |= {norm_(fn) for fn in extra_names if fn}   # 이미 목록에 있는 파일(단건 받기 등)은 중복 후보로 넣지 않음
+    known_mids = {str(it.get("message_id")) for it in found} | set(str(m) for m in (extra_mids or []))
+    idx_by_name = {norm_(fn): mid for mid, fn in telegram_report.load_report_index(root).items() if fn}   # .index.json: 파일명 → message_id
+    out = list(found)
+    try:
+        subs = telegram_report._listdir_retry(root) or []
+    except Exception:
+        subs = []
+    for sub in subs:
+        if sub in DRIVE_SKIP_SUBFOLDERS:
+            continue
+        sp = os.path.join(root, sub)
+        if not os.path.isdir(sp):
+            continue
+        for fn in telegram_report._listdir_retry(sp) or []:
+            if not fn.lower().endswith(".pdf") or fn.startswith("."):
                 continue
-            st = _load_json(os.path.join(CACHE_DIR, k, "state.json"), None)
-            if not st:
+            p = os.path.join(sp, fn)
+            try:
+                mt = os.path.getmtime(p)
+            except OSError:
                 continue
-            sm = _load_json(os.path.join(CACHE_DIR, k, "summaries.json"), {})
-            rows.append((st.get("name"), st.get("code"), st.get("market"), len(st.get("items", {})),
-                         sum(1 for s in sm.values() if s.get("status") == "ok"), st.get("updated_at")))
-    lines = ["# 리포트 인덱스", "", f"- 갱신: {_now()}", "", "| 종목 | 코드 | 시장 | 리포트 수 | AI 정리 | 마지막 갱신 | 폴더 |", "|---|---|---|---|---|---|---|"]
-    for nm, code, mk, n, nok, up in rows:
-        lines.append(f"| {nm or '-'} | {code} | {'한국' if mk == 'KR' else '미국'} | {n} | {nok} | {(up or '')[:16]} | {_safe(nm) or code}_{code}/ |")
-    os.makedirs(root, exist_ok=True)
-    p = os.path.join(root, INDEX_NAME)
-    tmp = p + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-    os.replace(tmp, p)
+            if mt < since:
+                continue
+            norm = norm_(fn)
+            if norm in have:
+                continue
+            have.add(norm)
+            mid = idx_by_name.get(norm)
+            if mid is not None:                       # 기존 기능이 받아 .index.json 에 기록한 파일: message_id 로 DB 에서 원래 정보를 찾아 일반 항목으로
+                if str(mid) in known_mids:
+                    continue
+                row = _db_row_by_mid(mid)
+                if row:
+                    out.append({"channel": row[0], "message_id": row[1], "date": row[2], "filename": row[3] or telegram_report.nfc(fn), "text_preview": row[4] or "",
+                                "matched": ["drive"], "broker": guess_broker(row[3], row[4]), "drive_src": p, "drive": p})
+                    known_mids.add(str(mid))
+                    stats["drive"] += 1
+                    continue
+            out.append({"channel": "drive", "message_id": _drive_id(fn), "date": datetime.fromtimestamp(mt).strftime("%Y-%m-%d %H:%M"),
+                        "filename": telegram_report.nfc(fn), "text_preview": "", "matched": ["drive"], "broker": guess_broker(fn, ""), "drive_src": p, "drive": p})
+            stats["drive"] += 1
+    out.sort(key=lambda x: x.get("date") or "", reverse=True)
+    return out[:MAX_PER_STOCK + stats["drive"]], stats
+
+
+def fetch_single(market, code, name, channel, message_id):
+    """(채널, message_id) 1건만 받아 로컬 사본 + Drive 종목 폴더에 저장 (AI 요약 없음). 반환 (로컬 pdf 경로 또는 None, 오류)"""
+    try:
+        mid = int(message_id)
+    except (TypeError, ValueError):
+        return None, "message_id 형식 오류"
+    with _state_lock:
+        st = _load_state(market, code, name)
+        it = st["items"].get(str(mid))
+    if not it:
+        db = os.path.join(_BD, telegram_report.REPORT_DB) if not os.path.isabs(telegram_report.REPORT_DB) else telegram_report.REPORT_DB
+        row = None
+        if os.path.exists(db):
+            conn = sqlite3.connect(db)
+            try:
+                row = conn.execute("SELECT channel, message_id, date, filename, text_preview FROM messages WHERE channel=? AND message_id=?",
+                                   (channel, mid)).fetchone()
+            finally:
+                conn.close()
+        if not row:
+            return None, "리포트 DB 에 없는 메시지"
+        it = {"channel": row[0], "message_id": row[1], "date": row[2], "filename": row[3] or "", "text_preview": row[4] or "",
+              "matched": [], "broker": guess_broker(row[3], row[4])}
+    if it.get("pdf") and os.path.isfile(os.path.join(_BD, it["pdf"])):
+        return os.path.join(_BD, it["pdf"]), None
+    p, err = download_one(market, code, name, it)
+    if not p:
+        return None, err
+    it["pdf"] = os.path.relpath(p, _BD)
+    it["size"] = os.path.getsize(p)
+    if not (it.get("from_drive") and it.get("drive")):
+        dst, derr = _copy_to_drive(p, name, code, it, market)
+        it["drive"], it["drive_error"] = dst, derr
+    with _state_lock:
+        st = _load_state(market, code, name)
+        cur = st["items"].get(str(mid), {})
+        cur.update(it)
+        st["items"][str(mid)] = cur
+        st["updated_at"] = _now()
+        _save_json(_state_path(market, code), st)
+    return p, None
 
 
 # ===== 6. 작업(뒤에서 받기·정리) =====
@@ -542,6 +698,10 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
             st = _load_state(market, code, name)
         if refresh_search or not st["items"]:
             found, stats = search_reports(market, code, name)
+            found, stats = _add_drive_candidates(market, code, name, found, stats,
+                                                 extra_names=[it.get("filename") for it in st["items"].values()]
+                                                 + [os.path.basename(it["drive"]) for it in st["items"].values() if it.get("drive")],
+                                                 extra_mids=list(st["items"].keys()))   # 기존 기능으로 받아둔 Drive PDF 도 후보에
             for it in found:
                 k = str(it["message_id"])
                 cur = st["items"].get(k, {})
@@ -551,6 +711,12 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
             st["search_stats"] = stats
             st["updated_at"] = _now()
             _save_json(_state_path(market, code), st)
+        # 이미 받은 로컬 사본인데 Drive 사본이 없거나(옛 폴더가 지워진 경우 등) 경로가 사라졌으면 Drive 종목 폴더로 다시 복사 (다운로드 없음)
+        for it in st["items"].values():
+            lp = os.path.join(_BD, it["pdf"]) if it.get("pdf") else None
+            if lp and os.path.isfile(lp) and not (it.get("drive") and os.path.isfile(it["drive"])):
+                dst, derr = _copy_to_drive(lp, name, code, it, market)
+                it["drive"], it["drive_error"] = dst, derr
         todo = [it for it in st["items"].values() if not it.get("pdf")]
         job.update(stage="downloading", done=0, total=len(todo))
         for n, it in enumerate(todo, 1):
@@ -558,9 +724,12 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
             if p:
                 it["pdf"] = os.path.relpath(p, _BD)
                 it["size"] = os.path.getsize(p)
-                dst, derr = _copy_to_drive(p, name, code, it)
-                it["drive"] = dst
-                it["drive_error"] = derr
+                if it.get("from_drive") and it.get("drive"):
+                    it["drive_error"] = None
+                else:
+                    dst, derr = _copy_to_drive(p, name, code, it, market)
+                    it["drive"] = dst
+                    it["drive_error"] = derr
             else:
                 it["error"] = err
             job.update(done=n)
@@ -576,6 +745,8 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
         for n, it in enumerate(pend, 1):
             res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price)
             summaries[str(it["message_id"])] = res
+            if res.get("status") == "ok" and res.get("broker"):
+                rename_if_broker_found(market, code, name, it, res["broker"])      # '미확인' → 증권사 이름으로 (4-D)
             _save_json(_sum_path(market, code), summaries)
             job.update(done=n)
         st["updated_at"] = _now()
@@ -628,6 +799,8 @@ def status(market, code, name="", start=True, ai_limit=None):
             "opinion": s.get("opinion"), "target": s.get("target"), "prev_target": s.get("prev_target"), "target_change": s.get("target_change"),
             "summary": s.get("summary") or [], "estimates": s.get("estimates") or [], "flags": s.get("flags") or [],
             "downloaded": bool(it.get("pdf")), "download_error": it.get("error"), "drive": it.get("drive"),
+            "file": f"{it['message_id']}.pdf" if it.get("pdf") else None,
+            "file_url": f"/api/stock/reports/file?market={market}&code={code}&name={it['message_id']}.pdf" if it.get("pdf") else None,
             "text_ok": s.get("text_ok") if s else None, "ai_status": s.get("status") if s else ("downloaded" if it.get("pdf") else "pending"),
         })
     agg = aggregate(summaries, _current_price(market, code) if summaries else None)

@@ -17,8 +17,8 @@ import watchlist as watchlist_store
 
 _BD = os.path.dirname(os.path.abspath(__file__))
 NOTES_DIR = os.path.join(_BD, "stock_notes")
-EXPORT_SUBDIR = ("Analysis", "종목판단")
-INDEX_NAME = "종목판단_인덱스.md"
+EXPORT_SUBFOLDER = "판단"          # <종목 폴더>/판단/<종목명>_<코드>.md (4-D)
+INDEX_NAME = "종목판단_인덱스.md"   # Analysis/종목판단_인덱스.md
 
 FIELDS = [("idea", "투자아이디어"), ("assumptions", "핵심가정"), ("followup", "Follow-up 포인트"), ("risks", "Risk 포인트")]
 FIELD_KEYS = [k for k, _ in FIELDS]
@@ -184,8 +184,8 @@ def delete_note(market, code):
         except FileNotFoundError:
             removed = False
         export = {"ok": False, "error": "Drive 를 찾지 못함"}
-        d = _export_dir()
-        if d:
+        d = _export_dir(note or {"market": market, "code": code, "name": ""})
+        if d and os.path.isdir(d):
             md_removed = []
             try:
                 for fn in os.listdir(d):
@@ -220,8 +220,27 @@ def list_notes():
 
 
 # ===== Drive 내보내기 =====
-def _export_dir():
-    return telegram_report.drive_path(*EXPORT_SUBDIR)
+def _index_dir():
+    """인덱스 위치: Analysis/ (report_download_base)"""
+    base = telegram_report.report_download_base()
+    return os.path.expanduser(base) if base else None
+
+
+def _export_dir(note=None):
+    """판단 md 폴더: <stock_folder(종목)>/판단/. note 없으면 인덱스 폴더"""
+    if note is None:
+        return _index_dir()
+    base = telegram_report.report_download_base()
+    if not base:
+        return None
+    kw = telegram_report.stock_folder_keyword(note["market"], note["code"], note.get("name") or None)
+    return os.path.join(telegram_report.stock_folder(base, kw), EXPORT_SUBFOLDER)
+
+
+def note_rel_path(it):
+    """인덱스에서 쓰는 상대 경로: <종목 폴더 키워드>/판단/<파일>"""
+    kw = telegram_report.stock_folder_keyword(it["market"], it["code"], it.get("name") or None)
+    return f"{kw}/{EXPORT_SUBFOLDER}/{_safe(it.get('name') or it['code'])}_{it['code']}.md"
 
 
 def _safe(name):
@@ -265,9 +284,9 @@ def render_index(items=None):
     lines = ["# 종목판단 인덱스", "", f"- 갱신: {_dt(_now())}", f"- 종목 수: {len(items)}", "",
              "| 종목 | 코드 | 시장 | 마지막 수정일 | 메모 수 | 파일 |", "|---|---|---|---|---|---|"]
     for it in items:
-        fn = f"{_safe(it.get('name') or it['code'])}_{it['code']}.md"
+        rel = note_rel_path(it)
         lines.append(f"| {it.get('name') or '-'} | {it['code']} | {'한국' if it['market'] == 'KR' else '미국'} | "
-                     f"{_d(it.get('updated_at'))} | {it['memo_count']} | [{fn}]({fn}) |")
+                     f"{_d(it.get('updated_at'))} | {it['memo_count']} | [{rel}]({rel}) |")
     return "\n".join(lines) + "\n"
 
 
@@ -280,14 +299,15 @@ def _atomic_text(path, text):
 
 
 def _write_index():
-    d = _export_dir()
+    d = _index_dir()
     with _index_lock:
+        os.makedirs(d, exist_ok=True)
         return _atomic_text(os.path.join(d, INDEX_NAME), render_index())
 
 
 def export_note(note):
     """반환: {"ok", "path", "bytes", "index_path"} 또는 {"ok": False, "error"}"""
-    d = _export_dir()
+    d = _export_dir(note)
     if not d:
         return {"ok": False, "error": "Drive 를 찾지 못함 (원본은 저장됨)"}
     try:
@@ -302,14 +322,14 @@ def export_note(note):
             except FileNotFoundError:
                 pass
         _write_index()
-        return {"ok": True, "path": path, "bytes": n, "index_path": os.path.join(d, INDEX_NAME)}
+        return {"ok": True, "path": path, "bytes": n, "index_path": os.path.join(_index_dir(), INDEX_NAME)}
     except OSError as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e} (원본은 저장됨)"}
 
 
 def export_status(note):
     """Gate 검증용: Drive 파일 존재 여부와 내용"""
-    d = _export_dir()
+    d = _export_dir(note)
     if not d:
         return {"ok": False, "error": "Drive 를 찾지 못함"}
     path = os.path.join(d, _md_name(note))
@@ -318,7 +338,7 @@ def export_status(note):
         if out["exists"]:
             with open(path, "r", encoding="utf-8") as f:
                 out["markdown"] = f.read()
-        ip = os.path.join(d, INDEX_NAME)
+        ip = os.path.join(_index_dir(), INDEX_NAME)
         out["index_path"] = ip
         if os.path.exists(ip):
             with open(ip, "r", encoding="utf-8") as f:
