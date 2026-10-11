@@ -1,8 +1,10 @@
+import io
 import os
 import re
 import subprocess
 import threading
 import time
+import zipfile
 from datetime import date, timedelta
 from uuid import uuid4
 
@@ -102,9 +104,38 @@ def list_periodic_filings(corp_code, bgn_de, end_de):
     return results
 
 
+def _save_zip_members(data, orig_dir, report_name, rcept_no=None):
+    """zip 바이트를 풀어 <orig_dir>/<보고서명>.xml(본문) + <보고서명>_첨부n.<ext>(나머지) 로 저장 (4-G).
+    본문 = rcept_no 와 같은 이름의 항목, 없으면 가장 큰 xml. 반환 저장한 파일명 목록"""
+    saved = []
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        members = [i for i in zf.infolist() if not i.is_dir()]
+        if not members:
+            return saved
+        main = next((i for i in members if rcept_no and os.path.splitext(os.path.basename(i.filename))[0] == str(rcept_no)), None)
+        if main is None:
+            xmls = [i for i in members if i.filename.lower().endswith(".xml")] or members
+            main = max(xmls, key=lambda i: i.file_size)
+        os.makedirs(orig_dir, exist_ok=True)
+        n = 0
+        for info in sorted(members, key=lambda i: (i is not main, i.filename)):
+            ext = os.path.splitext(info.filename)[1] or ".xml"
+            if info is main:
+                name = f"{report_name}{ext}"
+            else:
+                n += 1
+                name = f"{report_name}_첨부{n}{ext}"
+            with zf.open(info) as src, open(os.path.join(orig_dir, name), "wb") as dst:
+                dst.write(src.read())
+            saved.append(name)
+    return saved
+
+
 def download_original(rcept_no, save_dir, filename_base):
+    """document.xml(zip) 을 받아 메모리에서 풀어 <save_dir>/원본/<보고서명>.xml (+첨부) 로 저장 (zip 은 저장하지 않음, 4-G).
+    반환 (본문 경로 또는 None, 실패 사유). HTML 응답만 차단기 표시, 그 외 비정상은 사유만 남기고 계속."""
     if not DART_API_KEY:
-        return None
+        return None, "DART 키 없음"
     _check_paused()
     try:
         res = requests.get(
@@ -112,35 +143,92 @@ def download_original(rcept_no, save_dir, filename_base):
             params={"crtfc_key": DART_API_KEY, "rcept_no": rcept_no},
             timeout=30,
         )
-    except Exception:
-        return None
+    except Exception as e:
+        return None, f"요청 실패 {type(e).__name__}"
 
-    if _is_html(res) or res.content[:2] != b"PK":
+    if _is_html(res):
         raise DartPausedError(_mark_html("document.xml", res))
     if res.status_code != 200 or len(res.content) <= 100:
-        return None
+        return None, f"HTTP {res.status_code}, {len(res.content)}B"
+    if res.content[:2] != b"PK":
+        return None, f"ZIP 아님 ({(res.headers.get('Content-Type') or '?').split(';')[0]}, {len(res.content)}B)"
 
     orig_dir = os.path.join(save_dir, "원본")
-    os.makedirs(orig_dir, exist_ok=True)
-
-    safe_name = _safe_filename(filename_base) + ".zip"
-    save_path = os.path.join(orig_dir, safe_name)
-
-    with open(save_path, "wb") as f:
-        f.write(res.content)
-
+    try:
+        saved = _save_zip_members(res.content, orig_dir, _safe_filename(filename_base), rcept_no)
+    except zipfile.BadZipFile:
+        return None, "ZIP 손상"
     time.sleep(0.3)
-    return save_path
+    if not saved:
+        return None, "zip 안이 비어 있음"
+    return os.path.join(orig_dir, saved[0]), None
+
+
+def reorganize_report_dir(final_dir):
+    """4-G 1회 정리: <사업보고서>/ 바로 아래 PDF → PDF/, <보고서명>_원본/ 안 파일 → 원본/<보고서명>.xml(+첨부), 빈 _원본/ 삭제,
+    원본/*.zip 은 그대로 두고 목록만. 반환 집계"""
+    res = {"pdf_moved": 0, "orig_moved": 0, "attach_named": 0, "dirs_removed": 0, "skipped": [], "zips": []}
+    if not os.path.isdir(final_dir):
+        return res
+    pdf_dir, orig_dir = os.path.join(final_dir, "PDF"), os.path.join(final_dir, "원본")
+    for fn in sorted(os.listdir(final_dir)):
+        p = os.path.join(final_dir, fn)
+        if os.path.isfile(p) and fn.lower().endswith(".pdf"):
+            os.makedirs(pdf_dir, exist_ok=True)
+            dst = os.path.join(pdf_dir, fn)
+            if os.path.exists(dst):
+                res["skipped"].append(fn)
+                continue
+            os.rename(p, dst)
+            res["pdf_moved"] += 1
+        elif os.path.isdir(p) and fn.endswith("_원본"):
+            report_name = fn[:-3]
+            files = [x for x in sorted(os.listdir(p)) if os.path.isfile(os.path.join(p, x))]
+            if not files:
+                os.rmdir(p); res["dirs_removed"] += 1
+                continue
+            main = next((x for x in files if re.fullmatch(r"\d{14}\.xml", x)), None) or \
+                   max([x for x in files if x.lower().endswith(".xml")] or files, key=lambda x: os.path.getsize(os.path.join(p, x)))
+            os.makedirs(orig_dir, exist_ok=True)
+            n = 0
+            ok = True
+            for x in sorted(files, key=lambda x: (x != main, x)):
+                ext = os.path.splitext(x)[1] or ".xml"
+                if x == main:
+                    name = f"{report_name}{ext}"
+                else:
+                    n += 1
+                    name = f"{report_name}_첨부{n}{ext}"
+                dst = os.path.join(orig_dir, name)
+                if os.path.exists(dst):
+                    res["skipped"].append(f"{fn}/{x}")
+                    ok = False
+                    continue
+                os.rename(os.path.join(p, x), dst)
+                res["orig_moved"] += 1
+                if x != main:
+                    res["attach_named"] += 1
+            if ok and not os.listdir(p):
+                os.rmdir(p); res["dirs_removed"] += 1
+    if os.path.isdir(orig_dir):
+        res["zips"] = sorted(x for x in os.listdir(orig_dir) if x.lower().endswith(".zip"))
+    return res
 
 
 _BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 _DCM_NO_RE = re.compile(r"""dcmNo[^0-9]*?(\d{6,9})""")
 
 
-def _extract_main_dcm_no(rcept_no):
+def _viewer_session():
+    s = requests.Session()
+    s.headers.update({"User-Agent": _BROWSER_UA, "Accept": "text/html,application/xhtml+xml,application/pdf,*/*;q=0.8", "Accept-Language": "ko-KR,ko;q=0.9"})
+    return s
+
+
+def _extract_main_dcm_no(rcept_no, session=None):
     url = f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}"
     try:
-        resp = requests.get(url, headers={"User-Agent": _BROWSER_UA}, timeout=15)
+        resp = (session or requests).get(url, headers={"User-Agent": _BROWSER_UA}, timeout=15)
     except Exception:
         return None
     if resp.status_code != 200:
@@ -150,47 +238,48 @@ def _extract_main_dcm_no(rcept_no):
 
 
 def download_pdf(rcept_no, save_dir, filename_base):
-    _check_paused()                      # 뷰어(dart.fss.or.kr)는 opendart 와 다른 호스트라 HTML 응답을 차단 사유로 쓰지는 않고, 쉬는 중에만 건너뛴다
-    dcm_no = _extract_main_dcm_no(rcept_no)
+    """DART 뷰어의 PDF 받기 (4-F): 뷰어 페이지(쿠키·dcm_no) → 다운로드 대화상자(pdf/download/main.do) → 그 주소를 Referer 로 pdf.do.
+    세션·Referer 없이 pdf.do 를 바로 부르면 빈 응답(0B)이 온다. 반환 (dcm_no, 쓴 엔드포인트, 저장 경로, 실패 사유).
+    PDF 는 %PDF 매직/application/pdf 로만 판정하고, 뷰어(dart.fss.or.kr)의 HTML 응답은 차단기 사유로 쓰지 않는다."""
+    _check_paused()                      # 쉬는 중에만 건너뜀
+    sess = _viewer_session()
+    dcm_no = _extract_main_dcm_no(rcept_no, sess)
     if not dcm_no:
-        return None, None, None
+        return None, None, None, "뷰어 페이지에서 dcm_no 를 찾지 못함"
 
-    viewer_url = f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}"
-    headers = {"User-Agent": _BROWSER_UA, "Referer": viewer_url}
-    params = {"rcp_no": rcept_no, "dcm_no": dcm_no}
+    dialog_url = f"https://dart.fss.or.kr/pdf/download/main.do?rcp_no={rcept_no}&dcm_no={dcm_no}"
+    reasons = []
+    try:
+        sess.get(dialog_url, timeout=20)          # 다운로드 대화상자 (세션 준비)
+    except Exception as e:
+        reasons.append(f"main.do: 요청 실패 {type(e).__name__}")
 
     pdf_content = None
     used_endpoint = None
-
-    for endpoint in [
-        "https://dart.fss.or.kr/pdf/download/pdf.do",
-        "https://dart.fss.or.kr/pdf/download/main.do",
-    ]:
-        try:
-            resp = requests.get(endpoint, params=params, headers=headers, timeout=30)
-        except Exception:
-            time.sleep(0.5)
-            continue
-        if resp.content[:4] == b"%PDF":
-            pdf_content = resp.content
-            used_endpoint = endpoint.split("/")[-1]
-            break
+    try:
+        resp = sess.get("https://dart.fss.or.kr/pdf/download/pdf.do", params={"rcp_no": rcept_no, "dcm_no": dcm_no},
+                        headers={"Referer": dialog_url}, timeout=60)
+        if resp.content[:4] == b"%PDF" or (resp.headers.get("content-type") or "").lower().startswith("application/pdf"):
+            pdf_content, used_endpoint = resp.content, "pdf.do"
         else:
-            print(f"  [{endpoint.split('/')[-1]}] not PDF: status={resp.status_code}, "
-                  f"ct={resp.headers.get('content-type','')}, head={resp.content[:100]}")
-        time.sleep(0.5)
+            ct = (resp.headers.get("content-type") or "").split(";")[0] or "없음"
+            kind = "HTML 페이지" if _is_html(resp) else ("빈 응답" if not resp.content else f"{ct} {len(resp.content)}B")
+            reasons.append(f"pdf.do: PDF 아님 (HTTP {resp.status_code}, {kind})")
+    except Exception as e:
+        reasons.append(f"pdf.do: 요청 실패 {type(e).__name__}")
+    time.sleep(0.5)
 
     if not pdf_content:
-        return dcm_no, None, None
+        return dcm_no, None, None, "; ".join(reasons) or "PDF 없음"
 
     pdf_dir = os.path.join(save_dir, "PDF")
     os.makedirs(pdf_dir, exist_ok=True)
     safe_name = _safe_filename(filename_base) + ".pdf"
-    save_path = os.path.join(pdf_dir, safe_name)
+    save_path = os.path.join(pdf_dir, safe_name)           # <사업보고서>/PDF/ (4-G)
     with open(save_path, "wb") as f:
         f.write(pdf_content)
 
-    return dcm_no, used_endpoint, save_path
+    return dcm_no, used_endpoint, save_path, None
 
 
 _jobs = {}
@@ -218,6 +307,7 @@ def start_download_job(corp_code, corp_name, date_from, date_to,
         "download_path": "",
         "error": None,
         "stop_requested": False,
+        "pdf_ok": 0, "pdf_failed": [], "xml_ok": 0, "xml_failed": [],
     }
     t = threading.Thread(
         target=_run_download_job,
@@ -245,14 +335,13 @@ def _run_download_job(job_id, corp_code, corp_name, date_from, date_to,
         staging_dir = os.path.join("downloads", "dart", corp_name, "사업보고서")
         os.makedirs(staging_dir, exist_ok=True)
 
-        existing_xml = set()
-        existing_pdf = set()
-        xml_dir = os.path.join(final_dir, "원본")
-        pdf_dir = os.path.join(final_dir, "PDF")
-        if os.path.isdir(xml_dir):
-            existing_xml = set(os.listdir(xml_dir))
-        if os.path.isdir(pdf_dir):
-            existing_pdf = set(os.listdir(pdf_dir))
+        existing = set()                       # 새 위치(PDF/*.pdf, 원본/*.xml) + 옛 위치(바로 아래 PDF, <보고서명>_원본/, 원본/*.zip)
+        if os.path.isdir(final_dir):
+            existing |= set(os.listdir(final_dir))
+            for sub in ("원본", "PDF"):
+                sp = os.path.join(final_dir, sub)
+                if os.path.isdir(sp):
+                    existing |= set(os.listdir(sp))
 
         job["status"] = "downloading"
 
@@ -266,11 +355,8 @@ def _run_download_job(job_id, corp_code, corp_name, date_from, date_to,
                 f"{filing['corp_name']}_{filing['report_nm']}_{filing['rcept_dt']}"
             )
 
-            xml_name = fname_base + ".zip"
-            pdf_name = fname_base + ".pdf"
-
-            xml_skip = xml_name in existing_xml
-            pdf_skip = pdf_name in existing_pdf
+            xml_skip = any(k in existing for k in (fname_base + ".xml", fname_base + "_원본", fname_base + ".zip"))
+            pdf_skip = (fname_base + ".pdf") in existing
 
             if (not want_xml or xml_skip) and (not want_pdf or pdf_skip):
                 job["skipped"] += 1
@@ -278,24 +364,26 @@ def _run_download_job(job_id, corp_code, corp_name, date_from, date_to,
                 continue
 
             if want_xml and not xml_skip:
-                path = download_original(rcept_no, staging_dir, fname_base)
+                path, why = download_original(rcept_no, staging_dir, fname_base)
                 if path:
-                    job["files"].append({
-                        "filename": os.path.basename(path),
-                        "report_nm": filing["report_nm"],
-                        "rcept_dt": filing["rcept_dt"],
-                        "kind": "xml",
-                    })
+                    job["xml_ok"] += 1
+                    job["files"].append({"filename": "원본/" + os.path.basename(path), "report_nm": filing["report_nm"],
+                                         "rcept_dt": filing["rcept_dt"], "kind": "원본", "note": ""})
+                else:
+                    job["xml_failed"].append({"filename": fname_base, "reason": why})
+                    job["files"].append({"filename": "원본/" + fname_base + ".xml", "report_nm": filing["report_nm"],
+                                         "rcept_dt": filing["rcept_dt"], "kind": "원본 실패", "note": why})
 
             if want_pdf and not pdf_skip:
-                _, _, path = download_pdf(rcept_no, staging_dir, fname_base)
+                _, _, path, why = download_pdf(rcept_no, staging_dir, fname_base)
                 if path:
-                    job["files"].append({
-                        "filename": os.path.basename(path),
-                        "report_nm": filing["report_nm"],
-                        "rcept_dt": filing["rcept_dt"],
-                        "kind": "pdf",
-                    })
+                    job["pdf_ok"] += 1
+                    job["files"].append({"filename": "PDF/" + os.path.basename(path), "report_nm": filing["report_nm"],
+                                         "rcept_dt": filing["rcept_dt"], "kind": "pdf", "note": ""})
+                else:                           # 한 건 실패는 사유만 남기고 다음 보고서로 (DART 점검 중은 예외로 즉시 중단)
+                    job["pdf_failed"].append({"filename": fname_base + ".pdf", "reason": why})
+                    job["files"].append({"filename": fname_base + ".pdf", "report_nm": filing["report_nm"],
+                                         "rcept_dt": filing["rcept_dt"], "kind": "pdf 실패", "note": why})
 
             job["done"] += 1
 

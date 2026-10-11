@@ -2759,7 +2759,7 @@
         </div>
       </div>
       <div id="dart-rpt-result" class="data-table" style="display:none;margin-top:8px;">
-        <table class="rpt-result-table"><thead><tr><th>파일명</th><th>구분</th><th>날짜</th></tr></thead><tbody id="dart-rpt-result-body"></tbody></table>
+        <table class="rpt-result-table"><thead><tr><th>파일명</th><th>구분</th><th>날짜</th><th>비고</th></tr></thead><tbody id="dart-rpt-result-body"></tbody></table>
       </div>
     </div>
 
@@ -5780,8 +5780,11 @@
                 const stopBtn = document.getElementById('dart-rpt-stop');
                 if (job.status === 'done') {
                     clearInterval(_dartRptTimer);
-                    txt.textContent = `완료! 발견 ${job.found} / 다운로드 ${job.done}` + (job.skipped ? ` / 스킵 ${job.skipped}` : '');
-                    if (job.download_path) pathEl.textContent = '저장 경로: ' + job.download_path;
+                    const pf = (job.pdf_failed || []).length, xf = (job.xml_failed || []).length;
+                    txt.textContent = `완료! 발견 ${job.found} / 처리 ${job.done}` + (job.skipped ? ` / 스킵 ${job.skipped}` : '') +
+                        ` · PDF 성공 ${job.pdf_ok || 0} / 실패 ${pf}` + ` · 원본 성공 ${job.xml_ok || 0} / 실패 ${xf}` +
+                        '';
+                    if (job.download_path) pathEl.textContent = '저장 경로: ' + job.download_path + (pf ? ` · PDF 실패 사유: ${job.pdf_failed[0].reason}` : '');
                     stopBtn.style.display = 'none';
                     showDartReportResult(job.files);
                 } else if (job.status === 'error') {
@@ -5804,7 +5807,7 @@
         const container = document.getElementById('dart-rpt-result');
         const tbody = document.getElementById('dart-rpt-result-body');
         if (!files || !files.length) { container.style.display = 'none'; return; }
-        tbody.innerHTML = files.map(f => `<tr><td>${f.filename}</td><td>${f.kind||''}</td><td>${f.rcept_dt||''}</td></tr>`).join('');
+        tbody.innerHTML = files.map(f => `<tr${/실패/.test(f.kind || '') ? ' style="color:var(--down,#c33)"' : ''}><td>${f.filename}</td><td>${f.kind||''}</td><td>${f.rcept_dt||''}</td><td style="font-size:12px;color:var(--text-dim)">${f.note||''}</td></tr>`).join('');
         container.style.display = 'block';
     }
 
