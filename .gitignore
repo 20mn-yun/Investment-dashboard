@@ -83,3 +83,8 @@ cache/us_disclosures/
 
 # 종목별 계정 대응표 (규칙·AI·사용자 지정, 조회 시 생성)
 cache/concept_maps/
+
+# 배치 산출물 — tickers/*.json은 batch_top_gainers가 7일마다 생성, 첫 실행 시 자동 생성
+tickers/*.json
+# 소켓 모니터 로그 (scripts/socket_monitor.sh)
+socket_baseline.txt
