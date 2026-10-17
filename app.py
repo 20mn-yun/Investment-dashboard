@@ -3,7 +3,7 @@ from flask_cors import CORS
 import yfinance as yf
 import requests
 import feedparser
-import anthropic
+import llm_client
 import json
 import os
 from dotenv import load_dotenv
@@ -268,31 +268,27 @@ def get_stock_detail(ticker):
     overview = ""
     try:
         if yf_summary:
-            resp = claude_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
-                messages=[{"role": "user", "content": (
+            _r = llm_client.complete("stock_intro", (
                     f"다음 영문 기업 소개를 한국어 2-3문장으로 요약해라. "
                     f"회사명: {display_name}\n\n{yf_summary[:1500]}\n\n"
                     f"답변에 마크다운 문법(#, *, **, -, 등)이나 제목/헤더를 절대 포함하지 마. 평문 한국어로만 답변해."
-                )}],
-            )
-            overview = resp.content[0].text.strip()
+                ), max_tokens=300)
+            if not _r.ok:
+                raise RuntimeError(_r.error)
+            overview = _r.text.strip()
         else:
             ctx = f"회사명: {display_name}"
             if sector:
                 ctx += f", 섹터: {sector}"
             if industry:
                 ctx += f", 업종: {industry}"
-            resp = claude_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
-                messages=[{"role": "user", "content": (
+            _r = llm_client.complete("stock_intro", (
                     f"{ctx}\n이 종목의 사업 개요를 한국어 2-3문장으로 작성해라.\n\n"
                     f"답변에 마크다운 문법(#, *, **, -, 등)이나 제목/헤더를 절대 포함하지 마. 평문 한국어로만 답변해."
-                )}],
-            )
-            overview = resp.content[0].text.strip()
+                ), max_tokens=300)
+            if not _r.ok:
+                raise RuntimeError(_r.error)
+            overview = _r.text.strip()
     except Exception:
         overview = "기업 정보를 불러올 수 없습니다"
 
@@ -326,10 +322,7 @@ def get_stock_detail(ticker):
         )
         change_ctx = f"오늘 이 종목이 {change_pct}% 움직였는데, " if change_pct else ""
         try:
-            resp = claude_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=400,
-                messages=[{"role": "user", "content": (
+            _r = llm_client.complete("stock_news", (
                     f"다음은 {display_name} 관련 최근 뉴스다.\n{article_text}\n\n"
                     f"{change_ctx}이 움직임의 이유로 가장 가능성이 높은 것을 한국어로 요약해라. "
                     f"뉴스에 명확한 이유가 없으면 '- 특별한 뉴스 동인이 확인되지 않음'으로 답변.\n\n"
@@ -338,9 +331,10 @@ def get_stock_detail(ticker):
                     f"- 두 번째 이유 한 문장\n"
                     f"- 세 번째 이유 한 문장 (선택)\n\n"
                     f"각 줄은 정확히 '- '로 시작하고, 그 외에 #, *, **, 제목 같은 마크다운 문법이나 추가 설명은 절대 포함하지 마."
-                )}],
-            )
-            raw = resp.content[0].text.strip()
+                ), max_tokens=400)
+            if not _r.ok:
+                raise RuntimeError(_r.error)
+            raw = _r.text.strip()
             news_summary = [line.strip() for line in raw.split("\n")
                            if line.strip() and not line.strip().startswith('#')]
         except Exception:
@@ -987,7 +981,7 @@ def _us_wrap_auto_mode():
 
 
 def _generate_us_wrap(mode=None):
-    """특이 움직임 선별 → 관련 뉴스 수집 → anthropic 1회 호출로 원인 분석 브리프 생성.
+    """특이 움직임 선별 → 관련 뉴스 수집 → LLM(llm_client, us_wrap) 1회 호출로 원인 분석 브리프 생성.
 
     mode: "intraday"(장중, 마감 전 표현) | "close"(마감 기준) | None(현재 시각으로 자동).
     스케줄러와 자가 치유가 동시에 돌지 않게 프로세스 내 락으로 직렬화한다.
@@ -1072,18 +1066,16 @@ def _generate_us_wrap(mode=None):
         parsed = None
         raw_text = None
         try:
-            resp = claude_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=1500,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw_text = resp.content[0].text.strip()
-            json_str = raw_text
-            if json_str.startswith("```"):
-                json_str = re.sub(r"^```(?:json)?\s*|\s*```$", "", json_str, flags=re.DOTALL)
-            parsed = json.loads(json_str)
+            _r = llm_client.complete("us_wrap", prompt, json_mode=True, max_tokens=1500)
+            raw_text = (_r.text or "").strip() or None
+            if _r.ok and isinstance(_r.data, dict):
+                parsed = _r.data
+            elif _r.error == "json_parse_failed":
+                print("[us-wrap] JSON 파싱 실패 → raw 텍스트로 저장", flush=True)
+            else:
+                raise RuntimeError(_r.error)
         except Exception as e:
-            print(f"[us-wrap] anthropic 호출/파싱 실패: {e}", flush=True)
+            print(f"[us-wrap] LLM 호출/파싱 실패: {e}", flush=True)
 
         out = {"date": base_date, "indices": indices, "mode": mode, "as_of": as_of,
                "last_updated": datetime.now().astimezone().isoformat()}
@@ -1389,8 +1381,6 @@ TRUSTED_SOURCES = [
     "marketwatch", "economist", "associated press", "ap news",
 ]
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-claude_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 def fetch_rss_articles(search_terms):
@@ -1514,12 +1504,7 @@ def rank_group_articles(group_name, articles, top_n=3):
         for i, a in enumerate(articles)
     )
 
-    response = claude_client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=2048,
-        messages=[{
-            "role": "user",
-            "content": (
+    _r = llm_client.complete("news_rank", (
                 f"주제: \"{group_name}\"\n\n"
                 f"다음은 이 주제와 관련된 글로벌 금융 뉴스 목록이다.\n"
                 f"금융시장(주식, 채권, 환율, 원자재)에 미치는 영향력이 큰 순서대로 "
@@ -1532,17 +1517,18 @@ def rank_group_articles(group_name, articles, top_n=3):
                 "반드시 아래 JSON 배열 형식으로만 응답해라. 다른 텍스트는 절대 포함하지 마라.\n"
                 '[{"rank":1,"index":원래번호,"summary":["요약1","요약2","요약3"]},...]\n'
                 "index는 위 목록의 번호(1부터 시작)이다."
-            ),
-        }],
-    )
-
-    raw = response.content[0].text.strip()
-    start = raw.find("[")
-    end = raw.rfind("]") + 1
-    if start == -1 or end == 0:
-        return articles[:top_n]
-
-    ranked = json.loads(raw[start:end])
+            ), json_mode=True, max_tokens=2048)
+    if _r.ok and isinstance(_r.data, list):
+        ranked = _r.data
+    else:
+        if not _r.ok and _r.error != "json_parse_failed":
+            raise RuntimeError(_r.error)
+        raw = (_r.text or "").strip()
+        start = raw.find("[")
+        end = raw.rfind("]") + 1
+        if start == -1 or end == 0:
+            return articles[:top_n]
+        ranked = json.loads(raw[start:end])
     result = []
     for item in ranked[:top_n]:
         idx = item["index"] - 1

@@ -15,7 +15,6 @@ import json
 import zipfile
 import xml.etree.ElementTree as ET
 import requests
-import anthropic
 from datetime import datetime, date, timedelta
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -86,16 +85,7 @@ def _is_earnings_filing(report_nm: str) -> bool:
     return bool(EARNINGS_PATTERN.search(report_nm))
 
 
-_anthropic_client = None
-
-
-def _get_anthropic_client():
-    global _anthropic_client
-    if _anthropic_client is None:
-        _anthropic_client = anthropic.Anthropic(
-            api_key=os.environ.get("ANTHROPIC_API_KEY")
-        )
-    return _anthropic_client
+import llm_client
 
 
 def fetch_filing_body(rcept_no: str) -> str:
@@ -190,19 +180,19 @@ JSON 형식:
 {{"revenue_raw": 19514, "op_income_raw": 2556, "net_income_raw": 1958, "currency_unit": "억원"}}"""
 
     try:
-        client = _get_anthropic_client()
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=300,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = response.content[0].text.strip()
-        text = text.replace("```json", "").replace("```", "").strip()
-        brace_start = text.find("{")
-        brace_end = text.rfind("}")
-        if brace_start != -1 and brace_end != -1:
-            text = text[brace_start:brace_end + 1]
-        data = json.loads(text)
+        _r = llm_client.complete("earnings_extract", prompt, json_mode=True, max_tokens=300)
+        if _r.ok and isinstance(_r.data, dict):
+            data = _r.data
+        else:
+            if not _r.ok and _r.error != "json_parse_failed":
+                raise RuntimeError(_r.error)
+            text = (_r.text or "").strip()
+            text = text.replace("```json", "").replace("```", "").strip()
+            brace_start = text.find("{")
+            brace_end = text.rfind("}")
+            if brace_start != -1 and brace_end != -1:
+                text = text[brace_start:brace_end + 1]
+            data = json.loads(text)
         unit = data.get("currency_unit")
         return {
             "revenue": normalize_to_hundred_million_krw(data.get("revenue_raw"), unit),
@@ -355,15 +345,14 @@ def _translate_industry_code_with_haiku(industry_code: str) -> str | None:
 
 답변:"""
     try:
-        client = _get_anthropic_client()
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=80,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = response.content[0].text.strip()
-        text = text.replace("```json", "").replace("```", "").strip()
-        data = json.loads(text)
+        _r = llm_client.complete("ksic", prompt, json_mode=True, max_tokens=80)
+        if _r.ok and isinstance(_r.data, dict):
+            data = _r.data
+        else:
+            if not _r.ok and _r.error != "json_parse_failed":
+                raise RuntimeError(_r.error)
+            text = (_r.text or "").strip().replace("```json", "").replace("```", "").strip()
+            data = json.loads(text)
         return data.get("industry_name")
     except Exception as e:
         print(f"[earnings_tracker] 업종명 변환 실패 ({industry_code}): {e}")
@@ -480,14 +469,10 @@ def _summarize_business_with_haiku(corp_name: str, business_section: str) -> str
 
 답변:"""
     try:
-        client = _get_anthropic_client()
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=300,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = response.content[0].text.strip()
-        text = re.sub(r"^[#*\-\s]+", "", text)
+        _r = llm_client.complete("biz_overview", prompt, max_tokens=300)
+        if not _r.ok:
+            raise RuntimeError(_r.error)
+        text = re.sub(r"^[#*\-\s]+", "", (_r.text or "").strip())
         return text if text else None
     except Exception as e:
         print(f"[earnings_tracker] 기업개요 요약 실패 ({corp_name}): {e}")

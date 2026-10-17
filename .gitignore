@@ -88,3 +88,6 @@ cache/concept_maps/
 tickers/*.json
 # 소켓 모니터 로그 (scripts/socket_monitor.sh)
 socket_baseline.txt
+
+# LLM 호출·배치 로그
+logs/

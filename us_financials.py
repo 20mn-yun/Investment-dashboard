@@ -1848,15 +1848,14 @@ def _ai_user_message(cache, keys, catalog):
             f"회사가 쓰는 계정 목록 ({len(catalog)}개; 계정 | 단위 | 최근 기간 말 | 최근 연간 값)\n{rows}")
 
 
-def _call_ai(system, user, max_tokens=2000):
-    """Claude Haiku 호출 (earnings_tracker 의 클라이언트 재사용). 반환 (본문 텍스트, 입력 토큰, 출력 토큰). 키는 로그에 남기지 않는다.
-    max_tokens 는 긴 출력(컨콜 요약·번역)용. 기본 2000."""
-    from earnings_tracker import _get_anthropic_client
-    client = _get_anthropic_client()
-    res = client.messages.create(model=AI_MODEL, max_tokens=max_tokens, system=system, messages=[{"role": "user", "content": user}])
-    text = "".join(getattr(b, "text", "") for b in res.content).strip()
-    usage = getattr(res, "usage", None)
-    return text, getattr(usage, "input_tokens", None), getattr(usage, "output_tokens", None)
+def _call_ai(system, user, max_tokens=2000, *, task):
+    """LLM 호출 어댑터 (llm_client.complete: Claude Code CLI 기본, 실패 시 API Haiku 폴백). 반환 (본문 텍스트, 입력 토큰, 출력 토큰).
+    task 는 llm_client.TASK_TIERS 의 작업 이름(필수). 실패하면 예외를 던져 호출부의 ai_error 처리로 넘긴다. max_tokens 는 API 폴백에서만 쓰인다."""
+    import llm_client
+    r = llm_client.complete(task, user, system=system, max_tokens=max_tokens)
+    if not r.ok:
+        raise RuntimeError(f"llm_client[{task}] {r.error}" + (f" (fallback: {r.fallback_reason})" if r.fallback else ""))
+    return r.text, (r.input_tokens or 0) + (r.cache_tokens or 0), r.output_tokens
 
 
 def _parse_ai_json(text):
@@ -2016,7 +2015,7 @@ def ai_fill(code, cache=None, force=False, dry_run=False):
     answers, err = None, None
     for attempt in range(2):                          # 파싱 실패 시 1회 재시도
         try:
-            text, ti, to = _call_ai(AI_SYSTEM, user)
+            text, ti, to = _call_ai(AI_SYSTEM, user, task="concept_map")
             tokens["input"] += ti or 0
             tokens["output"] += to or 0
             answers = _parse_ai_json(text)

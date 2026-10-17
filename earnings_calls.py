@@ -301,7 +301,7 @@ def summarize(code, quarter, name="", limit=None, force=False):
     user = f"종목: {name or code} ({code})\n분기: {quarter} (회계연도 기준)\n\n{user_text}"
     t0 = time.time()
     try:
-        text, tin, tout = us_financials._call_ai(SUMMARY_SYSTEM, user, max_tokens=4000)
+        text, tin, tout = us_financials._call_ai(SUMMARY_SYSTEM, user, max_tokens=4000, task="call_summary")
         summ = _check_summary(_parse_json(text))
     except Exception as e:
         print(f"[earnings_calls] {code} {quarter} 요약 실패: {type(e).__name__}: {str(e)[:120]}", flush=True)
@@ -386,7 +386,7 @@ def _run_translate(code, quarter, name, transcript, job):
         job["stage"] = "translating"
         for ci, idxs in enumerate(_chunks(transcript), 1):
             user = "\n\n".join(f"[{i + 1}] ({transcript[i].get('speaker')}, {transcript[i].get('title')})\n{transcript[i].get('content', '')}" for i in idxs)
-            text, tin, tout = us_financials._call_ai(TRANSLATE_SYSTEM, user, max_tokens=16000)
+            text, tin, tout = us_financials._call_ai(TRANSLATE_SYSTEM, user, max_tokens=16000, task="call_translate")
             tokens["input"] += tin or 0
             tokens["output"] += tout or 0
             job["calls"] += 1

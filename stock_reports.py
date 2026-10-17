@@ -441,7 +441,7 @@ def summarize_one(market, code, name, item, pdf_path, price=None):
     raw, err = None, None
     for attempt in range(2):
         try:
-            t, ti, to = us_financials._call_ai(AI_SYSTEM, user)
+            t, ti, to = us_financials._call_ai(AI_SYSTEM, user, task="reports")
             tokens["input"] += ti or 0
             tokens["output"] += to or 0
             raw = _parse_json(t)

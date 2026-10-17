@@ -4,7 +4,6 @@ import sys
 import time
 from datetime import date
 
-import anthropic
 import yfinance as yf
 from dotenv import load_dotenv
 
@@ -13,17 +12,11 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_PATH = os.path.join(BASE_DIR, "cache", "stock_moat.json")
 TTL_DAYS = 90
-MODEL = "claude-haiku-4-5-20251001"
+sys.path.insert(0, BASE_DIR)
+import llm_client
+
+MODEL = "llm_client:moat"
 MAX_NEWS = 5
-
-_client = None
-
-
-def _get_client():
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-    return _client
 
 
 def _load_cache():
@@ -88,13 +81,11 @@ def analyze_moat(ticker, name, business_overview, news_items):
         f"형식:\n해자: ...\n병목: ..."
     )
 
-    client = _get_client()
-    resp = client.messages.create(
-        model=MODEL,
-        max_tokens=400,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    raw = resp.content[0].text.strip()
+    _r = llm_client.complete("moat", prompt, max_tokens=400)
+    if not _r.ok:
+        raise RuntimeError(f"llm_client[moat] {_r.error}")
+    raw = (_r.text or "").strip()
+    model_used = _r.model or MODEL
 
     moat = ""
     bottleneck = ""
@@ -114,7 +105,7 @@ def analyze_moat(ticker, name, business_overview, news_items):
         "moat": moat,
         "bottleneck": bottleneck,
         "raw_response": raw,
-        "model": MODEL,
+        "model": model_used,
         "news_count": len(news_items),
     }
 

@@ -1482,7 +1482,7 @@ def ai_fill(code, cache=None, force=False, dry_run=False):
     answers, err = None, None
     for attempt in range(2):
         try:
-            text, ti, to = us_financials._call_ai(AI_SYSTEM_KR, user)
+            text, ti, to = us_financials._call_ai(AI_SYSTEM_KR, user, task="concept_map")
             tokens["input"] += ti or 0
             tokens["output"] += to or 0
             answers = us_financials._parse_ai_json(text)

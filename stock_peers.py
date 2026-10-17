@@ -245,7 +245,7 @@ def suggest(market, code, name, limit=None, force=False):
             + f"후보 풀(참고용, {pool['label']}):\n{pool_txt or '(없음)'}")
     t0 = time.time()
     try:
-        text, tin, tout = us_financials._call_ai(PEERS_SYSTEM, user, max_tokens=2000)
+        text, tin, tout = us_financials._call_ai(PEERS_SYSTEM, user, max_tokens=2000, task="peers")
         raw = _parse_json(text).get("peers") or []
     except Exception as e:
         print(f"[stock_peers] {market}:{code} AI 제안 실패: {type(e).__name__}: {str(e)[:120]}", flush=True)
