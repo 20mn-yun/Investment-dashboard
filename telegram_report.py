@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 
 from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaDocument, DocumentAttributeFilename
+import logging
+
+logger = logging.getLogger("telegram_report")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
@@ -73,6 +76,7 @@ def _mask_brokerages(text, watchlist):
 
 
 def _gemini_yes_no(prompt):
+    last = ""
     for attempt in range(3):
         try:
             res = requests.post(
@@ -84,10 +88,13 @@ def _gemini_yes_no(prompt):
             if res.status_code == 200:
                 text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text.strip().upper()
+            last = f"status={res.status_code} {res.text[:120]}"
             print(f"[Report AI필터] gemini 실패 status={res.status_code} 시도={attempt+1}/3", flush=True)
         except Exception as e:
+            last = f"{type(e).__name__}: {e}"
             print(f"[Report AI필터] gemini 예외 {type(e).__name__} 시도={attempt+1}/3", flush=True)
         time.sleep(2)
+    logger.warning("[gemini] _gemini_yes_no 실패: 3회 시도 후 포기 — %s", last[:200])
     return ""
 
 

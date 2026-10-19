@@ -18,8 +18,17 @@ import requests
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 
 import telegram_report
+import logging
+
+logger = logging.getLogger("tg_inbox")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+
+def _gemini_warn(func, exc_or_msg):
+    """Gemini 실패 가시화: 동작은 바꾸지 않고(여전히 "" 반환) warning 만 남긴다."""
+    s = f"{type(exc_or_msg).__name__}: {exc_or_msg}" if isinstance(exc_or_msg, BaseException) else str(exc_or_msg)
+    logger.warning("[gemini] %s 실패: %s", func, s[:200])
 
 CONFIG_PATH = "tg_inbox_config.json"
 DATA_PATH = "cache/tg_inbox.json"
@@ -717,13 +726,15 @@ def _gemini(prompt):
             json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=30,
         )
-    except Exception:
+    except Exception as e:
+        _gemini_warn("_gemini", e)
         return ""
     if res.status_code == 429:
         raise RateLimitError("429 rate limit")
     try:
         return res.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
+    except Exception as e:
+        _gemini_warn("_gemini", f"응답 파싱 {type(e).__name__} status={res.status_code} body={res.text[:120]}")
         return ""
 
 
@@ -789,7 +800,8 @@ def _gemini_classify(batch, topics, topic_definitions, corrections=None):
             for o in arr:
                 if isinstance(o, dict) and o.get("id") is not None:
                     out[str(o["id"])] = o.get("topic")
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        _gemini_warn("_gemini_classify", f"JSON 파싱 {type(e).__name__}: {raw[:120]!r}")
         return {}
     return out
 
@@ -798,7 +810,8 @@ def _gemini_image(prompt, image_path):
     try:
         with open(image_path, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("ascii")
-    except OSError:
+    except OSError as e:
+        _gemini_warn("_gemini_image", f"이미지 열기 {type(e).__name__}: {image_path}")
         return ""
     try:
         res = requests.post(
@@ -810,13 +823,15 @@ def _gemini_image(prompt, image_path):
             ]}]},
             timeout=60,
         )
-    except Exception:
+    except Exception as e:
+        _gemini_warn("_gemini_image", e)
         return ""
     if res.status_code == 429:
         raise RateLimitError("429 rate limit")
     try:
         return res.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
+    except Exception as e:
+        _gemini_warn("_gemini_image", f"응답 파싱 {type(e).__name__} status={res.status_code} body={res.text[:120]}")
         return ""
 
 
@@ -842,7 +857,8 @@ def _gemini_image_classify(item, topics, topic_definitions, corrections=None):
             obj = json.loads(mm.group())
             if isinstance(obj, dict):
                 return obj.get("topic")
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        _gemini_warn("_gemini_image_classify", f"JSON 파싱 {type(e).__name__}: {raw[:120]!r}")
         return None
     return None
 
@@ -1018,7 +1034,8 @@ def _gemini_vision(prompt, image_path, model, timeout=120):
     try:
         with open(image_path, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("ascii")
-    except OSError:
+    except OSError as e:
+        _gemini_warn("_gemini_vision", f"이미지 열기 {type(e).__name__}: {image_path}")
         return ""
     try:
         res = requests.post(
@@ -1040,16 +1057,19 @@ def _gemini_vision(prompt, image_path, model, timeout=120):
             },
             timeout=timeout,
         )
-    except Exception:
+    except Exception as e:
+        _gemini_warn("_gemini_vision", e)
         return ""
     if res.status_code == 429:
         raise RateLimitError("429 rate limit")
     if res.status_code != 200:
         print(f"[tg_inbox] vision {model} http {res.status_code}: {res.text[:150]}", flush=True)
+        _gemini_warn("_gemini_vision", f"http {res.status_code} ({model}): {res.text[:120]}")
         return ""
     try:
         return res.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
+    except Exception as e:
+        _gemini_warn("_gemini_vision", f"응답 파싱 {type(e).__name__} ({model}) body={res.text[:120]}")
         return ""
 
 

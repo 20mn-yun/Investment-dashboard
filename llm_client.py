@@ -22,8 +22,8 @@ LOG_PATH = os.path.join(LOG_DIR, "llm_calls.jsonl")
 TASK_TIERS = {
     "us_wrap": "opus", "moat": "opus",
     "call_summary": "sonnet", "news_rank": "sonnet", "stock_intro": "sonnet", "biz_overview": "sonnet",
-    "peers": "sonnet", "dart_watch_summary": "sonnet", "dart_detail": "sonnet",
-    "reports": "haiku", "concept_map": "haiku", "earnings_extract": "haiku", "ksic": "haiku",
+    "peers": "sonnet", "dart_watch_summary": "sonnet", "dart_detail": "sonnet", "earnings_extract": "sonnet",
+    "reports": "haiku", "concept_map": "haiku", "ksic": "haiku",
     "call_translate": "haiku", "stock_news": "haiku",
 }
 TASK_BACKEND = {"call_translate": "api"}

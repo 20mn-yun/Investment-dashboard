@@ -1848,14 +1848,21 @@ def _ai_user_message(cache, keys, catalog):
             f"회사가 쓰는 계정 목록 ({len(catalog)}개; 계정 | 단위 | 최근 기간 말 | 최근 연간 값)\n{rows}")
 
 
-def _call_ai(system, user, max_tokens=2000, *, task):
-    """LLM 호출 어댑터 (llm_client.complete: Claude Code CLI 기본, 실패 시 API Haiku 폴백). 반환 (본문 텍스트, 입력 토큰, 출력 토큰).
-    task 는 llm_client.TASK_TIERS 의 작업 이름(필수). 실패하면 예외를 던져 호출부의 ai_error 처리로 넘긴다. max_tokens 는 API 폴백에서만 쓰인다."""
+def _call_ai_full(system, user, max_tokens=2000, *, task):
+    """LLM 호출 어댑터 (llm_client.complete: Claude Code CLI 기본, 실패 시 API Haiku 폴백).
+    반환 (본문 텍스트, 입력 토큰, 출력 토큰, 실제 사용 모델명). task 는 llm_client.TASK_TIERS 의 작업 이름(필수).
+    실패하면 예외를 던져 호출부의 ai_error 처리로 넘긴다. max_tokens 는 API 폴백에서만 쓰인다."""
     import llm_client
     r = llm_client.complete(task, user, system=system, max_tokens=max_tokens)
     if not r.ok:
         raise RuntimeError(f"llm_client[{task}] {r.error}" + (f" (fallback: {r.fallback_reason})" if r.fallback else ""))
-    return r.text, (r.input_tokens or 0) + (r.cache_tokens or 0), r.output_tokens
+    return r.text, (r.input_tokens or 0) + (r.cache_tokens or 0), r.output_tokens, (r.model or "")
+
+
+def _call_ai(system, user, max_tokens=2000, *, task):
+    """_call_ai_full 의 3-튜플 호환 래퍼 (본문 텍스트, 입력 토큰, 출력 토큰). 모델명이 필요하면 _call_ai_full 을 쓴다."""
+    text, tin, tout, _model = _call_ai_full(system, user, max_tokens, task=task)
+    return text, tin, tout
 
 
 def _parse_ai_json(text):

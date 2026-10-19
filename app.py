@@ -30,6 +30,9 @@ import tg_inbox
 import dart_report
 import earnings_tracker
 import disparity_tracker
+import logging
+
+logger = logging.getLogger("app")
 
 app = Flask(__name__)
 
@@ -2815,7 +2818,7 @@ def _tg_detect(token):
     return None
 
 
-# --- Gemini ---
+# --- Gemini (남은 호출: _save_excel 의 1줄 요약만) ---
 def _gemini(prompt):
     try:
         res = requests.post(
@@ -2825,8 +2828,30 @@ def _gemini(prompt):
             timeout=30,
         )
         return res.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
+    except Exception as e:
+        logger.warning("[gemini] _gemini(_save_excel) 실패: %s", f"{type(e).__name__}: {e}"[:200])
         return ""
+
+
+# --- LLM (llm_client: 공시 모니터 A묶음 — dart_watch_summary / dart_detail / earnings_extract) ---
+def _llm(task, prompt, json_mode=False):
+    """llm_client.complete 어댑터. 성공 시 text(json_mode 면 파싱된 data), 실패 시 ""(json_mode 면 None) 반환 + warning 로그.
+    기존 _gemini 호출부와 같은 '실패 = 빈 값' 계약을 유지한다."""
+    empty = None if json_mode else ""
+    try:
+        r = llm_client.complete(task, prompt, json_mode=json_mode)
+    except Exception as e:
+        logger.warning("[llm] %s 호출 예외: %s", task, f"{type(e).__name__}: {e}"[:200])
+        return empty
+    if not r.ok:
+        reason = (r.error or "unknown")[:200]
+        if r.fallback:
+            reason += f" (fallback: {r.fallback_reason})"
+        logger.warning("[llm] %s 실패: %s", task, reason)
+        return empty
+    if json_mode:
+        return r.data if isinstance(r.data, dict) else None
+    return r.text or ""
 
 
 # --- DART 문서 텍스트 추출 ---
@@ -2904,7 +2929,8 @@ def _ck_watchlist():
                     chg = True
                     title = it.get("report_nm", "")
                     doc = _dart_doc(rno)
-                    summary = _gemini(
+                    summary = _llm(
+                        "dart_watch_summary",
                         f"다음 DART 공시의 핵심 내용을 3줄 이내로 간결하게 한국어로 요약해줘:\n\n{doc[:4000]}"
                     ) if doc else ""
                     msg = (f"📢 <b>{info['name']}</b> 새 공시\n\n"
@@ -2997,18 +3023,21 @@ def _dart_summary(title, rno, corp_code=""):
     if not doc:
         return ""
 
+    def _one_line():
+        return _llm("dart_detail", f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+
     if "공급계약" in title:
-        raw = _gemini(
+        d = _llm(
+            "dart_detail",
             "다음 DART 공급계약 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
             '{"counterparty":"계약상대방","amount":계약금액(억원),'
             '"recent_revenue":최근매출액(억원),"pct":매출대비퍼센트숫자,'
             '"period":"계약기간 문자열"}\n'
-            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}"
+            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}",
+            json_mode=True,
         )
         try:
-            m = re.search(r"\{[\s\S]*\}", raw)
-            if m:
-                d = json.loads(m.group())
+            if d:
                 parts = []
                 if d.get("counterparty"):
                     parts.append(f"계약상대: {d['counterparty']}")
@@ -3024,20 +3053,20 @@ def _dart_summary(title, rno, corp_code=""):
                     return " · ".join(parts)
         except Exception:
             pass
-        return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+        return _one_line()
 
     if "대량보유" in title:
-        raw = _gemini(
+        d = _llm(
+            "dart_detail",
             "다음 DART 대량보유 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
             '{"reporter":"보고자","prev_ratio":직전보유비율숫자,'
             '"curr_ratio":이번보유비율숫자,"reason":"보고사유",'
             '"purpose":"보유목적"}\n'
-            f"숫자는 퍼센트, 없으면 null.\n\n{doc[:4000]}"
+            f"숫자는 퍼센트, 없으면 null.\n\n{doc[:4000]}",
+            json_mode=True,
         )
         try:
-            m = re.search(r"\{[\s\S]*\}", raw)
-            if m:
-                d = json.loads(m.group())
+            if d:
                 parts = []
                 if d.get("reporter"):
                     parts.append(f"보고자: {d['reporter']}")
@@ -3055,21 +3084,21 @@ def _dart_summary(title, rno, corp_code=""):
                     return " · ".join(parts)
         except Exception:
             pass
-        return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+        return _one_line()
 
     if "잠정실적" in title or "영업(잠정)" in title:
-        raw = _gemini(
+        d = _llm(
+            "dart_detail",
             "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
             '{"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
             '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)}}\n'
-            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}"
+            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}",
+            json_mode=True,
         )
         try:
-            m = re.search(r"\{[\s\S]*\}", raw)
-            if m:
-                d = json.loads(m.group())
-                rv = d.get("revenue", {})
-                op = d.get("op_profit", {})
+            if d:
+                rv = d.get("revenue") or {}
+                op = d.get("op_profit") or {}
                 parts = []
                 rc, rp = rv.get("current"), rv.get("prev")
                 oc, op_ = op.get("current"), op.get("prev")
@@ -3087,12 +3116,34 @@ def _dart_summary(title, rno, corp_code=""):
                     return " · ".join(parts)
         except Exception:
             pass
-        return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+        return _one_line()
 
-    return _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
+    return _one_line()
 
 
 # --- Feature 2: 잠정실적 ---
+def _earnings_extract(doc):
+    """잠정실적 공시 본문에서 수치 추출 (llm_client earnings_extract, JSON). 실패하면 None (기존 Gemini 시절과 같은 계약)."""
+    if not doc:
+        return None
+    fd = _llm(
+        "earnings_extract",
+        "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+        '{"fs_type":"연결 또는 별도",'
+        '"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
+        '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)},'
+        '"net_income":{"current":당기순이익(억원),"prev":전기순이익(억원)},'
+        '"reason":"변동요인 2줄 요약",'
+        '"raw_unit":{"unit":"원문 단위 문자열","revenue_current":환산 전 원문 숫자}}\n'
+        "숫자는 억원 단위, 없으면 null.\n"
+        "원문 금액의 단위(원/천원/백만원/억원)를 먼저 확인하고 억원으로 환산해서 적을 것. 백만원 단위면 100으로 나눔. "
+        "환산 전 원문 숫자와 단위도 raw_unit 에 함께 반환.\n\n"
+        f"{doc[:5000]}",
+        json_mode=True,
+    )
+    return fd or None
+
+
 def _ck_earnings():
     cfg = load_dm_cfg()
     seen = _load_seen()
@@ -3133,23 +3184,7 @@ def _ck_earnings():
                 stock_code = it.get("stock_code", "")
 
                 doc = _dart_doc(rno)
-                extract = _gemini(
-                    "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
-                    '{"fs_type":"연결 또는 별도",'
-                    '"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
-                    '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)},'
-                    '"net_income":{"current":당기순이익(억원),"prev":전기순이익(억원)},'
-                    '"reason":"변동요인 2줄 요약"}\n'
-                    f"숫자는 억원 단위, 없으면 null.\n\n{doc[:5000]}"
-                )
-
-                fd = None
-                try:
-                    m = re.search(r"\{[\s\S]*\}", extract)
-                    if m:
-                        fd = json.loads(m.group())
-                except Exception:
-                    pass
+                fd = _earnings_extract(doc)
 
                 if fd:
                     rev = fd.get("revenue", {})

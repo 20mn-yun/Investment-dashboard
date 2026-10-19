@@ -301,7 +301,7 @@ def summarize(code, quarter, name="", limit=None, force=False):
     user = f"종목: {name or code} ({code})\n분기: {quarter} (회계연도 기준)\n\n{user_text}"
     t0 = time.time()
     try:
-        text, tin, tout = us_financials._call_ai(SUMMARY_SYSTEM, user, max_tokens=4000, task="call_summary")
+        text, tin, tout, model = us_financials._call_ai_full(SUMMARY_SYSTEM, user, max_tokens=4000, task="call_summary")
         summ = _check_summary(_parse_json(text))
     except Exception as e:
         print(f"[earnings_calls] {code} {quarter} 요약 실패: {type(e).__name__}: {str(e)[:120]}", flush=True)
@@ -309,7 +309,7 @@ def summarize(code, quarter, name="", limit=None, force=False):
         _save_json(_p(code, quarter, "_summary"), res)
         return res
     res = {"status": "ok", "quarter": quarter, "code": code, "summary": summ, "tokens": {"input": tin, "output": tout},
-           "input_meta": meta, "seconds": round(time.time() - t0, 1), "at": _now(), "model": us_financials.AI_MODEL}
+           "input_meta": meta, "seconds": round(time.time() - t0, 1), "at": _now(), "model": model or us_financials.AI_MODEL}
     _save_json(_p(code, quarter, "_summary"), res)
     print(f"[earnings_calls] {code} {quarter} 요약 완료: 토큰 {tin}+{tout}, 오늘 {n}/{ai_budget.resolve_limit('call_summary', limit)}", flush=True)
     try:
@@ -382,11 +382,12 @@ def _run_translate(code, quarter, name, transcript, job):
     ko = [None] * len(transcript)
     tokens = {"input": 0, "output": 0}
     missing = []
+    model = ""
     try:
         job["stage"] = "translating"
         for ci, idxs in enumerate(_chunks(transcript), 1):
             user = "\n\n".join(f"[{i + 1}] ({transcript[i].get('speaker')}, {transcript[i].get('title')})\n{transcript[i].get('content', '')}" for i in idxs)
-            text, tin, tout = us_financials._call_ai(TRANSLATE_SYSTEM, user, max_tokens=16000, task="call_translate")
+            text, tin, tout, model = us_financials._call_ai_full(TRANSLATE_SYSTEM, user, max_tokens=16000, task="call_translate")
             tokens["input"] += tin or 0
             tokens["output"] += tout or 0
             job["calls"] += 1
@@ -405,7 +406,7 @@ def _run_translate(code, quarter, name, transcript, job):
         segs = [{"speaker": s.get("speaker"), "title": s.get("title"), "content": ko[i], "untranslated": i in missing}
                 for i, s in enumerate(transcript)]
         res = {"status": "ok", "code": code, "quarter": quarter, "segments": segs, "calls": job["calls"], "tokens": tokens,
-               "seconds": round(time.time() - t0, 1), "missing": len(missing), "at": _now(), "model": us_financials.AI_MODEL}
+               "seconds": round(time.time() - t0, 1), "missing": len(missing), "at": _now(), "model": model or us_financials.AI_MODEL}
         _save_json(_p(code, quarter, "_ko"), res)
         job.update(stage="done", seconds=res["seconds"], tokens=tokens, missing=len(missing))
         print(f"[earnings_calls] {code} {quarter} 번역 완료: 호출 {job['calls']}, {res['seconds']}s, 토큰 {tokens['input']}+{tokens['output']}, 미번역 {len(missing)}", flush=True)
