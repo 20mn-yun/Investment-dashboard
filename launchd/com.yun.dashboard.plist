@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yun.dashboard</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>cd /Users/yun/investment_dashboard &amp;&amp; /Library/Frameworks/Python.framework/Versions/3.14/bin/python3 app.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yun/investment_dashboard</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>8192</integer>
+    </dict>
+    <key>HardResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>8192</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/yun/investment_dashboard/app.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yun/investment_dashboard/app.log</string>
+</dict>
+</plist>

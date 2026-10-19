@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yun.batch_gainers_eu</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/Frameworks/Python.framework/Versions/3.14/bin/python3</string>
+        <string>/Users/yun/investment_dashboard/batch_top_gainers.py</string>
+        <string>eu</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yun/investment_dashboard</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/tmp/dashboard_batch_eu.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/dashboard_batch_eu.err</string>
+</dict>
+</plist>

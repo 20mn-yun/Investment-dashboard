@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yun.valuation-screener</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/Frameworks/Python.framework/Versions/3.14/bin/python3</string>
+        <string>/Users/yun/investment_dashboard/valuation_screener.py</string>
+        <string>0</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yun/investment_dashboard</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>16</integer>
+        <key>Minute</key>
+        <integer>50</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/Users/yun/investment_dashboard/valuation_screener.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yun/investment_dashboard/valuation_screener.err</string>
+</dict>
+</plist>

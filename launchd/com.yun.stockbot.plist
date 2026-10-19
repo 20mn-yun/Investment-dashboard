@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yun.stockbot</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/yun/Desktop/stock_info_bot/venv/bin/python</string>
+        <string>/Users/yun/Desktop/stock_info_bot/main.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/yun/Desktop/stock_info_bot</string>
+
+    <!-- 로그인 시 자동 시작 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 스크립트가 죽으면 자동 재시작 -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- 재시작 대기 시간 (초) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/yun/Desktop/stock_info_bot/venv/bin:/Library/Frameworks/Python.framework/Versions/3.14/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/yun/Library/Logs/stockbot.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yun/Library/Logs/stockbot_error.log</string>
+</dict>
+</plist>

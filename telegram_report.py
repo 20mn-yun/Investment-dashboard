@@ -526,17 +526,93 @@ def stock_folder(download_base, keyword):
     return os.path.join(os.path.expanduser(download_base), keyword)
 
 
+# --- Drive(File Provider) 폴더 나열: EDEADLK(errno 11) = 클라우드 전용(dataless) 폴더. launchd 프로세스는 실체화를 못 하므로
+#     Finder 로 폴더를 열어(open -g) 실체화를 유도한 뒤 재시도한다. 폴더별 open 은 하루 1회, 실패 로그도 하루 1회. ---
+_EDEADLK = 11
+_drive_open_at = {}          # 경로 → 마지막 open 실행 시각(datetime)
+_drive_folder_state = {}     # 경로 → {"last_fail": iso, "errno": int, "recovered": bool, "logged_day": "YYYY-MM-DD"}
+_drive_state_lock = threading.Lock()
+
+
+def _finder_open(path):
+    """Finder 에 폴더를 (비활성으로) 열어 File Provider 실체화를 트리거. 반환 (실행 여부, 설명)"""
+    try:
+        r = subprocess.run(["open", "-g", path], capture_output=True, text=True, timeout=10)
+        return r.returncode == 0, f"rc={r.returncode} {(r.stderr or '').strip()[:80]}"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {str(e)[:80]}"
+
+
 def _listdir_retry(path, attempts=2, wait=1.0):
+    today = datetime.now().date().isoformat()
     last_err = None
+    res = None
     for i in range(attempts):
+        try:
+            res = os.listdir(path)
+            break
+        except OSError as e:
+            last_err = e
+            if e.errno == _EDEADLK:
+                break                                   # 일반 재시도는 의미 없음 → 아래 실체화 경로로
+            if i < attempts - 1:
+                time.sleep(wait)
+    if last_err is not None and getattr(last_err, "errno", None) == _EDEADLK and res is None:
+        res = _listdir_materialize(path, today)
+    if res is not None:
+        if last_err is not None and getattr(last_err, "errno", None) == _EDEADLK:   # 실체화 재시도로 살아난 경우
+            with _drive_state_lock:
+                st = _drive_folder_state.setdefault(path, {})
+                st.update(last_fail=datetime.now().isoformat(timespec="seconds"), errno=_EDEADLK, recovered=True)
+            print(f"[report] 폴더 실체화 복구: {path}", flush=True)
+        return res
+    with _drive_state_lock:
+        st = _drive_folder_state.setdefault(path, {})
+        st.update(last_fail=datetime.now().isoformat(timespec="seconds"), errno=getattr(last_err, "errno", None), recovered=False)
+        should_log = st.get("logged_day") != today
+        st["logged_day"] = today
+    if should_log:
+        print(f"[report] 폴더 나열 실패(건너뜀): {path} — {type(last_err).__name__}: {last_err}", flush=True)
+    return None
+
+
+def _listdir_materialize(path, today):
+    """EDEADLK 폴더: open -g 로 Finder 에 열고 5초 뒤 재시도, 또 실패면 10초 더 기다려 마지막 재시도. open 은 폴더당 하루 1회."""
+    with _drive_state_lock:
+        opened_at = _drive_open_at.get(path)
+        already_today = opened_at is not None and opened_at.date().isoformat() == today
+        if not already_today:
+            _drive_open_at[path] = datetime.now()
+    if already_today:
+        return None                                     # 오늘 이미 열었는데 또 실패 → 바로 포기
+    ok, desc = _finder_open(path)
+    print(f"[report] dataless 폴더 Finder 열기({desc}): {path}", flush=True)
+    for delay in (5, 10):
+        time.sleep(delay)
         try:
             return os.listdir(path)
         except OSError as e:
-            last_err = e
-            if i < attempts - 1:
-                time.sleep(wait)
-    print(f"[report] 폴더 나열 실패(건너뜀): {path} — {type(last_err).__name__}: {last_err}", flush=True)
+            if e.errno != _EDEADLK:
+                break
     return None
+
+
+def drive_folder_status(prefix=None, day=None):
+    """당일 Drive 폴더 상태 요약: {"skipped_folders": [최종 실패 경로...], "recovered_folders": 복구 수}. prefix 로 종목 폴더만 걸러냄."""
+    day = day or datetime.now().date().isoformat()
+    skipped, recovered = [], 0
+    with _drive_state_lock:
+        for p, st in _drive_folder_state.items():
+            if prefix and not p.startswith(prefix):
+                continue
+            if (st.get("last_fail") or "")[:10] != day and not st.get("recovered"):
+                continue
+            if st.get("recovered"):
+                if (st.get("last_fail") or "")[:10] == day:
+                    recovered += 1
+            else:
+                skipped.append(p)
+    return {"skipped_folders": sorted(skipped), "recovered_folders": recovered}
 
 
 def existing_report_files(stock_root):

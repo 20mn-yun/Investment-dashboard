@@ -811,4 +811,5 @@ def status(market, code, name="", start=True, ai_limit=None):
         "period": {"from": (date.today() - timedelta(days=30 * MONTHS)).isoformat(), "to": today},
         "count": len(items), "items": items, "aggregate": agg, "drive": st.get("drive"),
         "ai_daily": {"counter_date": ai_budget.snapshot()["date"], "counter_value": ai_budget.used("reports"), "limit": AI_DAILY_LIMIT},
+        **telegram_report.drive_folder_status(prefix=stock_root(market, code, name)),   # skipped_folders / recovered_folders (당일)
     }
