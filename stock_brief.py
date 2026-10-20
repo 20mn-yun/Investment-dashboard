@@ -16,7 +16,7 @@ import watchlist as watchlist_store
 
 _BD = os.path.dirname(os.path.abspath(__file__))
 LOCAL_DIR = os.path.join(_BD, "cache", "briefs")
-BRIEF_NAME = "_브리프.md"
+BRIEF_NAME = "_브리프.md"          # 옛 파일명 (D2 에서 _브리프_<종목폴더명>.md 로 바뀜; 남아 있으면 삭제)
 VERSION = "stock_brief v1"
 KST = timezone(timedelta(hours=9))
 REPORT_DAYS = 90
@@ -139,13 +139,18 @@ def _sec_reports(market, code, name):
         else:
             tgt = "-"
         head = (it.get("summary") or [""])[0] if it.get("summary") else ("-" if it.get("ai_status") == "ok" else f"(정리 {it.get('ai_status') or '대기'})")
+        if it.get("unit_suspect"):
+            head = "(단위 의심) " + head
+        if it.get("text_source") == "ocr":
+            head = "(OCR) " + head
         out.append(f"| {_d(it.get('date'))} | {_cell(it.get('broker'))} | {_cell(it.get('analyst'))} | {_cell(it.get('opinion'))} | {tgt} | {_cell(head)} | {_cell(it.get('filename'))} |")
     if len(items) > MAX_REPORTS:
         out.append(f"| … | | | | | 외 {len(items) - MAX_REPORTS}건 | |")
     agg = st.get("aggregate") or {}
     dist = agg.get("opinion_dist") or {}
+    cur = "원" if market == "KR" else "$"
     out.append("")
-    out.append(f"집계(증권사별 최신 {agg.get('brokers_n') or 0}곳): 목표가 평균 {_n(agg.get('target_mean'))} / 최고 {_n(agg.get('target_max'))} / 최저 {_n(agg.get('target_min'))}"
+    out.append(f"집계(증권사별 최신 {agg.get('brokers_n') or 0}곳, 목표가 {cur}): 목표가 평균 {_n(agg.get('target_mean'))} / 최고 {_n(agg.get('target_max'))} / 최저 {_n(agg.get('target_min'))}"
                + (f" (현재가 대비 {_pct(agg.get('target_upside_pct'))})" if agg.get("target_upside_pct") is not None else "")
                + (f" · 의견 매수 {dist.get('buy', 0)} / 중립 {dist.get('hold', 0)} / 매도 {dist.get('sell', 0)}" if dist else "")
                + f" · AI 정리 {agg.get('reports_ok', 0)}/{agg.get('reports_total', 0)}건")
@@ -362,7 +367,14 @@ def write_drive(market, code, name, md):
         kw = telegram_report.stock_folder_keyword(market, code, name or None)
         folder = telegram_report.stock_folder(base, kw)
         os.makedirs(folder, exist_ok=True)
-        path = os.path.join(folder, unicodedata.normalize("NFC", BRIEF_NAME))
+        path = os.path.join(folder, unicodedata.normalize("NFC", f"_브리프_{kw}.md"))
+        old = os.path.join(folder, unicodedata.normalize("NFC", BRIEF_NAME))
+        for cand in {old, os.path.join(folder, unicodedata.normalize("NFD", BRIEF_NAME))}:
+            try:
+                if os.path.exists(cand):
+                    os.remove(cand)
+            except OSError:
+                pass
         tmp = path + ".tmp"
         with open(tmp, "wb") as f:
             f.write(data)

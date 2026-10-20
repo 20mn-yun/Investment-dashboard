@@ -514,8 +514,55 @@ def normalize_summary(raw, item, price=None, market="KR"):
     return out
 
 
-def summarize_one(market, code, name, item, pdf_path, price=None, annual_rev=None):
-    """PDF 1건 → AI 정리 결과(dict). AI 를 부르지 않은 경우 status 에 이유."""
+OCR_PAGES = 3
+OCR_MAX_TRIES = 3
+OCR_PROMPT = "이 리포트 페이지의 모든 텍스트와 표를 그대로 전사하라. 페이지 순서대로, 표는 행마다 한 줄로 셀을 | 로 구분해 적어라. 요약·해석은 하지 마라."
+
+
+def _render_pdf_pages(pdf_path, n_pages=OCR_PAGES, px=1600):
+    """pypdf 로 1~n 페이지를 낱장 PDF 로 분리 → qlmanage 썸네일 PNG. 반환 (임시 폴더, PNG 경로 목록)"""
+    import subprocess
+    import tempfile
+    from pypdf import PdfReader, PdfWriter
+    tmp = tempfile.mkdtemp(prefix="ocr_")
+    pngs = []
+    r = PdfReader(pdf_path)
+    for i in range(min(n_pages, len(r.pages))):
+        w = PdfWriter()
+        w.add_page(r.pages[i])
+        one = os.path.join(tmp, f"p{i + 1}.pdf")
+        with open(one, "wb") as f:
+            w.write(f)
+        subprocess.run(["qlmanage", "-t", "-s", str(px), "-o", tmp, one], capture_output=True, timeout=60)
+        png = one + ".png"
+        if os.path.exists(png) and os.path.getsize(png) > 1000:
+            pngs.append(png)
+    return tmp, pngs
+
+
+def ocr_pdf(pdf_path):
+    """이미지 PDF 1~3페이지 → PNG → llm_client tg_ocr(codex). 반환 (텍스트, 초, 오류문자열|None). 한도는 호출부(ai_budget 'ocr')"""
+    import shutil
+    import llm_client
+    t0 = time.time()
+    tmp, pngs = None, []
+    try:
+        tmp, pngs = _render_pdf_pages(pdf_path)
+        if not pngs:
+            return "", round(time.time() - t0, 1), "render_failed(qlmanage)"
+        r = llm_client.complete("tg_ocr", OCR_PROMPT, images=pngs)
+        if not r.ok:
+            return "", round(time.time() - t0, 1), f"ocr_error:{(r.error or 'unknown')[:80]}"
+        return r.text or "", round(time.time() - t0, 1), None
+    except Exception as e:
+        return "", round(time.time() - t0, 1), f"ocr_exception:{type(e).__name__}"
+    finally:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+def summarize_one(market, code, name, item, pdf_path, price=None, annual_rev=None, prev=None):
+    """PDF 1건 → AI 정리 결과(dict). AI 를 부르지 않은 경우 status 에 이유. prev 는 같은 건의 이전 레코드(OCR 재시도 횟수용)."""
     import us_financials
     base = {"message_id": item["message_id"], "channel": item["channel"], "date": item.get("date"), "filename": item.get("filename"),
             "broker": item.get("broker"), "status": "ok", "text_ok": True, "tokens": None, "summarized_at": _now()}
@@ -525,7 +572,21 @@ def summarize_one(market, code, name, item, pdf_path, price=None, annual_rev=Non
         return dict(base, status=f"pdf_error:{type(e).__name__}", text_ok=False)
     base.update(pages=n_pages, chars=n_chars)
     if n_chars < MIN_TEXT_CHARS:
-        return dict(base, status="no_text", text_ok=False)
+        # 이미지 PDF → OCR 경로 (D1): 하루 1회, 최대 3회 시도. 한도 ai_budget 'ocr'
+        prev = prev or {}
+        tries = int(prev.get("ocr_tries") or 0)
+        today = date.today().isoformat()
+        if tries >= OCR_MAX_TRIES or (prev.get("ocr_last") or "")[:10] == today:
+            return dict(base, status="no_text", text_ok=False, ocr_tried=bool(tries), ocr_tries=tries, ocr_last=prev.get("ocr_last"), ocr_error=prev.get("ocr_error"))
+        allowed, _n = ai_budget.take("ocr")
+        if not allowed:
+            return dict(base, status="no_text", text_ok=False, ocr_tried=bool(tries), ocr_tries=tries, ocr_last=prev.get("ocr_last"), ocr_error="ocr_limit")
+        otext, osec, oerr = ocr_pdf(pdf_path)
+        if oerr or len(otext) < MIN_TEXT_CHARS:
+            return dict(base, status="no_text", text_ok=False, ocr_tried=True, ocr_tries=tries + 1, ocr_last=_now(),
+                        ocr_error=oerr or f"ocr_short:{len(otext)}", ocr_seconds=osec)
+        text, n_chars = otext, len(otext)
+        base.update(text_source="ocr", ocr_seconds=osec, ocr_tries=tries + 1, ocr_last=_now(), chars=n_chars)
     allowed, n = _ai_allowed(market)
     if not allowed:
         return dict(base, status="ai_limit", ai_pending=True)
@@ -870,14 +931,20 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
                                 "status": "duplicate", "duplicate_of": it["duplicate_of"], "duplicate_why": it.get("duplicate_why"), "summarized_at": _now()}
         _save_json(_sum_path(market, code), summaries)
         price = _current_price(market, code)
+        today_s = date.today().isoformat()
+
+        def _ocr_retry(s):   # no_text 레코드: 하루 1회·3회까지 OCR 재시도 대상
+            return s.get("status") == "no_text" and int(s.get("ocr_tries") or 0) < OCR_MAX_TRIES and (s.get("ocr_last") or "")[:10] != today_s
+
         pend = [it for it in st["items"].values() if it.get("pdf") and (summaries.get(str(it["message_id"])) or {}).get("status") not in ("duplicate", "irrelevant")
-                and (str(it["message_id"]) not in summaries or (summaries.get(str(it["message_id"])) or {}).get("ai_pending"))]
+                and (str(it["message_id"]) not in summaries or (summaries.get(str(it["message_id"])) or {}).get("ai_pending")
+                     or _ocr_retry(summaries.get(str(it["message_id"])) or {}))]
         pend.sort(key=lambda x: x.get("date") or "", reverse=True)
         if ai_limit is not None:
             pend = pend[:ai_limit]
         job.update(stage="summarizing", done=0, total=len(pend))
         for n, it in enumerate(pend, 1):
-            res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price, annual_rev)
+            res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price, annual_rev, summaries.get(str(it["message_id"])))
             summaries[str(it["message_id"])] = res
             job["ai_done"] = job.get("ai_done", 0) + (1 if res.get("status") == "ok" else 0)
             if res.get("status") == "ok" and res.get("broker"):
@@ -930,7 +997,7 @@ def status(market, code, name="", start=True, ai_limit=None):
         if s.get("status") in ("duplicate", "irrelevant"):
             continue
         items.append({
-            "currency": s.get("currency") or MARKET_CURRENCY.get(market, "KRW"), "unit_suspect": bool(s.get("unit_suspect")),
+            "currency": s.get("currency") or MARKET_CURRENCY.get(market, "KRW"), "unit_suspect": bool(s.get("unit_suspect")), "text_source": s.get("text_source"),
             "message_id": it["message_id"], "channel": it["channel"], "date": it.get("date"), "filename": it.get("filename"),
             "title": re.sub(r"\.pdf$", "", it.get("filename") or "", flags=re.I).replace("_", " "),
             "broker": s.get("broker") or it.get("broker"), "analyst": s.get("analyst"), "type": s.get("type"),
