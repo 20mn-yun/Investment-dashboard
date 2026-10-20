@@ -27,7 +27,7 @@ TASK_TIERS = {
     "us_wrap": "opus", "moat": "opus",
     "call_summary": "sonnet", "news_rank": "sonnet", "stock_intro": "sonnet", "biz_overview": "sonnet",
     "peers": "sonnet", "dart_watch_summary": "sonnet", "dart_detail": "sonnet", "earnings_extract": "sonnet",
-    "reports": "sonnet", "tg_topic": "sonnet", "report_relevance": "sonnet", "tg_image_topic": "sonnet", "tg_ocr": "sonnet",
+    "reports": "sonnet", "tg_topic": "sonnet", "report_relevance": "sonnet", "tg_image_topic": "sonnet", "tg_ocr": "sonnet", "ir_release": "sonnet",
     "concept_map": "haiku", "ksic": "haiku", "call_translate": "haiku", "stock_news": "haiku", "dart_excel_line": "haiku",
 }
 TASK_BACKEND = {"call_translate": "api",            # 값: "cli" | "codex" | "api". codex 지정 task 는 Claude CLI 를 거치지 않는다
@@ -35,7 +35,7 @@ TASK_BACKEND = {"call_translate": "api",            # 값: "cli" | "codex" | "ap
 CODEX_MODELS = {"default": "gpt-6.1-sol", "fast": "gpt-6-luna"}   # opus/sonnet → default, haiku → fast
 CODEX_IMAGE_TIMEOUT = 240
 API_MODELS = {"haiku": "claude-haiku-4-5-20251001", "sonnet": "claude-haiku-4-5-20251001", "opus": "claude-haiku-4-5-20251001"}
-TASK_TIMEOUTS = {"call_translate": 600, "call_summary": 180, "tg_ocr": 240}
+TASK_TIMEOUTS = {"call_translate": 600, "call_summary": 180, "tg_ocr": 240, "ir_release": 180}
 DEFAULT_TIMEOUT = 120
 TASK_BUDGET_USD = {"call_translate": 1.50, "call_summary": 1.50}
 DEFAULT_BUDGET_USD = 0.50

@@ -152,6 +152,62 @@ def _sec_reports(market, code, name):
     return out
 
 
+def _sec_actions(code, days=90, max_rows=25):
+    import us_analyst_actions
+    rows = us_analyst_actions.recent(code, days)
+    if not rows:
+        return ["(최근 90일 액션 없음 또는 미수집)"]
+    out = ["| 날짜 | 기관 | 액션 | 등급(전→후) | 목표가(전→후) |", "|---|---|---|---|---|"]
+    up = down = keep = 0
+    for r in rows[:max_rows]:
+        grade = f"{r.get('from_grade') or '-'}→{r.get('to_grade') or '-'}" if r.get("from_grade") and r.get("from_grade") != r.get("to_grade") else (r.get("to_grade") or "-")
+        p, c = r.get("prior_pt"), r.get("current_pt")
+        pt = f"{_n(p)}→{_n(c)}" if p and c and p != c else (_n(c) if c else "-")
+        out.append(f"| {_d(r.get('date'))} | {_cell(r.get('firm'))} | {_cell(r.get('pt_action') or r.get('action'))} | {_cell(grade)} | {pt} |")
+    for r in rows:
+        p, c = r.get("prior_pt"), r.get("current_pt")
+        if p and c:
+            up += c > p
+            down += c < p
+            keep += c == p
+    if len(rows) > max_rows:
+        out.append(f"| … | | | | 외 {len(rows) - max_rows}건 |")
+    out.append("")
+    out.append(f"목표가 변경 있는 건: 상향 {up} / 하향 {down} / 유지 {keep} (총 {len(rows)}건)")
+    return out
+
+
+def _sec_8k(code):
+    import sec_filings
+    st = sec_filings.status(code)
+    items = st.get("items") or []
+    if not items:
+        return ["(저장된 8-K 실적 보도자료 없음)"]
+    out = []
+    seen_acc = []
+    for it in items:
+        if it["accession"] in seen_acc:
+            continue
+        seen_acc.append(it["accession"])
+        if len(seen_acc) > 2:
+            break
+        exs = [x for x in items if x["accession"] == it["accession"]]
+        out.append(f"### {it['date']} · " + " · ".join(f"{x['exhibit']} {x.get('filename') or ''}" for x in exs))
+        s = next((x.get("summary") for x in exs if x.get("summary")), None)
+        if s:
+            if s.get("분기"):
+                out.append(f"- 분기: {_cell(s['분기'])}" + (f" (단위 {s.get('숫자단위')})" if s.get("숫자단위") else ""))
+            for line in (s.get("실적핵심") or [])[:3]:
+                out.append(f"- 실적핵심: {_cell(line)}")
+            g = s.get("가이던스") or {}
+            for line in ((g.get("다음분기") or []) + (g.get("연간") or []))[:3]:
+                out.append(f"- 가이던스: {_cell(line)}")
+        else:
+            out.append("- (요약 없음)")
+        out.append("")
+    return out
+
+
 def _sec_calls(market, code, name):
     import earnings_calls
     if market == "US":
@@ -277,6 +333,10 @@ def build(market, code, name, corp_code=None, fx=None):
     lines.append("")
     lines += run("최근 실적 (분기)", lambda: _sec_financials(market, code, name))
     lines += run("증권사 리포트 (최근 3개월)", lambda: _sec_reports(market, code, name))
+    if market == "US":
+        lines += run("애널리스트 액션 (최근 90일)", lambda: _sec_actions(code))
+    if market == "US":
+        lines += run("회사 발표 (8-K 실적 보도자료)", lambda: _sec_8k(code))
     lines += run("컨콜", lambda: _sec_calls(market, code, name))
     lines += run("공시 (최근 30일)", lambda: _sec_disclosures(market, code, corp_code))
     lines += run("나의 판단", lambda: _sec_notes(market, code, name))

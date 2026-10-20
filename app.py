@@ -27,6 +27,8 @@ import ai_budget
 import earnings_calls
 import stock_peers
 import stock_brief
+import sec_filings
+import us_analyst_actions
 import tg_inbox
 import dart_report
 import earnings_tracker
@@ -2215,6 +2217,28 @@ def stock_notes_list():
     return jsonify({"count": len(items), "items": items})
 
 
+@app.route("/api/stock/analyst-actions", methods=["GET"])
+def stock_analyst_actions_api():
+    """미국 종목 애널리스트 액션(최근 90일, yfinance 저장본). 네트워크 호출 없음."""
+    r, err = _resolve_stock("US", request.args.get("code", ""))
+    if err:
+        return err
+    try:
+        days = max(1, min(int(request.args.get("days", 90)), 3650))
+    except ValueError:
+        days = 90
+    return jsonify(us_analyst_actions.status(r[1], days))
+
+
+@app.route("/api/stock/sec8k", methods=["GET"])
+def stock_sec8k_api():
+    """미국 종목 8-K 실적 보도자료(EX-99.1/99.2) 저장본 상태·요약. 네트워크 호출 없음."""
+    r, err = _resolve_stock("US", request.args.get("code", ""))
+    if err:
+        return err
+    return jsonify(sec_filings.status(r[1]))
+
+
 @app.route("/api/stock/brief", methods=["GET"])
 def stock_brief_api():
     """종목 브리프(저장본 기반 마크다운 한 장). 즉시 생성해 Drive·로컬에 쓰고 본문을 돌려준다. LLM 호출 없음."""
@@ -3605,6 +3629,17 @@ def _krfin_prefetch_run(reason):
             results[key] += f", 공시 {disc['count']}건"
         except Exception as e:
             results[key] += f", 공시 실패({type(e).__name__})"
+        try:   # 애널리스트 액션(yfinance upgrades_downgrades): 하루 1회, Yahoo 백오프 공유
+            aa = us_analyst_actions.refresh(code)
+            results[f"actions:US_{code}"] = (f"{'ok' if aa.get('ok') else '실패'} {aa.get('rows', 0)}행" + (f" ({aa.get('skipped') or aa.get('error')})" if aa.get("skipped") or aa.get("error") else ""))
+        except Exception as e:
+            results[f"actions:US_{code}"] = f"실패({type(e).__name__})"
+        try:   # 8-K 실적 보도자료(EX-99.1/99.2): 첫 실행 최근 400일, 이후 신규 접수만. 요약은 ir_release 한도 안에서
+            s8 = sec_filings.ensure_recent(code, None, items_name.get(code, ""))
+            results[f"sec8k:US_{code}"] = (f"신규 {s8.get('new', 0)}/첨부 {s8.get('exhibits', 0)}/요약 {s8.get('summarized', 0)}/SEC {s8.get('sec_calls', 0)}회"
+                                           + (f" 오류 {s8['errors']}" if s8.get("errors") else "") + (f" ({s8['error']})" if s8.get("error") else ""))
+        except Exception as e:
+            results[f"sec8k:US_{code}"] = f"실패({type(e).__name__})"
         try:   # 컨콜: 최근 2개 분기 녹취록 받기 + 요약 (Alpha Vantage 하루 25건·AI 요약 20건 한도 안에서, 넘으면 대기)
             calls = earnings_calls.ensure_recent(code, items_name.get(code, ""), 2, True)
             results[key] += ", 컨콜 " + " ".join(f"{c['quarter']}:{c.get('transcript')}/{c.get('summary', '-')}" for c in calls)
