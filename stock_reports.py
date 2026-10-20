@@ -209,16 +209,21 @@ def _copy_to_drive(local_pdf, name, code, item, market=None):
     try:
         fname = _drive_filename(item, name, market)
         mid = item["message_id"] if str(item.get("channel")) != "drive" else None
-        dup = telegram_report.find_duplicate(root, mid, fname, item.get("filename"))
+        fp = telegram_report.pdf_fingerprint(local_pdf)
+        dup, why = telegram_report.find_duplicate_detail(root, mid, fname, item.get("filename"), None, fp.get("sha256"), fp.get("text_fp"))
         if dup:
+            if why in ("sha256", "text_fp") and os.path.basename(dup) != fname:
+                item["duplicate_of"] = os.path.basename(dup)
+                item["duplicate_why"] = why
+                print(f"[report] 중복 건너뜀: {fname} = {os.path.basename(dup)} ({why})", flush=True)
             if mid is not None:
-                telegram_report.record_report(root, mid, os.path.basename(dup))
+                telegram_report.record_report(root, mid, os.path.basename(dup), fp, item.get("channel"), item.get("filename"))
             return dup, None
         os.makedirs(d, exist_ok=True)
         dst = os.path.join(d, fname)
         shutil.copy2(local_pdf, dst)
         if mid is not None:
-            telegram_report.record_report(root, mid, fname)
+            telegram_report.record_report(root, mid, fname, fp, item.get("channel"), item.get("filename"))
         return dst, None
     except OSError as e:
         return None, f"{type(e).__name__}"
@@ -519,9 +524,12 @@ def aggregate(summaries, price=None):
 
 # ===== 5. Drive 내보내기 =====
 def _render_summary_md(name, code, items, summaries):
-    lines = [f"# {name} ({code}) 리포트 요약", "", f"- 갱신: {_now()}", f"- 리포트 {len(items)}건, AI 정리 {sum(1 for s in summaries.values() if s.get('status') == 'ok')}건", ""]
+    n_dup = sum(1 for s in summaries.values() if s.get("status") == "duplicate")
+    lines = [f"# {name} ({code}) 리포트 요약", "", f"- 갱신: {_now()}", f"- 리포트 {len(items) - n_dup}건, AI 정리 {sum(1 for s in summaries.values() if s.get('status') == 'ok')}건" + (f", 중복 제외 {n_dup}건" if n_dup else ""), ""]
     for it in sorted(items, key=lambda x: x.get("date") or "", reverse=True):
         s = summaries.get(str(it["message_id"])) or {}
+        if s.get("status") == "duplicate":
+            continue
         lines.append(f"## {(it.get('date') or '')[:10]} · {s.get('broker') or it.get('broker') or '-'} · {re.sub(r'\\.pdf$', '', it.get('filename') or '', flags=re.I)}")
         if s.get("status") == "ok":
             lines.append(f"- 유형 {s.get('type') or '-'} · 투자의견 {s.get('opinion') or '-'} · 목표주가 {int(s['target']):,} " if s.get("target") else f"- 유형 {s.get('type') or '-'} · 투자의견 {s.get('opinion') or '-'} · 목표주가 -")
@@ -582,7 +590,8 @@ def _add_drive_candidates(market, code, name, found, stats, months=MONTHS, extra
     have = {norm_(it.get("filename")) for it in found}
     have |= {norm_(fn) for fn in extra_names if fn}   # 이미 목록에 있는 파일(단건 받기 등)은 중복 후보로 넣지 않음
     known_mids = {str(it.get("message_id")) for it in found} | set(str(m) for m in (extra_mids or []))
-    idx_by_name = {norm_(fn): mid for mid, fn in telegram_report.load_report_index(root).items() if fn}   # .index.json: 파일명 → message_id
+    idx_by_name = {norm_(e.get("filename")): mid for mid, e in telegram_report.load_report_index(root).items()
+                   if e.get("filename") and not str(mid).startswith("file:")}   # .index.json: 파일명 → message_id
     out = list(found)
     try:
         subs = telegram_report._listdir_retry(root) or []
@@ -735,9 +744,15 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
             job.update(done=n)
             _save_json(_state_path(market, code), st)
         summaries = _load_json(_sum_path(market, code), {})
+        for it in st["items"].values():   # 내용 지문으로 중복 판정된 항목: AI 정리·집계·표시에서 제외
+            k = str(it["message_id"])
+            if it.get("duplicate_of") and (summaries.get(k) or {}).get("status") != "duplicate":
+                summaries[k] = {"message_id": it["message_id"], "channel": it.get("channel"), "date": it.get("date"), "filename": it.get("filename"),
+                                "status": "duplicate", "duplicate_of": it["duplicate_of"], "duplicate_why": it.get("duplicate_why"), "summarized_at": _now()}
+        _save_json(_sum_path(market, code), summaries)
         price = _current_price(market, code)
-        pend = [it for it in st["items"].values() if it.get("pdf") and str(it["message_id"]) not in summaries
-                or (it.get("pdf") and (summaries.get(str(it["message_id"])) or {}).get("ai_pending"))]
+        pend = [it for it in st["items"].values() if it.get("pdf") and (summaries.get(str(it["message_id"])) or {}).get("status") != "duplicate"
+                and (str(it["message_id"]) not in summaries or (summaries.get(str(it["message_id"])) or {}).get("ai_pending"))]
         pend.sort(key=lambda x: x.get("date") or "", reverse=True)
         if ai_limit is not None:
             pend = pend[:ai_limit]
@@ -792,6 +807,8 @@ def status(market, code, name="", start=True, ai_limit=None):
     items = []
     for it in sorted(st["items"].values(), key=lambda x: x.get("date") or "", reverse=True):
         s = summaries.get(str(it["message_id"])) or {}
+        if s.get("status") == "duplicate":
+            continue
         items.append({
             "message_id": it["message_id"], "channel": it["channel"], "date": it.get("date"), "filename": it.get("filename"),
             "title": re.sub(r"\.pdf$", "", it.get("filename") or "", flags=re.I).replace("_", " "),

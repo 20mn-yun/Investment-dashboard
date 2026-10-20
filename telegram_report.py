@@ -689,7 +689,9 @@ def existing_report_files(stock_root):
 _BD = os.path.dirname(os.path.abspath(__file__))
 _maps_cache = {}
 REPORT_SUBFOLDER = "리포트"
-REPORT_INDEX = ".index.json"          # 종목 폴더/리포트/.index.json : {message_id: 파일명} (두 기능이 공유하는 중복 기록)
+REPORT_INDEX = ".index.json"          # 종목 폴더/리포트/.index.json (두 기능이 공유하는 중복 기록)
+# 구형: {message_id: "파일명"}  /  신형: {message_id: {"filename","sha256","size","text_fp","pages","channel","original_name","saved_at"}}
+# 키는 message_id 문자열, 또는 index 에 없던 파일을 백필한 "file:<sha256 앞 12자>"
 _TAIL_RE = re.compile(r"^(?P<name>.+?)(?P<tail>[\s\d.,\-_]+)$")
 ISSUER_EXTRAS = ("KB증권", "삼성증권", "한국투자증권", "NH투자증권", "현대차증권", "SK증권", "LS증권", "iM증권", "DS투자증권", "리딩투자증권",
                  "한양증권", "유화증권", "KR투자증권", "코리아에셋투자증권", "삼성선물", "토스증권", "대신증권", "메리츠증권", "하나증권")
@@ -849,7 +851,26 @@ def report_dir(stock_root):
     return os.path.join(stock_root, REPORT_SUBFOLDER)
 
 
+def _index_entry(v):
+    """구형(문자열)·신형(dict) 항목을 모두 dict 로 정규화"""
+    if isinstance(v, dict):
+        return dict(v, filename=v.get("filename"))
+    return {"filename": v if isinstance(v, str) else None}
+
+
 def load_report_index(stock_root):
+    """{키: {"filename", "sha256", "size", "text_fp", "pages", "channel", "original_name", "saved_at"}} — 구형 항목은 filename 만 채워짐"""
+    p = os.path.join(report_dir(stock_root), REPORT_INDEX)
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return {str(k): _index_entry(v) for k, v in d.items()} if isinstance(d, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def load_report_index_raw(stock_root):
+    """저장된 그대로(구형 문자열 항목 보존) — record_report 가 다른 항목을 건드리지 않게 쓸 때"""
     p = os.path.join(report_dir(stock_root), REPORT_INDEX)
     try:
         with open(p, "r", encoding="utf-8") as f:
@@ -857,6 +878,33 @@ def load_report_index(stock_root):
         return d if isinstance(d, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def pdf_fingerprint(path):
+    """PDF 내용 지문: {"sha256", "size", "pages", "text_fp"}. text_fp = sha256(페이지수|첫 페이지 텍스트(공백·줄바꿈 제거))[:16], 추출 실패면 None"""
+    import hashlib
+    out = {"sha256": None, "size": None, "pages": None, "text_fp": None}
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for b in iter(lambda: f.read(1 << 20), b""):
+                h.update(b)
+        out["sha256"] = h.hexdigest()
+        out["size"] = os.path.getsize(path)
+    except OSError:
+        return out
+    try:
+        from pypdf import PdfReader
+        r = PdfReader(path)
+        n = len(r.pages)
+        t = (r.pages[0].extract_text() or "") if n else ""
+        t = re.sub(r"\s+", "", t)
+        out["pages"] = n
+        if t:
+            out["text_fp"] = hashlib.sha256(f"{n}|{t}".encode("utf-8")).hexdigest()[:16]
+    except Exception:
+        pass
+    return out
 
 
 def save_report_index(stock_root, index):
@@ -869,28 +917,48 @@ def save_report_index(stock_root, index):
     os.replace(tmp, p)
 
 
-def record_report(stock_root, message_id, filename):
+def record_report(stock_root, message_id, filename, fp=None, channel=None, original_name=None):
+    """신형 항목으로 기록. fp 는 pdf_fingerprint 결과(없으면 파일명만). 다른 항목(구형 포함)은 건드리지 않는다."""
     if message_id is None:
         return
-    idx = load_report_index(stock_root)
-    idx[str(message_id)] = filename
+    idx = load_report_index_raw(stock_root)
+    fp = fp or {}
+    idx[str(message_id)] = {"filename": filename, "sha256": fp.get("sha256"), "size": fp.get("size"), "text_fp": fp.get("text_fp"),
+                            "pages": fp.get("pages"), "channel": channel, "original_name": original_name,
+                            "saved_at": datetime.now().isoformat(timespec="seconds")}
     save_report_index(stock_root, idx)
 
 
-def find_duplicate(stock_root, message_id=None, new_name=None, original_name=None, existing=None):
-    """중복이면 기존 파일 경로, 아니면 None. (a) .index.json 의 message_id (b) 새 규칙 파일명 (c) 원본 파일명 — 하나라도 맞으면 중복"""
+def find_duplicate_detail(stock_root, message_id=None, new_name=None, original_name=None, existing=None, sha256=None, text_fp=None):
+    """중복이면 (기존 파일 경로, 사유), 아니면 (None, None).
+    (a) .index.json 의 message_id (b) 새 규칙 파일명 (c) 원본 파일명 (d) sha256 일치 (e) text_fp 일치(None 제외) — 하나라도 맞으면 중복"""
     if not stock_root:
-        return None
+        return None, None
     existing = existing if existing is not None else existing_report_files(stock_root)
+    idx = load_report_index(stock_root) if (message_id is not None or sha256 or text_fp) else {}
     if message_id is not None:
-        fn = nfc(load_report_index(stock_root).get(str(message_id)))
+        fn = nfc((idx.get(str(message_id)) or {}).get("filename"))
         if fn and fn in existing:
-            return existing[fn]
-    for nm in (new_name, original_name):
+            return existing[fn], "message_id"
+    for nm, why in ((new_name, "new_name"), (original_name, "original_name")):
         nm = nfc(nm)
         if nm and nm in existing:
-            return existing[nm]
-    return None
+            return existing[nm], why
+    for key, why in (("sha256", "sha256"), ("text_fp", "text_fp")):
+        want = sha256 if key == "sha256" else text_fp
+        if not want:
+            continue
+        for ent in idx.values():
+            if ent.get(key) and ent[key] == want:
+                fn = nfc(ent.get("filename"))
+                if fn and fn in existing:
+                    return existing[fn], why
+    return None, None
+
+
+def find_duplicate(stock_root, message_id=None, new_name=None, original_name=None, existing=None, sha256=None, text_fp=None):
+    """중복이면 기존 파일 경로, 아니면 None (find_duplicate_detail 의 호환 래퍼)"""
+    return find_duplicate_detail(stock_root, message_id, new_name, original_name, existing, sha256, text_fp)[0]
 
 
 def _unique_path(directory, filename):
@@ -1011,13 +1079,24 @@ async def _search_and_download(job_id, channel_username, keyword, date_from, dat
             return
 
         def _copy_to_drive():
-            if stocks:                      # 종목 폴더: 파일마다 자기 종목 폴더/리포트/ 로 옮기고 .index.json 에 기록
+            if stocks:                      # 종목 폴더: 파일마다 자기 종목 폴더/리포트/ 로 옮기고 .index.json 에 기록 (내용 지문 중복이면 저장하지 않음)
                 for lp, dest_dir, root, mid, fn in staged:
+                    fp = pdf_fingerprint(lp)
+                    dup, why = find_duplicate_detail(root, None, None, None, None, fp.get("sha256"), fp.get("text_fp"))
+                    if dup and why in ("sha256", "text_fp"):
+                        print(f"[report] 중복 건너뜀: {fn} = {os.path.basename(dup)} ({why})", flush=True)
+                        record_report(root, mid, os.path.basename(dup), fp, channel_username, fn)
+                        try:
+                            os.remove(lp)
+                        except OSError:
+                            pass
+                        job["skipped"] = job.get("skipped", 0) + 1
+                        continue
                     os.makedirs(dest_dir, exist_ok=True)
                     dst = os.path.join(dest_dir, fn)
                     if not os.path.exists(dst):
                         shutil.move(lp, dst)
-                    record_report(root, mid, fn)
+                    record_report(root, mid, fn, fp, channel_username, fn)
                 shutil.rmtree(local_staging, ignore_errors=True)
                 parent = os.path.dirname(local_staging)
                 if os.path.isdir(parent) and not os.listdir(parent):
