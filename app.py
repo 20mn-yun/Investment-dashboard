@@ -3610,6 +3610,12 @@ def _krfin_prefetch_run(reason):
             results[key] += ", 컨콜 " + " ".join(f"{c['quarter']}:{c.get('transcript')}/{c.get('summary', '-')}" for c in calls)
         except Exception as e:
             results[key] += f", 컨콜 실패({type(e).__name__})"
+        try:   # 증권사 리포트(미국): 한글명·영문명 검색 → 관련성 판정 → 받기 → AI 정리 (ai_budget reports_us 한도)
+            rj = stock_reports.run_blocking("US", code, items_name.get(code, ""))
+            results[f"reports:US_{code}"] = (f"{rj.get('stage')} 검색 {rj.get('found', 0)}/판정 {rj.get('relevance_checked', 0)}/신규 {rj.get('new', 0)}/AI {rj.get('ai_done', 0)}"
+                                             + (f" ({rj.get('error')})" if rj.get("error") else ""))
+        except Exception as e:
+            results[f"reports:US_{code}"] = f"실패({type(e).__name__})"
     # 관련 기업(확정)의 재무 저장본·최근 컨콜 요약 (한도 안에서)
     for it in items:
         try:

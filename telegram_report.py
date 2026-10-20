@@ -170,6 +170,25 @@ def _ai_relevance_detail(filename, caption, watchlist):
     return _ai_relevance_detail_from_prompt(_relevance_prompt(filename, caption, watchlist))
 
 
+def relevance_us(filename, caption, company_en, ticker):
+    """미국 종목 리포트 관련성: 파일명 + 본문 500자 로 '<영문명>(<티커>) 기업에 대한 증권사 리포트인가' 판정. 반환 True/False/None(실패).
+    판정 경로(Sonnet → Gemini → None)는 한국과 같은 _ai_relevance_detail_from_prompt 를 쓴다."""
+    prompt = (
+        "너는 증권사 리포트 필터다. 아래는 텔레그램 채널에 올라온 리포트의 파일명과 메시지 본문 일부다.\n\n"
+        f"대상 기업: {company_en} ({ticker})\n\n"
+        f"파일명: {filename}\n"
+        f"본문: {(caption or '')[:500]}\n\n"
+        f"질문: 이 자료가 {company_en}({ticker}) 기업에 대한 증권사 리포트인가?\n\n"
+        "판정 규칙을 순서대로 적용해라.\n"
+        "규칙 1 (무조건 NO): 시황·마감시황·데일리·위클리·월간전망·투자전략·자산배분·퀀트·파생·ETF·채권·환율·매크로 같은 정기 시장 요약·전략 자료.\n"
+        "규칙 2 (YES): 규칙 1에 해당하지 않고, 이 기업을 주요 분석 대상으로 하는 개별 기업 리포트(실적 리뷰·프리뷰·기업분석·탐방 포함)이거나, "
+        "이 기업이 제목이나 본문의 핵심 주제인 산업 리포트.\n"
+        "규칙 3: 그 외는 전부 NO. 이름만 비슷한 다른 회사·상품(예: Metal Futures 는 META 가 아니다, Muse 는 MU 가 아니다)도 NO.\n\n"
+        "답은 YES 또는 NO 한 단어만 출력해라."
+    )
+    return _ai_relevance_detail_from_prompt(prompt)[0]
+
+
 def _relevance_log_label(sonnet, gemini):
     lab = lambda v: "YES" if v is True else "NO" if v is False else "FAIL"
     s = f"sonnet={lab(sonnet)}"

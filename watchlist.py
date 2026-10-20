@@ -23,6 +23,11 @@ DART_CORP_MAP_FILE = os.path.join(_BD, "dart_corp_map.json")
 US_STOCK_MAP_FILE = os.path.join(_BD, "us_stock_map.json")
 
 MARKETS = ("KR", "US")
+# 미국 종목 한글명(텔레그램 리포트 검색어). 항목의 name_kr 이 비어 있으면 이 기본값을 쓴다. (A1)
+US_NAME_KR_DEFAULTS = {
+    "AAPL": "애플", "MSFT": "마이크로소프트", "GOOGL": "알파벳", "AMZN": "아마존", "NVDA": "엔비디아", "META": "메타",
+    "MU": "마이크론", "GEV": "GE버노바", "SNDK": "샌디스크", "VLO": "발레로", "MPC": "마라톤페트롤리엄", "PSX": "필립스66", "TDW": "타이드워터",
+}
 _lock = threading.RLock()
 
 
@@ -102,10 +107,24 @@ def _now():
 
 # ===== 조회 =====
 def load_watchlist():
-    """[{market, code, name, added_at}, ...] (추가 순서)"""
+    """[{market, code, name, added_at, name_kr}, ...] (추가 순서). name_kr 은 선택 필드(없으면 None; 미국은 기본값 표에서 보충)"""
     with _lock:
         data = _read_json(WATCHLIST_FILE, [])
-        return data if isinstance(data, list) else []
+        items = data if isinstance(data, list) else []
+    for it in items:
+        if not it.get("name_kr"):
+            it["name_kr"] = US_NAME_KR_DEFAULTS.get(it.get("code")) if it.get("market") == "US" else None
+    return items
+
+
+def get_name_kr(market, code):
+    """종목 한글명(리포트 검색어). 워치리스트 항목 → 미국 기본값 → None"""
+    m = (market or "").strip().upper()
+    c = normalize_code(m, code)
+    for it in load_watchlist():
+        if it.get("market") == m and it.get("code") == c:
+            return it.get("name_kr") or None
+    return US_NAME_KR_DEFAULTS.get(c) if m == "US" else None
 
 
 def is_in_watchlist(market, code):

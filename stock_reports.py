@@ -111,10 +111,13 @@ def name_variants(market, code, name):
                 break
     if market == "KR" and re.fullmatch(r"[0-9A-Z]{6}", str(code)):
         out.append(str(code))
-    if market == "US":
-        out.append(str(code).upper())
+    if market == "US":   # 미국: 한글명(워치리스트 name_kr) + 영문 첫 단어(5자 이상). 티커·전체 이름은 오탐이 많아 쓰지 않는다 (A2)
+        out = []
+        kr = watchlist_store.get_name_kr("US", code)
+        if kr:
+            out.append(kr)
         first = re.split(r"[\s,.-]+", name)[0] if name else ""
-        if len(first) >= 4 and first.lower() not in ("the", "common", "class"):
+        if len(first) >= 5 and first.lower() not in ("the", "common", "class"):
             out.append(first)
     seen, uniq = set(), []
     for v in out:
@@ -144,6 +147,7 @@ def search_reports(market, code, name, months=MONTHS, limit=MAX_PER_STOCK):
         return [], {"variants": [], "raw": 0, "excluded_issuer": 0, "dedup": 0}
     variants = name_variants(market, code, name)
     if not variants:
+        print(f"[stock_reports] {market} {code} 검색어 없음(한글명·영문명 모두 없음) → 검색 건너뜀", flush=True)
         return [], {"variants": [], "raw": 0, "excluded_issuer": 0, "dedup": 0}
     since = (date.today() - timedelta(days=30 * months)).isoformat()
     conds, params = [], []
@@ -333,9 +337,9 @@ AI_SYSTEM = """당신은 한국 증권사 리포트를 구조화하는 분석 �
  "목표주가이력": [{"날짜": "YYYY-MM-DD", "목표주가": 0, "투자의견": ""}]}"""
 
 
-def _ai_allowed():
-    """일일 한도(ai_budget kind='reports', 기본 AI_DAILY_LIMIT) 확인 + 카운터 증가. 반환 (허용 여부, 오늘 호출 수)"""
-    return ai_budget.take("reports")
+def _ai_allowed(market="KR"):
+    """일일 한도 확인 + 카운터 증가. 한국 reports(300) / 미국 reports_us(80) 별도. 반환 (허용 여부, 오늘 호출 수)"""
+    return ai_budget.take("reports_us" if market == "US" else "reports")
 
 
 def _parse_json(text):
@@ -348,6 +352,11 @@ def _parse_json(text):
 
 UNIT_TO_EOK = {"억원": 1, "억": 1, "십억원": 10, "십억": 10, "조원": 10000, "조": 10000, "백만원": 0.01, "백만": 0.01,
                "천억원": 1000, "백억원": 100, "십만원": 0.001, "만원": 0.0001}
+UNIT_TO_MUSD = {"백만달러": 1, "백만불": 1, "백만USD": 1, "십억달러": 1000, "십억불": 1000, "십억USD": 1000, "억달러": 100, "억불": 100,
+                "천달러": 0.001, "천불": 0.001, "달러": 0.000001, "USD": 0.000001, "$M": 1, "$B": 1000, "M": 1, "B": 1000}
+MARKET_UNIT = {"KR": "억원", "US": "백만달러"}
+MARKET_CURRENCY = {"KR": "KRW", "US": "USD"}
+UNIT_SUSPECT_LOW, UNIT_SUSPECT_HIGH = 0.2, 5.0   # 추정 매출 / 최근 연간 매출 비율이 이 범위 밖이면 단위 의심 (A4)
 
 
 def _to_eok(v, unit):
@@ -358,6 +367,84 @@ def _to_eok(v, unit):
         if u.startswith(k):
             return round(float(v) * UNIT_TO_EOK[k], 1)
     return None if u and "원" not in u else float(v)   # 단위 모르면 그대로(억원 가정) — 달러 등은 None
+
+
+def _to_musd(v, unit):
+    if v is None:
+        return None
+    u = (unit or "").replace(" ", "")
+    for k in sorted(UNIT_TO_MUSD, key=len, reverse=True):
+        if u.lower().startswith(k.lower()):
+            return round(float(v) * UNIT_TO_MUSD[k], 1)
+    return None if u and ("원" in u) else float(v)       # 단위 모르면 그대로(백만달러 가정) — 원화 표기는 None
+
+
+def _to_unit(v, unit, market):
+    """시장별 표시 단위로 환산: 한국 억원, 미국 백만달러"""
+    return _to_musd(v, unit) if market == "US" else _to_eok(v, unit)
+
+
+def annual_revenue(market, code, name=""):
+    """최근 연간 매출(시장별 표시 단위: 한국 억원, 미국 백만달러). 저장본이 없으면 None — 자릿수 검증용"""
+    try:
+        if market == "US":
+            import us_financials as fm
+            cache = fm._load_cache(code)
+            if not cache or not cache.get("facts"):
+                return None
+            fin = fm.compute(cache, 5, name, persist=False)
+            div = 1e6
+        else:
+            import kr_financials as fm
+            cache = fm._load_cache(code)
+            if not cache or not cache.get("acc_mt"):
+                return None
+            fin = fm.compute(cache, 5, name)
+            div = 1e8
+        ann = ((((fin.get("statements") or {}).get("IS") or {}).get("items") or {}).get("revenue") or {}).get("annual") or {}
+        labels = (fin.get("periods") or {}).get("annual") or []
+        for lb in reversed(labels):
+            v = ann.get(lb)
+            if v:
+                return float(v) / div
+    except Exception:
+        return None
+    return None
+
+
+def check_unit_suspect(rec, annual_rev):
+    """추정 매출(가장 가까운 추정 연도)이 최근 연간 매출의 0.2배 미만·5배 초과면 unit_suspect=True. 연간 매출 없으면 검증 생략(False)."""
+    rec["unit_suspect"] = False
+    rec["unit_check"] = None
+    if not annual_rev:
+        return rec
+    ests = [e for e in rec.get("estimates") or [] if e.get("revenue") and re.match(r"^20\d\dE$", str(e.get("period") or ""))]
+    if not ests:
+        return rec
+    e = sorted(ests, key=lambda x: x["period"])[0]
+    ratio = float(e["revenue"]) / annual_rev
+    rec["unit_check"] = {"period": e["period"], "est_revenue": e["revenue"], "annual_revenue": round(annual_rev, 1), "ratio": round(ratio, 3)}
+    if ratio < UNIT_SUSPECT_LOW or ratio > UNIT_SUSPECT_HIGH:
+        rec["unit_suspect"] = True
+    return rec
+
+
+def reverify_units(market, code, name=""):
+    """저장된 summaries 전체에 자릿수 검증을 다시 적용(AI 호출 없음). 반환 (검사 건수, unit_suspect 건수)"""
+    sp = _sum_path(market, code)
+    summaries = _load_json(sp, {})
+    ann = annual_revenue(market, code, name)
+    n = k = 0
+    for rec in summaries.values():
+        if rec.get("status") != "ok":
+            continue
+        rec.setdefault("currency", MARKET_CURRENCY.get(market, "KRW"))
+        check_unit_suspect(rec, ann)
+        n += 1
+        k += 1 if rec.get("unit_suspect") else 0
+    if summaries:
+        _save_json(sp, summaries)
+    return n, k
 
 
 def _norm_period(lb):
@@ -389,10 +476,12 @@ def _num(v):
         return None
 
 
-def normalize_summary(raw, item, price=None):
-    """AI 응답 → 저장 형식. 단위 억원 통일, 기간 라벨 정규화, 목표주가 범위 검사"""
+def normalize_summary(raw, item, price=None, market="KR"):
+    """AI 응답 → 저장 형식. 단위 시장별 통일(한국 억원·미국 백만달러), 기간 라벨 정규화, 목표주가 범위 검사"""
+    unit_out = MARKET_UNIT.get(market, "억원")
     out = {
         "message_id": item["message_id"], "channel": item["channel"], "date": item.get("date"), "filename": item.get("filename"),
+        "currency": MARKET_CURRENCY.get(market, "KRW"),
         "broker": (raw.get("증권사") or item.get("broker") or None), "analyst": raw.get("애널리스트") or None,
         "published": raw.get("발행일") or (item.get("date") or "")[:10], "type": raw.get("리포트유형") or None,
         "opinion": raw.get("투자의견") or None, "target": _num(raw.get("목표주가")), "prev_target": _num(raw.get("이전목표주가")),
@@ -404,8 +493,8 @@ def normalize_summary(raw, item, price=None):
             continue
         unit = e.get("단위") or ""
         out["estimates"].append({"period": _norm_period(e.get("기간")), "period_raw": e.get("기간"),
-                                 "revenue": _to_eok(_num(e.get("매출액")), unit), "operating_income": _to_eok(_num(e.get("영업이익")), unit),
-                                 "net_income": _to_eok(_num(e.get("순이익")), unit), "eps": _num(e.get("EPS")), "unit_raw": unit, "unit": "억원"})
+                                 "revenue": _to_unit(_num(e.get("매출액")), unit, market), "operating_income": _to_unit(_num(e.get("영업이익")), unit, market),
+                                 "net_income": _to_unit(_num(e.get("순이익")), unit, market), "eps": _num(e.get("EPS")), "unit_raw": unit, "unit": unit_out})
     for h in raw.get("목표주가이력") or []:
         if isinstance(h, dict) and _num(h.get("목표주가")):
             d = str(h.get("날짜") or "")
@@ -425,7 +514,7 @@ def normalize_summary(raw, item, price=None):
     return out
 
 
-def summarize_one(market, code, name, item, pdf_path, price=None):
+def summarize_one(market, code, name, item, pdf_path, price=None, annual_rev=None):
     """PDF 1건 → AI 정리 결과(dict). AI 를 부르지 않은 경우 status 에 이유."""
     import us_financials
     base = {"message_id": item["message_id"], "channel": item["channel"], "date": item.get("date"), "filename": item.get("filename"),
@@ -437,7 +526,7 @@ def summarize_one(market, code, name, item, pdf_path, price=None):
     base.update(pages=n_pages, chars=n_chars)
     if n_chars < MIN_TEXT_CHARS:
         return dict(base, status="no_text", text_ok=False)
-    allowed, n = _ai_allowed()
+    allowed, n = _ai_allowed(market)
     if not allowed:
         return dict(base, status="ai_limit", ai_pending=True)
     user = (f"종목: {name} ({code})\n파일명: {item.get('filename')}\n텔레그램 게시: {item.get('date')}\n"
@@ -455,8 +544,9 @@ def summarize_one(market, code, name, item, pdf_path, price=None):
             err = type(e).__name__
     if raw is None:
         return dict(base, status=f"ai_error:{err}", tokens=tokens)
-    out = normalize_summary(raw, item, price)
+    out = normalize_summary(raw, item, price, market)
     out.update(base, tokens=tokens, status="ok", text_ok=True, pages=n_pages, chars=n_chars, broker=out["broker"] or item.get("broker"))
+    check_unit_suspect(out, annual_rev)
     return out
 
 
@@ -499,6 +589,8 @@ def aggregate(summaries, price=None):
     traj.sort(key=lambda x: (x["date"] or "", x["broker"] or ""))
     est = {}
     for s in sorted(ok, key=lambda x: x.get("published") or ""):
+        if s.get("unit_suspect"):
+            continue                                     # 단위 의심 레코드의 추정실적은 집계에서 제외 (A4)
         for e in s.get("estimates") or []:
             per = _norm_period(e.get("period"))          # 저장 뒤 규칙이 바뀌어도 집계 때 다시 정규화 (지난 연도는 A)
             if not per or not per.endswith("E"):
@@ -518,7 +610,7 @@ def aggregate(summaries, price=None):
         "target_upside_pct": round((mean / price - 1) * 100, 1) if mean and price else None,
         "brokers_n": len(latest_by_broker), "opinion_dist": dist,
         "trajectory": traj, "estimates": est_table,
-        "reports_ok": len(ok), "reports_total": len(summaries),
+        "reports_ok": len(ok), "reports_total": sum(1 for s in summaries.values() if s.get("status") not in ("duplicate", "irrelevant")),
     }
 
 
@@ -528,15 +620,18 @@ def _render_summary_md(name, code, items, summaries):
     lines = [f"# {name} ({code}) 리포트 요약", "", f"- 갱신: {_now()}", f"- 리포트 {len(items) - n_dup}건, AI 정리 {sum(1 for s in summaries.values() if s.get('status') == 'ok')}건" + (f", 중복 제외 {n_dup}건" if n_dup else ""), ""]
     for it in sorted(items, key=lambda x: x.get("date") or "", reverse=True):
         s = summaries.get(str(it["message_id"])) or {}
-        if s.get("status") == "duplicate":
+        if s.get("status") in ("duplicate", "irrelevant"):
             continue
         lines.append(f"## {(it.get('date') or '')[:10]} · {s.get('broker') or it.get('broker') or '-'} · {re.sub(r'\\.pdf$', '', it.get('filename') or '', flags=re.I)}")
         if s.get("status") == "ok":
             lines.append(f"- 유형 {s.get('type') or '-'} · 투자의견 {s.get('opinion') or '-'} · 목표주가 {int(s['target']):,} " if s.get("target") else f"- 유형 {s.get('type') or '-'} · 투자의견 {s.get('opinion') or '-'} · 목표주가 -")
             for line in s.get("summary") or []:
                 lines.append(f"  - {line}")
-            for e in s.get("estimates") or []:
-                lines.append(f"  - {e['period']}: 매출 {e.get('revenue')} / 영업이익 {e.get('operating_income')} / 순이익 {e.get('net_income')} (억원), EPS {e.get('eps')}")
+            if s.get("unit_suspect"):
+                lines.append("  - (단위 의심) 추정실적 생략")
+            else:
+                for e in s.get("estimates") or []:
+                    lines.append(f"  - {e['period']}: 매출 {e.get('revenue')} / 영업이익 {e.get('operating_income')} / 순이익 {e.get('net_income')} ({e.get('unit') or '억원'}), EPS {e.get('eps')}")
         elif s.get("status") == "no_text":
             lines.append("- 텍스트 추출 불가(이미지 PDF)")
         else:
@@ -720,14 +815,37 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
             st["search_stats"] = stats
             st["updated_at"] = _now()
             _save_json(_state_path(market, code), st)
+        summaries = _load_json(_sum_path(market, code), {})
+        if market == "US":   # 미국 후보: 관련성 판정(Sonnet) 전에는 다운로드·AI 정리 금지. NO 는 summaries 에 irrelevant 로 남겨 재판정 안 함 (A3)
+            n_rel = 0
+            for it in st["items"].values():
+                k = str(it["message_id"])
+                if it.get("relevance") == "YES" or (summaries.get(k) or {}).get("status") == "irrelevant" or it.get("pdf"):
+                    continue
+                verdict = telegram_report.relevance_us(it.get("filename") or "", it.get("text_preview") or "", name, code)
+                n_rel += 1
+                if verdict is True:
+                    it["relevance"] = "YES"
+                elif verdict is False:
+                    it["relevance"] = "NO"
+                    summaries[k] = {"message_id": it["message_id"], "channel": it.get("channel"), "date": it.get("date"), "filename": it.get("filename"),
+                                    "status": "irrelevant", "summarized_at": _now()}
+            if n_rel:
+                _save_json(_sum_path(market, code), summaries)
+                _save_json(_state_path(market, code), st)
+            job["relevance_checked"] = n_rel
+        irrelevant = {k for k, s in summaries.items() if s.get("status") == "irrelevant"}
+        job["found"] = len(st["items"])
         # 이미 받은 로컬 사본인데 Drive 사본이 없거나(옛 폴더가 지워진 경우 등) 경로가 사라졌으면 Drive 종목 폴더로 다시 복사 (다운로드 없음)
         for it in st["items"].values():
             lp = os.path.join(_BD, it["pdf"]) if it.get("pdf") else None
             if lp and os.path.isfile(lp) and not (it.get("drive") and os.path.isfile(it["drive"])):
                 dst, derr = _copy_to_drive(lp, name, code, it, market)
                 it["drive"], it["drive_error"] = dst, derr
-        todo = [it for it in st["items"].values() if not it.get("pdf")]
+        todo = [it for it in st["items"].values() if not it.get("pdf") and str(it["message_id"]) not in irrelevant
+                and (market != "US" or it.get("relevance") == "YES")]
         job.update(stage="downloading", done=0, total=len(todo))
+        job["new"] = len(todo)
         for n, it in enumerate(todo, 1):
             p, err = download_one(market, code, name, it)
             if p:
@@ -744,6 +862,7 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
             job.update(done=n)
             _save_json(_state_path(market, code), st)
         summaries = _load_json(_sum_path(market, code), {})
+        annual_rev = annual_revenue(market, code, name)   # 추정실적 자릿수 검증용 (A4)
         for it in st["items"].values():   # 내용 지문으로 중복 판정된 항목: AI 정리·집계·표시에서 제외
             k = str(it["message_id"])
             if it.get("duplicate_of") and (summaries.get(k) or {}).get("status") != "duplicate":
@@ -751,15 +870,16 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
                                 "status": "duplicate", "duplicate_of": it["duplicate_of"], "duplicate_why": it.get("duplicate_why"), "summarized_at": _now()}
         _save_json(_sum_path(market, code), summaries)
         price = _current_price(market, code)
-        pend = [it for it in st["items"].values() if it.get("pdf") and (summaries.get(str(it["message_id"])) or {}).get("status") != "duplicate"
+        pend = [it for it in st["items"].values() if it.get("pdf") and (summaries.get(str(it["message_id"])) or {}).get("status") not in ("duplicate", "irrelevant")
                 and (str(it["message_id"]) not in summaries or (summaries.get(str(it["message_id"])) or {}).get("ai_pending"))]
         pend.sort(key=lambda x: x.get("date") or "", reverse=True)
         if ai_limit is not None:
             pend = pend[:ai_limit]
         job.update(stage="summarizing", done=0, total=len(pend))
         for n, it in enumerate(pend, 1):
-            res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price)
+            res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price, annual_rev)
             summaries[str(it["message_id"])] = res
+            job["ai_done"] = job.get("ai_done", 0) + (1 if res.get("status") == "ok" else 0)
             if res.get("status") == "ok" and res.get("broker"):
                 rename_if_broker_found(market, code, name, it, res["broker"])      # '미확인' → 증권사 이름으로 (4-D)
             _save_json(_sum_path(market, code), summaries)
@@ -807,14 +927,16 @@ def status(market, code, name="", start=True, ai_limit=None):
     items = []
     for it in sorted(st["items"].values(), key=lambda x: x.get("date") or "", reverse=True):
         s = summaries.get(str(it["message_id"])) or {}
-        if s.get("status") == "duplicate":
+        if s.get("status") in ("duplicate", "irrelevant"):
             continue
         items.append({
+            "currency": s.get("currency") or MARKET_CURRENCY.get(market, "KRW"), "unit_suspect": bool(s.get("unit_suspect")),
             "message_id": it["message_id"], "channel": it["channel"], "date": it.get("date"), "filename": it.get("filename"),
             "title": re.sub(r"\.pdf$", "", it.get("filename") or "", flags=re.I).replace("_", " "),
             "broker": s.get("broker") or it.get("broker"), "analyst": s.get("analyst"), "type": s.get("type"),
             "opinion": s.get("opinion"), "target": s.get("target"), "prev_target": s.get("prev_target"), "target_change": s.get("target_change"),
-            "summary": s.get("summary") or [], "estimates": s.get("estimates") or [], "flags": s.get("flags") or [],
+            "summary": s.get("summary") or [], "estimates": [] if s.get("unit_suspect") else (s.get("estimates") or []),
+            "flags": (s.get("flags") or []) + (["(단위 의심) 추정실적 숨김"] if s.get("unit_suspect") else []),
             "downloaded": bool(it.get("pdf")), "download_error": it.get("error"), "drive": it.get("drive"),
             "file": f"{it['message_id']}.pdf" if it.get("pdf") else None,
             "file_url": f"/api/stock/reports/file?market={market}&code={code}&name={it['message_id']}.pdf" if it.get("pdf") else None,

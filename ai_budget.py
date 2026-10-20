@@ -22,6 +22,7 @@ DEFAULT_LIMITS = {
     "call_summary": 20,      # 3-B 컨콜 요약
     "call_translate": 5,     # 3-B 컨콜 전문 번역 (녹취록 1건 = 1건)
     "peers": 50,             # 3-C 관련 기업 제안
+    "reports_us": 80,        # 3-A 미국 종목 리포트 정리 (한국 reports 와 별도 한도)
 }
 
 _lock = threading.Lock()
