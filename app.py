@@ -3408,7 +3408,13 @@ def _save_excel():
                     sector = s[2]
                     break
         doc = _dart_doc(it.get("rcept_no", ""))
-        summary = _gemini(f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") if doc else ""
+        summary = ""
+        if doc:
+            _p = f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}"
+            summary = _llm("dart_excel_line", _p)                       # Codex(gpt-6-luna) 1차
+            if not summary:
+                logger.warning("[llm] dart_excel_line 실패 → gemini 폴백: %s", it.get("corp_name", ""))
+                summary = _gemini(_p)
         ratio = ""
         try:
             if mc_s and op_s:

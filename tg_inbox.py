@@ -788,21 +788,30 @@ def _build_classify_prompt(batch, topics, topic_definitions, corrections=None):
 
 
 def _gemini_classify(batch, topics, topic_definitions, corrections=None):
+    """텍스트 글 토픽 분류 — llm_client(task tg_topic, Sonnet) 로 이전. 함수 이름은 호출부 호환을 위해 유지.
+    실패 시 RuntimeError (호출부의 기존 재시도·실패 흐름 그대로). 이미지 분류·OCR 은 Gemini 유지."""
+    import llm_client
     prompt = _build_classify_prompt(batch, topics, topic_definitions, corrections)
-    raw = _gemini(prompt)
-    if not raw or not raw.strip():
-        raise RuntimeError("empty gemini response (quota/network)")
+    r = llm_client.complete("tg_topic", prompt, json_mode=True)
+    if r.ok and isinstance(r.data, list):
+        arr = r.data
+    else:
+        if not r.ok and r.error != "json_parse_failed":
+            logger.warning("[llm] tg_topic 실패: %s%s", (r.error or "unknown")[:200], f" (fallback: {r.fallback_reason})" if r.fallback else "")
+            raise RuntimeError(f"llm_client[tg_topic] {r.error}")
+        raw = r.text or ""                                  # JSON 파싱 실패: 기존 파싱 로직으로 text 재시도
+        if not raw.strip():
+            raise RuntimeError("empty llm response (tg_topic)")
+        try:
+            mm = re.search(r"\[[\s\S]*\]", raw)
+            arr = json.loads(mm.group()) if mm else []
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            logger.warning("[llm] tg_topic JSON 파싱 실패: %s: %r", type(e).__name__, raw[:120])
+            return {}
     out = {}
-    try:
-        mm = re.search(r"\[[\s\S]*\]", raw)
-        if mm:
-            arr = json.loads(mm.group())
-            for o in arr:
-                if isinstance(o, dict) and o.get("id") is not None:
-                    out[str(o["id"])] = o.get("topic")
-    except (json.JSONDecodeError, ValueError, TypeError) as e:
-        _gemini_warn("_gemini_classify", f"JSON 파싱 {type(e).__name__}: {raw[:120]!r}")
-        return {}
+    for o in arr:
+        if isinstance(o, dict) and o.get("id") is not None:
+            out[str(o["id"])] = o.get("topic")
     return out
 
 
@@ -848,9 +857,15 @@ def _gemini_image_classify(item, topics, topic_definitions, corrections=None):
         + "반드시 JSON 단일 객체만 출력하고 다른 텍스트는 출력하지 마라.\n"
         '형식: {"topic":"..."}'
     )
-    raw = _gemini_image(prompt, path)
+    import llm_client
+    r = llm_client.complete("tg_image_topic", prompt, images=[path])          # Codex(gpt-6.1-sol) 1차
+    if r.ok:
+        raw = r.text or ""
+    else:
+        logger.warning("[llm] tg_image_topic 실패 → gemini: %s", (r.error or "unknown")[:200])
+        raw = _gemini_image(prompt, path)                                   # Gemini 폴백 (429 는 RateLimitError 그대로)
     if not raw or not raw.strip():
-        raise RuntimeError("empty gemini response (quota/network)")
+        raise RuntimeError("empty image-classify response (llm+gemini)")
     try:
         mm = re.search(r"\{[\s\S]*\}", raw)
         if mm:
@@ -1030,7 +1045,18 @@ def _tg_send_photo(image_path, caption):
 
 
 def _gemini_vision(prompt, image_path, model, timeout=120):
-    """설정된 상위 비전 모델로 이미지 1장을 전사. 429는 RateLimitError, 그 외 실패는 ""."""
+    """이미지 1장 전사: Codex(task tg_ocr, gpt-6.1-sol) 1차 → 실패 시 Gemini 비전(_gemini_vision_api) 폴백.
+    함수 이름·시그니처는 호출부 호환을 위해 유지. 429 는 Gemini 폴백 단계에서만 RateLimitError."""
+    import llm_client
+    r = llm_client.complete("tg_ocr", prompt, images=[image_path])
+    if r.ok and (r.text or "").strip():
+        return r.text
+    logger.warning("[llm] tg_ocr 실패 → gemini(%s): %s", model, (r.error or "empty")[:200])
+    return _gemini_vision_api(prompt, image_path, model, timeout)
+
+
+def _gemini_vision_api(prompt, image_path, model, timeout=120):
+    """Gemini 비전 모델로 이미지 1장을 전사(폴백 전용). 429는 RateLimitError, 그 외 실패는 ""."""
     try:
         with open(image_path, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1074,16 +1100,13 @@ def _gemini_vision(prompt, image_path, model, timeout=120):
 
 
 def _transcribe_one(image_path, model):
-    """이미지 1장 전사. 실패 시 재시도 1회(총 2회). 최종 실패면 "" 반환."""
-    for attempt in range(2):
-        try:
-            txt = _gemini_vision(_TRANSCRIBE_PROMPT, image_path, model)
-        except RateLimitError:
-            time.sleep(20)
-            continue
-        if txt and txt.strip():
-            return txt.strip()
-    return ""
+    """이미지 1장 전사 1회(Codex → Gemini 폴백은 _gemini_vision 안에서 처리). 최종 실패면 "" 반환."""
+    try:
+        txt = _gemini_vision(_TRANSCRIBE_PROMPT, image_path, model)
+    except RateLimitError:
+        logger.warning("[gemini] _transcribe_one: 폴백 Gemini 429 — 이번 전사 건너뜀")
+        return ""
+    return txt.strip() if txt and txt.strip() else ""
 
 
 def transcribe_item_images(item_id):

@@ -1,7 +1,10 @@
-"""LLM 공통 클라이언트: Claude Code CLI(구독 로그인)를 기본으로 쓰고, 실패하면 Anthropic API(Haiku)로 폴백한다.
+"""LLM 공통 클라이언트: Claude Code CLI(구독 로그인)를 기본으로 쓰고, 실패하면 폴백 체인(기본 codex → api) 순서로 넘어간다.
 
-사용: result = llm_client.complete("reports", prompt, system=..., json_mode=True); result.ok / result.text / result.data
-설정(환경변수): LLM_BACKEND=cli|api, LLM_CLI_PATH, LLM_API_FALLBACK=1|0, LLM_MAX_CONCURRENT
+백엔드: cli(Claude Code CLI) · codex(OpenAI Codex CLI, ChatGPT 구독) · api(Anthropic API Haiku)
+사용: result = llm_client.complete("reports", prompt, system=..., json_mode=True, images=[...]); result.ok / result.text / result.data
+      images(경로 리스트)가 있으면 codex 로 강제되고, 실패해도 api 로 가지 않는다(호출부가 Gemini 등으로 폴백).
+설정(환경변수): LLM_BACKEND=cli|codex|api, LLM_CLI_PATH, LLM_CODEX_PATH, LLM_FALLBACK_CHAIN(기본 "codex,api"), LLM_API_FALLBACK=1|0,
+      LLM_MAX_CONCURRENT(Claude), LLM_CODEX_MAX_CONCURRENT(Codex)
 로그: logs/llm_calls.jsonl (호출 1건 1줄)
 """
 import json
@@ -10,6 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, asdict, field
@@ -23,12 +27,15 @@ TASK_TIERS = {
     "us_wrap": "opus", "moat": "opus",
     "call_summary": "sonnet", "news_rank": "sonnet", "stock_intro": "sonnet", "biz_overview": "sonnet",
     "peers": "sonnet", "dart_watch_summary": "sonnet", "dart_detail": "sonnet", "earnings_extract": "sonnet",
-    "reports": "sonnet",
-    "concept_map": "haiku", "ksic": "haiku", "call_translate": "haiku", "stock_news": "haiku",
+    "reports": "sonnet", "tg_topic": "sonnet", "report_relevance": "sonnet", "tg_image_topic": "sonnet", "tg_ocr": "sonnet",
+    "concept_map": "haiku", "ksic": "haiku", "call_translate": "haiku", "stock_news": "haiku", "dart_excel_line": "haiku",
 }
-TASK_BACKEND = {"call_translate": "api"}
+TASK_BACKEND = {"call_translate": "api",            # 값: "cli" | "codex" | "api". codex 지정 task 는 Claude CLI 를 거치지 않는다
+                "tg_image_topic": "codex", "tg_ocr": "codex", "dart_excel_line": "codex"}   # 옛 Gemini 자리: 이미지 2종 + 엑셀 1줄
+CODEX_MODELS = {"default": "gpt-6.1-sol", "fast": "gpt-6-luna"}   # opus/sonnet → default, haiku → fast
+CODEX_IMAGE_TIMEOUT = 240
 API_MODELS = {"haiku": "claude-haiku-4-5-20251001", "sonnet": "claude-haiku-4-5-20251001", "opus": "claude-haiku-4-5-20251001"}
-TASK_TIMEOUTS = {"call_translate": 600, "call_summary": 180}
+TASK_TIMEOUTS = {"call_translate": 600, "call_summary": 180, "tg_ocr": 240}
 DEFAULT_TIMEOUT = 120
 TASK_BUDGET_USD = {"call_translate": 1.50, "call_summary": 1.50}
 DEFAULT_BUDGET_USD = 0.50
@@ -43,6 +50,7 @@ KST = timezone(timedelta(hours=9))
 logger = logging.getLogger("llm_client")
 _log_lock = threading.Lock()
 _sem = threading.Semaphore(max(1, int(os.environ.get("LLM_MAX_CONCURRENT", "2") or 2)))
+_codex_sem = threading.Semaphore(max(1, int(os.environ.get("LLM_CODEX_MAX_CONCURRENT", "2") or 2)))
 
 try:
     from dotenv import load_dotenv
@@ -94,6 +102,25 @@ def _cli_env():
     if "/Users/yun/.local/bin" not in path.split(":"):
         env["PATH"] = "/Users/yun/.local/bin" + (":" + path if path else "")
     return env
+
+
+def _codex_path():
+    return os.environ.get("LLM_CODEX_PATH") or "/Users/yun/.local/bin/codex"
+
+
+def _codex_model(tier):
+    return CODEX_MODELS["fast"] if tier == "haiku" else CODEX_MODELS["default"]
+
+
+def _codex_env():
+    env = _cli_env()
+    env.pop("OPENAI_API_KEY", None)                     # 있으면 구독 대신 API 과금으로 가므로 제거
+    return env
+
+
+def _fallback_chain():
+    raw = os.environ.get("LLM_FALLBACK_CHAIN") or "codex,api"
+    return [x.strip().lower() for x in raw.split(",") if x.strip()]
 
 
 def _strip_fences(text):
@@ -202,6 +229,84 @@ def _run_cli(task, tier, prompt, system, timeout):
     return res, None
 
 
+def _run_codex(task, tier, prompt, system, timeout, images=None):
+    """OpenAI Codex CLI(비대화 exec). 시스템 프롬프트 교체 플래그가 없어 '[지시]/[입력]' 으로 합쳐 stdin 으로 넘긴다.
+    반환 (LLMResult, 폴백 사유 또는 None). 사유 'rate_limit' 은 한도 관련 오류."""
+    model = _codex_model(tier)
+    res = LLMResult(backend="codex", tier=tier, task=task, model=model)
+    exe = _codex_path()
+    if not (os.path.isfile(exe) and os.access(exe, os.X_OK)) and not shutil.which(exe):
+        res.error = f"codex_not_found:{exe}"
+        return res, res.error
+    for im in images or []:
+        if not os.path.isfile(im):
+            res.error = f"codex_image_not_found:{im}"
+            return res, res.error
+    full_prompt = f"[지시]\n{system}\n\n[입력]\n{prompt}"
+    fd, out_path = tempfile.mkstemp(prefix="codex_last_", suffix=".txt")
+    os.close(fd)
+    args = [exe, "exec", "-", "--json", "-o", out_path, "-s", "read-only", "--skip-git-repo-check", "--ephemeral", "-m", model]
+    for im in images or []:
+        args += ["-i", im]
+    t0 = time.time()
+    try:
+        try:
+            proc = subprocess.run(args, input=full_prompt, capture_output=True, text=True, timeout=timeout, env=_codex_env(), cwd=_BD)
+        except subprocess.TimeoutExpired:
+            res.duration_ms = int((time.time() - t0) * 1000)
+            res.error = "timeout"
+            return res, "timeout"
+        except Exception as e:
+            res.error = f"codex_exec_error:{type(e).__name__}"
+            return res, res.error
+        res.duration_ms = int((time.time() - t0) * 1000)
+        try:
+            with open(out_path, encoding="utf-8") as f:
+                last = f.read()
+        except Exception:
+            last = ""
+    finally:
+        try:
+            os.remove(out_path)
+        except Exception:
+            pass
+    errors, usage, n_turns = [], {}, 0
+    for line in (proc.stdout or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except Exception:
+            continue
+        et = ev.get("type")
+        if et == "turn.completed":
+            usage = ev.get("usage") or usage
+            n_turns += 1
+        elif et == "item.completed" and (ev.get("item") or {}).get("type") == "error":
+            errors.append(str((ev.get("item") or {}).get("message") or ""))
+        elif et == "error":
+            errors.append(str(ev.get("message") or ev))
+    res.input_tokens = usage.get("input_tokens")
+    res.output_tokens = usage.get("output_tokens")
+    res.cache_tokens = usage.get("cached_input_tokens")
+    res.num_turns = n_turns or None
+    res.extra = {"rc": proc.returncode, "codex_errors": [e[:120] for e in errors if "Code Mode" not in e][:3]}
+    limit_msgs = [e for e in errors if any(k in e.lower() for k in ("rate limit", "usage limit", "quota"))]
+    if limit_msgs:
+        res.error = f"codex_limit:{limit_msgs[0][:200]}"
+        return res, "rate_limit"
+    if proc.returncode != 0:
+        res.error = f"codex_error:rc={proc.returncode}:{(proc.stderr or '')[:200].strip()}"
+        return res, res.error
+    if not last.strip():
+        res.error = "codex_empty_output" + (f":{[e for e in errors if 'Code Mode' not in e][:1]}" if errors else "")
+        return res, res.error
+    res.text = _strip_fences(last)
+    res.ok = True
+    return res, None
+
+
 def _run_api(task, tier, prompt, system, max_tokens, timeout, model=None):
     model = model or FALLBACK_MODEL
     res = LLMResult(backend="api", tier=tier, task=task, model=model)
@@ -258,27 +363,50 @@ def _log(res, prompt_chars):
         logger.warning("llm_client: 로그 쓰기 실패 %s", type(e).__name__)
 
 
-def complete(task, prompt, system=None, json_mode=False, max_tokens=None, timeout=None):
+def _run_backend(name, task, tier, prompt, sys_prompt, max_tokens, timeout, images):
+    """백엔드 1개 실행. 반환 (LLMResult, 폴백 사유 또는 None). 세마포어는 백엔드별."""
+    if name == "cli":
+        with _sem:
+            return _run_cli(task, tier, prompt, sys_prompt, timeout)
+    if name == "codex":
+        with _codex_sem:
+            return _run_codex(task, tier, prompt, sys_prompt, CODEX_IMAGE_TIMEOUT if images else timeout, images=images)
+    if name == "api":
+        with _sem:
+            r = _run_api(task, tier, prompt, sys_prompt, max_tokens, timeout, model=API_MODELS.get(tier, FALLBACK_MODEL))
+        return r, (None if r.ok else r.error)
+    r = LLMResult(backend=name, tier=tier, task=task, error=f"unknown_backend:{name}")
+    return r, r.error
+
+
+def complete(task, prompt, system=None, json_mode=False, max_tokens=None, timeout=None, images=None):
     tier = _tier(task)
     sys_prompt = (system or DEFAULT_SYSTEM).rstrip()
     if json_mode:
         sys_prompt = sys_prompt + JSON_SUFFIX
     timeout = timeout or TASK_TIMEOUTS.get(task, DEFAULT_TIMEOUT)
-    backend = (TASK_BACKEND.get(task) or os.environ.get("LLM_BACKEND") or "cli").lower()
+    images = [str(p) for p in (images or []) if p] or None
+    backend = "codex" if images else (TASK_BACKEND.get(task) or os.environ.get("LLM_BACKEND") or "cli").lower()
     allow_fallback = (os.environ.get("LLM_API_FALLBACK") or "1") != "0"
+    chain = [b for b in _fallback_chain() if b != backend]
+    if backend == "cli" and "api" not in chain and "codex" not in chain:
+        chain.append("api")
+    if images:
+        chain = [b for b in chain if b != "api"]        # 이미지는 Anthropic API 로 보내지 않음
+    if backend == "api":
+        chain = []                                      # api 지정 task(call_translate)는 기존처럼 폴백 없음
     try:
-        with _sem:
-            if backend == "api":
-                res = _run_api(task, tier, prompt, sys_prompt, max_tokens, timeout, model=API_MODELS.get(tier, FALLBACK_MODEL))
-            else:
-                res, reason = _run_cli(task, tier, prompt, sys_prompt, timeout)
-                if not res.ok and reason and allow_fallback:
-                    cli_err = res.error
-                    api = _run_api(task, tier, prompt, sys_prompt, max_tokens, timeout)
-                    api.fallback = True
-                    api.fallback_reason = reason if reason in ("timeout", "budget_exceeded") else (cli_err or reason)
-                    api.extra = {"cli_error": cli_err}
-                    res = api
+        res, reason = _run_backend(backend, task, tier, prompt, sys_prompt, max_tokens, timeout, images)
+        if not res.ok and reason and allow_fallback and chain:
+            first_err, first_reason = res.error, reason
+            for nxt in chain:
+                r2, reason2 = _run_backend(nxt, task, tier, prompt, sys_prompt, max_tokens, timeout, images)
+                r2.fallback = True
+                r2.fallback_reason = first_reason if first_reason in ("timeout", "budget_exceeded", "rate_limit") else (first_err or first_reason)
+                r2.extra = dict(r2.extra or {}, primary_backend=backend, primary_error=first_err)
+                res = r2
+                if r2.ok or not reason2:
+                    break
         res = _finish_json(res, json_mode)
     except Exception as e:
         res = LLMResult(backend=backend, tier=tier, task=task, error=f"unexpected:{type(e).__name__}:{str(e)[:200]}")
@@ -294,12 +422,51 @@ def _count_session_files():
     return n
 
 
+def _codex_selftest(add):
+    """C1~C5: codex 백엔드 셀프테스트 (TASK_BACKEND 임시 변경·환경변수 변경은 모두 원복)"""
+    import glob
+    def _with_env(key, val, fn):
+        orig = os.environ.get(key)
+        os.environ[key] = val
+        try:
+            return fn()
+        finally:
+            if orig is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = orig
+    saved = TASK_BACKEND.get("stock_news")
+    TASK_BACKEND["stock_news"] = "codex"
+    try:
+        r1 = complete("stock_news", "다음 숫자를 한국어로 읽어줘: 2026")
+        add("C1 codex 평문(default→fast: haiku task)", r1, "모델 " + (r1.model or "-"))
+        r2 = complete("stock_news", '{"revenue": 1234} 이 값을 그대로 JSON으로 돌려줘', json_mode=True)
+        add("C2 codex JSON fast", r2, "data OK" if isinstance(r2.data, dict) and r2.data.get("revenue") == 1234 else f"data 불일치: {r2.data!r}"[:60])
+    finally:
+        if saved is None:
+            TASK_BACKEND.pop("stock_news", None)
+        else:
+            TASK_BACKEND["stock_news"] = saved
+    imgs = sorted(glob.glob(os.path.join(_BD, "cache", "tg_media", "*.jpg")), key=os.path.getmtime, reverse=True)
+    img = imgs[0] if imgs else None
+    if img:
+        r3 = complete("stock_news", "이 이미지의 제목 한 줄만 답해.", images=[img])
+        add("C3 codex 이미지", r3, os.path.basename(img) + " → " + (r3.text or "")[:100].replace("\n", " "))
+    else:
+        add("C3 codex 이미지", LLMResult(backend="codex", task="stock_news", error="no_image"), "cache/tg_media 에 jpg 없음")
+    r4 = _with_env("LLM_CLI_PATH", "/nonexistent/claude", lambda: complete("stock_news", "다음 숫자를 한국어로 읽어줘: 2026"))
+    add("C4 폴백 체인 cli→codex", r4, "체인 OK" if (r4.backend == "codex" and r4.fallback and r4.ok and "cli_not_found" in (r4.fallback_reason or "")) else f"예상 밖: {r4.backend} fb={r4.fallback} err={r4.error}"[:60])
+    if img:
+        r5 = _with_env("LLM_CODEX_PATH", "/nonexistent/codex", lambda: complete("stock_news", "이 이미지의 제목 한 줄만 답해.", images=[img]))
+        add("C5 이미지+codex 실패", r5, "기대대로(api 미사용)" if (not r5.ok and r5.backend == "codex" and not r5.fallback and "codex_not_found" in (r5.error or "")) else f"예상 밖: {r5.backend} fb={r5.fallback} ok={r5.ok} err={r5.error}"[:60])
+
+
 def _selftest(tier_filter="all"):
     rows = []
 
     def add(name, r, note=""):
         rows.append((name, r.backend, r.model or "-", r.duration_ms, r.cost_usd, r.input_tokens, r.output_tokens, r.cache_tokens,
-                     r.num_turns, r.fallback, r.ok, (r.text or "")[:80].replace("\n", " "), note))
+                     r.num_turns, r.fallback, (r.fallback_reason or "")[:40], r.ok, (r.text or "")[:80].replace("\n", " "), note))
 
     def want(t):
         return tier_filter in ("all", t)
@@ -338,9 +505,12 @@ def _selftest(tier_filter="all"):
                 os.environ.pop("LLM_CLI_PATH", None)
             else:
                 os.environ["LLM_CLI_PATH"] = orig_cli
-        add("T7 폴백", r7, "폴백 OK" if (r7.backend == "api" and r7.fallback and "haiku" in r7.model and r7.ok) else f"예상 밖: {r7.backend} fb={r7.fallback} err={r7.error}"[:60])
+        exp_fb = (_fallback_chain() or ["api"])[0]
+        add("T7 폴백", r7, "폴백 OK" if (r7.backend == exp_fb and r7.fallback and r7.ok and "cli_not_found" in (r7.fallback_reason or "")) else f"예상 밖: {r7.backend} fb={r7.fallback} err={r7.error}"[:60])
+    if want("codex"):
+        _codex_selftest(add)
     sessions_after = _count_session_files()
-    hdr = ("항목", "backend", "model", "ms", "cost_usd", "in", "out", "cache", "turns", "fallback", "ok", "응답 앞 80자", "비고")
+    hdr = ("항목", "backend", "model", "ms", "cost_usd", "in", "out", "cache", "turns", "fallback", "fallback_reason", "ok", "응답 앞 80자", "비고")
     print(" | ".join(hdr))
     for row in rows:
         print(" | ".join("" if v is None else str(v) for v in row))
@@ -352,7 +522,7 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("--tier", default="all", choices=["haiku", "sonnet", "opus", "all"])
+    ap.add_argument("--tier", default="all", choices=["haiku", "sonnet", "opus", "codex", "all"])
     a = ap.parse_args()
     if a.selftest:
         logging.basicConfig(level=logging.WARNING)

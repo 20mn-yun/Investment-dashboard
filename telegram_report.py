@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaDocument, DocumentAttributeFilename
 import logging
+import llm_client
 
 logger = logging.getLogger("telegram_report")
 
@@ -99,6 +100,10 @@ def _gemini_yes_no(prompt):
 
 
 def _ai_relevance(filename, caption, watchlist):
+    return _ai_relevance_detail(filename, caption, watchlist)[0]
+
+
+def _relevance_prompt(filename, caption, watchlist):
     wl = ", ".join(watchlist)
     prompt = (
         "너는 증권사 리포트 필터다. 아래는 텔레그램 채널에 올라온 리포트의 파일명과 메시지 본문 일부다.\n\n"
@@ -126,12 +131,51 @@ def _ai_relevance(filename, caption, watchlist):
         "- 삼성전자 2Q26 프리뷰 → YES (규칙 2, 개별 기업)\n\n"
         "답은 YES 또는 NO 한 단어만 출력해라."
     )
-    ans = _gemini_yes_no(prompt)
+    return prompt
+
+
+def _yes_no(ans):
+    ans = (ans or "").strip().upper()
     if ans.startswith("YES"):
         return True
     if ans.startswith("NO"):
         return False
     return None
+
+
+def _ai_relevance_detail_from_prompt(prompt):
+    """관련성 판정 (Sonnet 단일). 반환 (최종, sonnet 판정, gemini 판정). 판정값은 True/False/None(실패·미호출).
+    순서: llm_client report_relevance(Sonnet) → 실패·해석 불가면 Gemini(_gemini_yes_no) 1회 → 그것도 실패면 None(호출부 키워드 규칙 폴백)."""
+    sonnet = None
+    try:
+        r = llm_client.complete("report_relevance", prompt)
+        if r.ok:
+            sonnet = _yes_no(r.text)
+            if sonnet is None:
+                logger.warning("[llm] report_relevance 응답 해석 불가: %r — Gemini 로 폴백", (r.text or "")[:80])
+        else:
+            logger.warning("[llm] report_relevance 실패: %s%s — Gemini 로 폴백", (r.error or "unknown")[:200], f" (fallback: {r.fallback_reason})" if r.fallback else "")
+    except Exception as e:
+        logger.warning("[llm] report_relevance 호출 예외: %s — Gemini 로 폴백", f"{type(e).__name__}: {e}"[:200])
+    if sonnet is not None:
+        return sonnet, sonnet, None
+    gemini = _yes_no(_gemini_yes_no(prompt)) if GEMINI_API_KEY else None
+    if gemini is None:
+        logger.warning("[gemini] 관련성 폴백도 실패%s — 키워드 규칙으로 폴백", "" if GEMINI_API_KEY else "(GEMINI_API_KEY 없음)")
+    return gemini, None, gemini
+
+
+def _ai_relevance_detail(filename, caption, watchlist):
+    """_ai_relevance 와 같은 입력·프롬프트로 (최종, sonnet, gemini) 을 돌려준다 (로그용)."""
+    return _ai_relevance_detail_from_prompt(_relevance_prompt(filename, caption, watchlist))
+
+
+def _relevance_log_label(sonnet, gemini):
+    lab = lambda v: "YES" if v is True else "NO" if v is False else "FAIL"
+    s = f"sonnet={lab(sonnet)}"
+    if sonnet is None:
+        s += f" gemini={lab(gemini)}"
+    return s
 
 
 _jobs = {}
@@ -355,12 +399,12 @@ def start_realtime_watcher(api_id, api_hash, session_path):
                 return
             text = message.message or ""
             should_forward = None
-            if cfg.get("ai_filter_enabled", True) and GEMINI_API_KEY:
+            if cfg.get("ai_filter_enabled", True):
                 loop = asyncio.get_event_loop()
-                should_forward = await loop.run_in_executor(
-                    None, _ai_relevance, filename, text, watchlist
+                should_forward, _s, _g = await loop.run_in_executor(
+                    None, _ai_relevance_detail, filename, text, watchlist
                 )
-                print(f"[Report AI필터] {filename[:60]} -> {should_forward}", flush=True)
+                print(f"[Report AI필터] {filename[:60]} {_relevance_log_label(_s, _g)} → {should_forward}", flush=True)
             if should_forward is None:
                 cleaned_filename = _mask_brokerages(filename.lower(), watchlist)
                 should_forward = False
