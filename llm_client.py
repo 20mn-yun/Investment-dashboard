@@ -23,8 +23,8 @@ TASK_TIERS = {
     "us_wrap": "opus", "moat": "opus",
     "call_summary": "sonnet", "news_rank": "sonnet", "stock_intro": "sonnet", "biz_overview": "sonnet",
     "peers": "sonnet", "dart_watch_summary": "sonnet", "dart_detail": "sonnet", "earnings_extract": "sonnet",
-    "reports": "haiku", "concept_map": "haiku", "ksic": "haiku",
-    "call_translate": "haiku", "stock_news": "haiku",
+    "reports": "sonnet",
+    "concept_map": "haiku", "ksic": "haiku", "call_translate": "haiku", "stock_news": "haiku",
 }
 TASK_BACKEND = {"call_translate": "api"}
 API_MODELS = {"haiku": "claude-haiku-4-5-20251001", "sonnet": "claude-haiku-4-5-20251001", "opus": "claude-haiku-4-5-20251001"}
