@@ -26,6 +26,7 @@ import stock_reports
 import ai_budget
 import earnings_calls
 import stock_peers
+import stock_brief
 import tg_inbox
 import dart_report
 import earnings_tracker
@@ -2214,6 +2215,19 @@ def stock_notes_list():
     return jsonify({"count": len(items), "items": items})
 
 
+@app.route("/api/stock/brief", methods=["GET"])
+def stock_brief_api():
+    """종목 브리프(저장본 기반 마크다운 한 장). 즉시 생성해 Drive·로컬에 쓰고 본문을 돌려준다. LLM 호출 없음."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    b = stock_brief.build(market, code, name, corp_code, usdkrw_rate())
+    w = stock_brief.write_drive(market, code, b["name"], b["md"])
+    return jsonify({"ok": bool(w.get("ok")), "path": w.get("path"), "local": w.get("local"), "md": b["md"],
+                    "failed_sections": b["failed"], "error": w.get("error")})
+
+
 @app.route("/api/stock/reports", methods=["GET"])
 def stock_reports_api():
     """종목 리포트(텔레그램 리포트 DB, 최근 3개월): 상태·목록·집계. 처음 열면 뒤에서 검색·받기·AI 정리를 시작한다."""
@@ -3604,6 +3618,13 @@ def _krfin_prefetch_run(reason):
                 results[f"peers:{it['market']}:{it['code']}"] = ", ".join(got)
         except Exception as e:
             results[f"peers:{it['market']}:{it['code']}"] = f"실패({type(e).__name__})"
+        try:   # 종목 브리프: 재무·리포트·컨콜·공시·판단·관련기업이 모두 갱신된 뒤 마크다운 한 장 (LLM 호출 없음)
+            corp = (cmap.get(it["code"]) or {}).get("corp_code") if it["market"] == "KR" else None
+            b = stock_brief.build_and_write(it["market"], it["code"], it.get("name", ""), corp, usdkrw_rate())
+            results[f"brief:{it['market']}_{it['code']}"] = (f"ok {b.get('bytes')}B" if b.get("ok") else f"실패({b.get('error')})") \
+                + (f", 섹션 실패 {len(b['failed_sections'])}" if b.get("failed_sections") else "")
+        except Exception as e:
+            results[f"brief:{it['market']}_{it['code']}"] = f"실패({type(e).__name__}: {str(e)[:80]})"
     st = _krfin_prefetch_state()
     st.update(last_run_date=date.today().isoformat(), last_run_at=datetime.now().isoformat(timespec="seconds"),
               last_results=results)
