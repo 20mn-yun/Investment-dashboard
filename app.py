@@ -3580,6 +3580,20 @@ def _krfin_prefetch_state():
     return _lj(_KRFIN_PREFETCH_STATE, {})
 
 
+_PREFETCH_OK_PREFIXES = ("done", "ok", "신규", "정상")
+
+
+def _prefetch_result_ok(v, key=""):
+    """배치 last_results 값 1개의 성공 여부: done(재무·리포트)·ok(브리프·액션)·신규(8-K)·정상 으로 시작하고 '실패' 표식이 없으면 성공.
+    peers: 항목은 자유 서술(관련 기업 목록)이라 '실패(' 표식만 본다."""
+    s = str(v or "")
+    if "공시 실패" in s or "실패(" in s:
+        return False
+    if str(key).startswith("peers:"):
+        return True
+    return s.startswith(_PREFETCH_OK_PREFIXES)
+
+
 def _krfin_prefetch_run(reason):
     st = _krfin_prefetch_state()
     st.update(last_start=datetime.now().isoformat(timespec="seconds"), last_reason=reason)
@@ -3671,7 +3685,7 @@ def _krfin_prefetch_run(reason):
               last_results=results)
     watchlist_store.atomic_write_json(_KRFIN_PREFETCH_STATE, st)
     print(f"[kr_financials] 미리 받기 완료({reason}): 한국 {len(codes)}종목, 미국 {len(us_codes)}종목 {time.time() - t0:.0f}s "
-          f"실패 {sum(1 for v in results.values() if not v.startswith('done') or '공시 실패' in v)}건", flush=True)
+          f"실패 {sum(1 for k, v in results.items() if not _prefetch_result_ok(v, k))}건", flush=True)
 
 
 def _krfin_prefetch_loop():
