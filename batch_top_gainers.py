@@ -90,22 +90,75 @@ def _load_universe(path, market, fetch_fn, max_age_days, save_fn, key=None):
     return tickers
 
 
+_ISHARES_BASE = "https://www.ishares.com"
+
+
+def _ishares_discover_csv(html_text, base=_ISHARES_BASE):
+    """iShares 상품 페이지(HTML) 안의 보유종목 CSV 링크(…/latest-holdings.csv)를 찾아 절대 URL 로. 없으면 None"""
+    import html as _html
+    m = re.search(r'["\']((?:https?://[^"\'\s<>]+)?/[^"\'\s<>]*latest-holdings\.csv[^"\'\s<>]*)["\']', _html.unescape(html_text))
+    if not m:
+        return None
+    u = m.group(1)
+    return u if u.startswith("http") else base + u
+
+
 def _fetch_ishares_csv(url, header_tokens=("Ticker",)):
+    """iShares 보유종목 CSV → DataFrame.
+    - 2026-10 사이트 개편으로 옛 '.ajax?fileType=csv' 주소가 HTML 상품 페이지를 돌려준다 → 본문이 HTML 이면 페이지 안의
+      latest-holdings.csv 링크를 찾아 다시 받는다.
+    - 헤더 줄 = 첫 필드(따옴표 제거)가 header_tokens 중 하나인 줄. 구분자는 헤더 줄의 ';' 와 ',' 개수로 자동 결정.
+    - 독일 사이트는 숫자가 "1.234,56" 꼴이라 숫자 변환은 호출부(_de_num)가 맡는다."""
     resp = req.get(url, headers=_ISHARES_HEADERS, timeout=30)
     if resp.status_code != 200:
         raise RuntimeError(f"iShares returned HTTP {resp.status_code}; body: {resp.text[:200]!r}")
+    text = resp.content.decode("utf-8-sig", errors="replace")
+    if text.lstrip()[:15].lower().startswith(("<!doctype", "<html")):
+        alt = _ishares_discover_csv(text)
+        if not alt:
+            raise RuntimeError("iShares returned HTML and no latest-holdings.csv link was found")
+        log(f"iShares: HTML page returned, switching to {alt.split('/products/')[-1][:70]}")
+        resp = req.get(alt, headers=_ISHARES_HEADERS, timeout=30)
+        if resp.status_code != 200:
+            raise RuntimeError(f"iShares latest-holdings returned HTTP {resp.status_code}")
+        text = resp.content.decode("utf-8-sig", errors="replace")
+        if text.lstrip()[:15].lower().startswith(("<!doctype", "<html")):
+            raise RuntimeError("iShares latest-holdings.csv also returned HTML (blocked?)")
 
-    lines = resp.text.splitlines()
+    toks = tuple(t.strip().strip(',').strip('"') for t in header_tokens)
+    lines = text.splitlines()
     header_idx = None
     for i, line in enumerate(lines):
-        if any(tok in line for tok in header_tokens):
+        first = line.split(";")[0].split(",")[0].strip().strip('"').strip()
+        if first in toks:
             header_idx = i
             break
     if header_idx is None:
         raise RuntimeError(f"could not find CSV header row; first lines: {lines[:5]!r}")
 
+    header = lines[header_idx]
+    sep = ";" if header.count(";") > header.count(",") else ","
     csv_text = "\n".join(lines[header_idx:])
-    return pd.read_csv(io.StringIO(csv_text))
+    return pd.read_csv(io.StringIO(csv_text), sep=sep, engine="python", on_bad_lines="skip", skip_blank_lines=True)
+
+
+def _de_num(v):
+    """독일식 숫자 "1.234,56" / 미국식 "1,234.56" / "4,24" → float. 실패하면 None"""
+    s = str(v if v is not None else "").strip().replace("%", "").replace(" ", "")
+    if not s or s.lower() == "nan" or s == "-":
+        return None
+    if "," in s and "." in s:
+        if s.rfind(",") > s.rfind("."):      # 1.234,56 (독일)
+            s = s.replace(".", "").replace(",", ".")
+        else:                                # 1,234.56 (미국)
+            s = s.replace(",", "")
+    elif "," in s:                           # "4,24" 처럼 쉼표 하나만 있으면 독일식 소수점으로 본다 (iShares DE 가중치 전용)
+        head, tail = s.rsplit(",", 1)
+        s = head.replace(".", "").replace(",", "") + "." + tail
+    try:
+        return float(s)
+    except ValueError:
+        return None
 
 
 def _parse_russell_df(df):
@@ -141,11 +194,7 @@ def load_russell1000():
 
     def fetch():
         log("Downloading Russell 1000 holdings from iShares...")
-        url = (
-            "https://www.ishares.com/us/products/239707/"
-            "ishares-russell-1000-etf/1467271812596.ajax"
-            "?fileType=csv&fileName=IWB_holdings&dataType=fund"
-        )
+        url = "https://www.ishares.com/us/products/239707/ishares-russell-1000-etf/latest-holdings.csv"
         df = _fetch_ishares_csv(url, header_tokens=("Ticker,", '"Ticker"'))
         return _parse_russell_df(df)
 
@@ -157,11 +206,7 @@ def load_russell3000():
 
     def fetch():
         log("Downloading Russell 3000 holdings from iShares...")
-        url = (
-            "https://www.ishares.com/us/products/239714/"
-            "ishares-russell-3000-etf/1467271812596.ajax"
-            "?fileType=csv&fileName=IWV_holdings&dataType=fund"
-        )
+        url = "https://www.ishares.com/us/products/239714/ishares-russell-3000-etf/latest-holdings.csv"
         df = _fetch_ishares_csv(url, header_tokens=("Ticker,", '"Ticker"'))
         return _parse_russell_df(df)
 
@@ -178,11 +223,7 @@ def load_sp500():
 
     def _fetch_ivv():
         log("Downloading S&P 500 (IVV) holdings from iShares...")
-        url = (
-            "https://www.ishares.com/us/products/239726/"
-            "ishares-core-sp-500-etf/1467271812596.ajax"
-            "?fileType=csv&fileName=IVV_holdings&dataType=fund"
-        )
+        url = "https://www.ishares.com/us/products/239726/ishares-core-s-p-500-etf/latest-holdings.csv"
         df = _fetch_ishares_csv(url, header_tokens=("Ticker,", '"Ticker"'))
         if "Asset Class" in df.columns:
             df = df[df["Asset Class"] == "Equity"]
@@ -428,6 +469,8 @@ _EU_EXCHANGE_SUFFIX = {
     "Irish Stock Exchange - All Market": ".IR",
     "Wiener Boerse Ag": ".VI",
     "Warsaw Stock Exchange/Equities/Main Market": ".WA",
+    "Athens Exchange S.A. Cash Market": ".AT",   # 2026-10 STOXX 600 리밸런싱으로 그리스 종목 편입
+    "Deutsche Börse AG": ".DE",
 }
 
 
@@ -436,11 +479,7 @@ def load_eu_stoxx600():
 
     def fetch():
         log("Downloading STOXX 600 holdings from iShares DE...")
-        url = (
-            "https://www.ishares.com/de/privatanleger/de/produkte/251931/"
-            "ishares-stoxx-europe-600-ucits-etf-de-fund/1478358465952.ajax"
-            "?fileType=csv&fileName=EXSA_holdings&dataType=fund"
-        )
+        url = "https://www.ishares.com/de/privatanleger/de/produkte/251931/ishares-stoxx-europe-600-ucits-etf-de/latest-holdings.csv"
         df = _fetch_ishares_csv(url, header_tokens=("Emittententicker", "Ticker"))
 
         col_ticker = "Emittententicker" if "Emittententicker" in df.columns else "Ticker"
@@ -448,6 +487,7 @@ def load_eu_stoxx600():
         col_sector = "Sektor" if "Sektor" in df.columns else "Sector"
         col_asset = "Anlageklasse" if "Anlageklasse" in df.columns else "Asset Class"
         col_exchange = "Börse" if "Börse" in df.columns else "Exchange"
+        col_weight = next((c for c in ("Gewichtung (%)", "Weight (%)", "Gewichtung") if c in df.columns), None)
 
         if col_asset in df.columns:
             df = df[df[col_asset] == "Aktien"]
@@ -481,6 +521,7 @@ def load_eu_stoxx600():
                 "name": name,
                 "sector": sector,
                 "exchange": exchange,
+                "weight": _de_num(row.get(col_weight)) if col_weight else None,
             })
         return tickers
 
