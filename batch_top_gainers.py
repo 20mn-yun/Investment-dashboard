@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""배치로 상승률 TOP 10을 계산하여 cache/ 에 저장."""
+"""배치로 상승률 TOP 30(TOP_N)을 계산하여 cache/ 에 저장."""
 import sys
 import os
 import json
@@ -15,6 +15,7 @@ from kis_api import get_market_cap_ranking, get_daily_price_history
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TICKERS_DIR = os.path.join(BASE_DIR, "tickers")
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
+TOP_N = 30                       # 시장별 상승률 랭킹 상위 개수 (1d/1w/1mo 공통)
 
 OUTLIER_THRESHOLDS = {
     "1d": 50.0,
@@ -168,7 +169,7 @@ def load_russell3000():
 
 
 def load_sp500():
-    """S&P 500 구성종목 — Top10/히트맵 공용. {ticker, name, sector, weight(%)}.
+    """S&P 500 구성종목 — 상승률 TOP_N/히트맵 공용. {ticker, name, sector, weight(%)}.
 
     1순위 iShares IVV holdings CSV, 실패 시 Wikipedia(이름·섹터) + Slickcharts(지수비중)
     조합으로 폴백. (iShares가 CSV 대신 HTML을 주는 봇 차단 구간이 있음)
@@ -692,7 +693,7 @@ def calc_rankings(price_data, ticker_meta):
             excluded_str = ", ".join(f"{s}({p:+.1f}%)" for s, p in excluded[:5])
             log(f"  [{period_key}] outlier 제외 {len(excluded)}개: {excluded_str}{'...' if len(excluded) > 5 else ''}")
         excluded_counts[period_key] = len(excluded)
-        top = filtered_changes[:10]
+        top = filtered_changes[:TOP_N]
 
         items = []
         for sym, pct in top:
@@ -1233,7 +1234,7 @@ def main():
             if items:
                 log(f"  {p} top: {items[0]['ticker']} ({items[0]['change_pct']:+.2f}%)")
 
-    # 히트맵 맵 생성 (us/jp). 실패해도 Top10 결과에는 영향 없음.
+    # 히트맵 맵 생성 (us/jp). 실패해도 TOP_N 랭킹 결과에는 영향 없음.
     # us는 tickers가 이미 S&P 500(IVV) 전체이고 가격도 전체를 받았으므로 그대로 재활용.
     try:
         if market == "us":

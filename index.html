@@ -1939,9 +1939,9 @@
         </div>
     </div>
 
-    <!-- 시장별 상승률 TOP 10 -->
+    <!-- 시장별 상승률 TOP 30 -->
     <div style="margin-bottom:24px;">
-        <div class="section-title">🚀 시장별 상승률 TOP 10</div>
+        <div class="section-title">🚀 시장별 상승률 TOP 30</div>
         <div id="gainers-timestamp" style="font-size:12px; color:#57606a; margin-bottom:8px;"></div>
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
             <button class="period-btn active" data-market="us" onclick="switchGainerMarket('us')">미장</button>
@@ -1953,7 +1953,7 @@
             <button class="period-btn active" data-gperiod="1w" onclick="switchGainerPeriod('1w')">1주일</button>
             <button class="period-btn" data-gperiod="1mo" onclick="switchGainerPeriod('1mo')">1개월</button>
         </div>
-        <div class="data-table" id="top-gainers-table">
+        <div class="data-table" id="top-gainers-table" style="max-height:520px; overflow-y:auto;">
             <div class="loading">시장과 기간을 선택하면 데이터를 불러옵니다</div>
         </div>
     </div>
@@ -4586,7 +4586,7 @@
         }).join('');
     }
 
-    // 시장별 상승률 TOP 10
+    // 시장별 상승률 TOP 30
     let gainerMarket = 'us', gainerPeriod = '1w';
 
     function switchGainerMarket(m) {

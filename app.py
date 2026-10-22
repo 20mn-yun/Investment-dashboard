@@ -814,7 +814,7 @@ def _spawn_gainers_batch(market):
 
 @app.route("/api/top-gainers", methods=["GET"])
 def get_top_gainers():
-    """시장별 상승률 TOP 10 (배치 프리페치 파일 기반, 오래되면 자동 갱신)"""
+    """시장별 상승률 TOP 30 (batch_top_gainers.TOP_N; 배치 프리페치 파일 기반, 오래되면 자동 갱신)"""
     market = request.args.get("market", "us")
     period = request.args.get("period", "1w")
 
@@ -943,7 +943,7 @@ def _us_wrap_select():
     try:
         with open(os.path.join(_CACHE_DIR, "top_gainers_us.json"), encoding="utf-8") as f:
             tg = json.load(f)
-        # TOP10은 밤 배치 산출물 — 기준일이 맵과 다르면(장중 시황, 다음날 16:30 마감 시황)
+        # TOP 30 랭킹은 밤 배치 산출물 — 기준일이 맵과 다르면(장중 시황, 다음날 16:30 마감 시황)
         # 전날 종목이 섞이므로 보충하지 않는다.
         if base_date and str(tg.get("last_updated", ""))[:10] != base_date:
             raise ValueError("top_gainers 기준일 불일치")
