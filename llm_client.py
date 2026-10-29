@@ -43,7 +43,9 @@ FALLBACK_MODEL = "claude-haiku-4-5-20251001"
 DEFAULT_SYSTEM = ("You are a precise assistant embedded in a financial data pipeline. Follow the user's format instructions exactly. "
                   "Output only the requested content with no preamble, no explanation, and no markdown code fences.")
 JSON_SUFFIX = " Respond with valid JSON only."
-FALLBACK_MARKERS = ("rate limit", "usage limit", "limit reached", "overloaded", "401", "403")
+# 폴백 판정 마커 — 오류 문맥이 포함된 형태만. (bare "401"/"403" 은 JSON 본문의 숫자열과 매칭돼 오판했음: 2026-10-29)
+FALLBACK_MARKERS = ("rate limit", "usage limit", "limit reached", "overloaded", "http 401", "http 403", "status 401", "status 403",
+                    "api error: 401", "api error: 403", "authentication_error", "permission_error", "failed to authenticate")
 HAIKU_PRICE_IN, HAIKU_PRICE_OUT = 1.0 / 1_000_000, 5.0 / 1_000_000
 KST = timezone(timedelta(hours=9))
 
@@ -220,7 +222,8 @@ def _run_cli(task, tier, prompt, system, timeout):
         res.error = f"cli_error:rc={proc.returncode}:{subtype}:{(result_text or proc.stderr or '')[:200].strip()}"
         res.text = _strip_fences(result_text)
         return res, res.error
-    if _needs_fallback(result_text) and len(result_text) < 400:
+    # 정상 종료(rc=0, is_error 아님)인데 본문이 한도·인증 오류 안내문인 경우만 폴백. 오류 문맥 마커(위)로만 판정해 JSON 본문의 숫자열(…401…)에 오판하지 않는다.
+    if len(result_text) < 400 and not result_text.lstrip().startswith(("{", "[")) and _needs_fallback(result_text):
         res.error = f"cli_limit:{result_text[:200].strip()}"
         res.text = _strip_fences(result_text)
         return res, res.error

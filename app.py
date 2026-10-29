@@ -3212,6 +3212,30 @@ def _majorstock_summary(corp_code, rno):
         return None
 
 
+_MAJOR_PURPOSES = (("경영참가", ("경영참가", "경영권", "경영에 영향", "경영참여")), ("일반투자", ("일반투자",)), ("단순투자", ("단순투자",)))
+
+
+def _major_purpose(*texts):
+    """사유·목적 문구에서 보유목적 3분류 추출. 우선순위 경영참가 > 일반투자 > 단순투자, 없으면 '-'"""
+    hay = " ".join(str(t or "") for t in texts)
+    for label, kws in _MAJOR_PURPOSES:
+        if any(k in hay for k in kws):
+            return label
+    return "-"
+
+
+def _major_reason_clean(reason):
+    """사유 문구 정제(LLM 없음): '<목적>목적(으로|의|)' 제거, 장내에서 매수→장내매수, 장외에서→장외, 공백 정리, 50자"""
+    s = str(reason or "")
+    s = re.sub(r"(단순|일반|경영참가|경영참여|경영권\s*(?:행사|확보)?)\s*투자?\s*목적\s*(?:으로|의|을|를|에서)?", " ", s)
+    s = re.sub(r"(경영\s*참가|경영\s*참여|경영권\s*행사)\s*(?:목적)?\s*(?:으로|의)?", " ", s)
+    s = re.sub(r"장내\s*에서\s*(의\s*)?매수", "장내매수", s)
+    s = re.sub(r"장내\s*에서\s*(의\s*)?매도", "장내매도", s)
+    s = re.sub(r"장외\s*에서", "장외", s)
+    s = re.sub(r"\s+", " ", s).strip(" -·,.")
+    return s[:50] if s else "-"
+
+
 def _fmt_major(d):
     pv, cv = d.get("prev"), d.get("curr")
     ratio = "-"
@@ -3219,7 +3243,8 @@ def _fmt_major(d):
         ratio = f"{float(pv):.2f}% → {float(cv):.2f}% ({float(cv) - float(pv):+.2f}%p)"
     elif cv is not None:
         ratio = f"{float(cv):.2f}%"
-    s = f"[대량보유] 보고자: {d.get('reporter') or '-'} | {ratio} | 사유: {d.get('reason') or '-'} | 목적: {d.get('purpose') or '-'}"
+    purpose = _major_purpose(d.get("purpose"), d.get("reason"))
+    s = f"[대량보유] 보고자: {d.get('reporter') or '-'} | {ratio} | 사유: {_major_reason_clean(d.get('reason'))} | 목적: {purpose}"
     if d.get("report_tp"):
         s += f" ({d['report_tp']})"
     return s
@@ -3419,7 +3444,17 @@ def _ck_earnings():
 
 # --- Feature 3: 주요 공시 ---
 _MAJOR_KW = ["대량보유", "실적", "매출액", "공급계약"]
-_MAJOR_EXCLUDE = ["증권발행실적보고서", "주식등의대량보유상황보고서(일반)"]
+_MAJOR_EXCLUDE = ["증권발행실적보고서", "주식등의대량보유상황보고서(일반)", "결산실적공시예고"]
+
+
+def _major_excluded(title):
+    """제목이 _MAJOR_EXCLUDE 에 걸리면 True — 수집(_ck_major)·표시(/api/dart/daily)·슬롯·엑셀이 같은 목록을 쓴다"""
+    t = title or ""
+    return any(ex in t for ex in _MAJOR_EXCLUDE)
+
+
+def _major_visible(items):
+    return [it for it in (items or []) if not _major_excluded(it.get("title"))]
 
 
 _MAJOR_RETRY_PER_LOOP = 30
@@ -3510,7 +3545,7 @@ def _ck_major():
                 title = it.get("report_nm", "")
                 if not any(k in title for k in _MAJOR_KW):
                     continue
-                if any(ex in title for ex in _MAJOR_EXCLUDE):
+                if _major_excluded(title):
                     continue
                 rno = it.get("rcept_no", "")
                 key = f"m_{rno}"
@@ -3608,13 +3643,13 @@ def _send_daily_slot(slot):
     if not cid or not daily.get("items"):
         return
     if slot["start"] is not None:
-        filtered = [it for it in daily["items"]
+        filtered = [it for it in _major_visible(daily["items"])
                     if slot["start"] <= it.get("detected_at", "00:00") <= slot["end"]]
         if not filtered:
             return
         header = slot["header"]
     else:
-        filtered = daily["items"]
+        filtered = _major_visible(daily["items"])
         if not filtered:
             return
         header = f"📋 <b>오늘의 전체 공시 정리 ({date.today().isoformat()})</b>"
@@ -3653,7 +3688,7 @@ def _save_excel():
         ws.title = "DART 공시"
         ws.append(["날짜", "종목명", "공시사유", "섹터", "시총", "매출액", "영업이익", "공시내용", "영익대비시총"])
 
-    for it in daily["items"]:
+    for it in _major_visible(daily["items"]):
         sc = it.get("stock_code", "")
         mc_s = rev_s = op_s = sector = ""
         try:
@@ -4118,14 +4153,14 @@ def get_dart_daily():
         items = []
         for d, d_items in all_days.items():
             if d >= cutoff:
-                for it in d_items:
+                for it in _major_visible(d_items):
                     it_copy = dict(it)
                     it_copy["date"] = d
                     items.append(it_copy)
         return jsonify({"days": n, "items": items})
     dt = request.args.get("date", date.today().isoformat())
     h = _load_daily_history()
-    items = h.get("days", {}).get(dt, [])
+    items = _major_visible(h.get("days", {}).get(dt, []))
     return jsonify({"date": dt, "items": items})
 
 
