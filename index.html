@@ -1435,6 +1435,7 @@
         #tab-refinery .refinery-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
         #tab-refinery .refinery-refresh-btn:disabled { opacity: 0.5; cursor: default; }
         #tab-refinery .metrics-grid { grid-template-columns: repeat(4, 1fr); }
+        #tab-refinery #refinery-daily-grid { grid-template-columns: repeat(2, 1fr); }
         #tab-refinery .metric-card .desc { font-size: 11px; color: var(--text-muted); opacity: 0.65; margin-top: 6px; line-height: 1.45; }
         #tab-refinery .refinery-chart-box { position: relative; height: 200px; }
         #tab-refinery .refinery-chart-sub { font-size: 12px; color: var(--text-muted); margin: -8px 0 8px; }
@@ -2461,7 +2462,14 @@
 
         <div class="metrics-grid" id="refinery-cards"></div>
 
-        <div class="section-title">3-2-1 크랙스프레드 ($/bbl, 주간 3년)</div>
+        <div id="refinery-daily-section" style="display:none;">
+            <div class="section-title">일간 크랙스프레드 (최근 60거래일) — 주간 확정치 사이 확인용</div>
+            <div class="refinery-chart-sub">판정은 위 주간 카드 기준. 일간은 변동이 커서 추세 확인에만 사용. vs 주간 = 일간 최신 − 주간 최신</div>
+            <div class="metrics-grid" id="refinery-daily-grid"></div>
+            <div class="refinery-chart-box"><canvas id="refinery-chart-daily"></canvas></div>
+        </div>
+
+        <div class="section-title" style="margin-top:24px;">3-2-1 크랙스프레드 ($/bbl, 주간 3년)</div>
         <div class="refinery-chart-sub">빨간 점선($20) = 경보선. 선에 접근하는 '추세'가 레벨보다 중요</div>
         <div class="refinery-chart-box"><canvas id="refinery-chart-crack"></canvas></div>
 
@@ -7824,6 +7832,7 @@
             renderRefineryHeader(data);
             renderRefineryCards(data.latest);
             renderRefineryCharts(data.history);
+            renderRefineryDaily(data.daily_cracks);
             loading.style.display = 'none';
             content.style.display = 'block';
             loadRefineryBacktest();
@@ -7842,7 +7851,10 @@
         verdict.className = 'refinery-verdict v-' + level;
         verdict.textContent = `${REFINERY_VERDICT_EMOJI[level] || ''} ${data.overall.message}`;
         document.getElementById('refinery-asof').textContent =
-            `데이터 기준일 ${data.data_as_of}` + (data.stale ? ' (재수집 실패 — 이전 캐시)' : '');
+            `주간 ${data.data_as_of} (EIA 주간, 미국 수요일 발표)`
+            + (data.data_as_of_daily ? ` · 일간 스팟 ${data.data_as_of_daily}` : '')
+            + (data.updated_at ? ` · 갱신 ${String(data.updated_at).slice(0, 16)}` : '')
+            + (data.stale ? ' (재수집 실패 — 이전 캐시)' : '');
     }
 
     function renderRefineryCards(latest) {
@@ -7910,6 +7922,46 @@
                 { label: '휘발유 z', data: h.gas_z, borderColor: '#8250df', pointRadius: 0, borderWidth: 1.5, tension: 0.1, spanGaps: true },
                 refLine('z = -1', -1, 'rgba(110,118,129,0.6)'),
                 refLine('z = +1', 1, 'rgba(110,118,129,0.6)'),
+            ] },
+            options: baseOpts,
+        }));
+    }
+
+    function renderRefineryDaily(dc) {
+        const section = document.getElementById('refinery-daily-section');
+        if (!dc || !dc.latest) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+        const fmt = v => v == null ? '—' : Number(v).toFixed(2);
+        const sgn = v => v == null ? '—' : (v >= 0 ? '+' : '−') + Math.abs(Number(v)).toFixed(2);
+        const chgCls = v => v == null ? '' : (v >= 0 ? 'positive' : 'negative');   // 상승 빨강(var(--up)) · 하락 파랑(var(--accent))
+        const cards = [['3-2-1 크랙 (일간)', dc.latest.crack_321], ['ULSD-Brent (일간)', dc.latest.ulsd_brent]];
+        document.getElementById('refinery-daily-grid').innerHTML = cards.map(([label, m]) => `<div class="metric-card">
+            <div class="label">${label}</div>
+            <div class="value">$${fmt(m.value)}</div>
+            <div class="change"><span class="${chgCls(m.chg_1d)}">전일 ${sgn(m.chg_1d)}</span> · 20일 평균 $${fmt(m.avg_20d)} · vs 주간 ${sgn(m.vs_weekly)}</div>
+            <div class="desc">일간 스팟 ${m.date} 기준</div>
+        </div>`).join('');
+
+        const n = dc.dates.length;
+        const baseOpts = {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: true, position: 'top', labels: { color: '#57606a', font: { size: 11 }, boxWidth: 18 } } },
+            scales: {
+                x: { ticks: { color: '#1f2937', maxTicksLimit: 12, font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+                y: { beginAtZero: false, ticks: { color: '#1f2937', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.5)' } },
+            },
+        };
+        const refLine = (label, value, color) => ({
+            label, data: Array(n).fill(value), borderColor: color,
+            borderDash: [5, 5], borderWidth: 1, pointRadius: 0, spanGaps: true,
+        });
+        refineryCharts.push(new Chart(document.getElementById('refinery-chart-daily'), {
+            type: 'line',
+            data: { labels: dc.dates, datasets: [
+                { label: '3-2-1 크랙 일간 ($/bbl)', data: dc.crack_321, borderColor: '#0969da', pointRadius: 0, borderWidth: 1.5, tension: 0.1, spanGaps: true },
+                { label: 'ULSD-Brent 일간 ($/bbl)', data: dc.ulsd_brent, borderColor: '#f0883e', pointRadius: 0, borderWidth: 1.5, tension: 0.1, spanGaps: true },
+                refLine('경보선 $20', 20, '#cf222e'),
             ] },
             options: baseOpts,
         }));

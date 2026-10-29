@@ -133,15 +133,53 @@ def fetch_daily():
 
 # ===== 계산 =====
 
-def _compute_cracks(raw):
-    """{date: crack_321}, {date: ulsd_brent} (날짜 교집합 기준)."""
+def _compute_cracks(raw, wti="wti", brent="brent", gasoline="gasoline", ulsd="ulsd"):
+    """{date: crack_321}, {date: ulsd_brent} (날짜 교집합 기준). 키 이름만 바꿔 주간(wti…)·일간(wti_d…) 공용.
+    crack_321 = (2·휘발유·42 + 디젤·42)/3 − WTI,  ulsd_brent = 디젤·42 − Brent  ($/gal → $/bbl 환산 42)"""
     crack_321 = {}
-    for d in set(raw["wti"]) & set(raw["gasoline"]) & set(raw["ulsd"]):
-        crack_321[d] = (2 * raw["gasoline"][d] * 42 + raw["ulsd"][d] * 42) / 3 - raw["wti"][d]
+    for d in set(raw[wti]) & set(raw[gasoline]) & set(raw[ulsd]):
+        crack_321[d] = (2 * raw[gasoline][d] * 42 + raw[ulsd][d] * 42) / 3 - raw[wti][d]
     ulsd_brent = {}
-    for d in set(raw["ulsd"]) & set(raw["brent"]):
-        ulsd_brent[d] = raw["ulsd"][d] * 42 - raw["brent"][d]
+    for d in set(raw[ulsd]) & set(raw[brent]):
+        ulsd_brent[d] = raw[ulsd][d] * 42 - raw[brent][d]
     return crack_321, ulsd_brent
+
+
+DAILY_HISTORY_DAYS = 60
+DAILY_AVG_DAYS = 20
+
+
+def _compute_daily_cracks(daily, weekly_latest=None):
+    """fetch_daily() 결과(일간 스팟 4개) → 일간 크랙 시리즈·최신값. 시리즈가 하나라도 없으면 None.
+    주간 판정과 무관한 '확정치 사이 확인용' 값이다. vs_weekly = 일간 최신 − 주간 최신(weekly_latest[key]["value"])."""
+    need = ("wti_d", "brent_d", "gasoline_d", "ulsd_d")
+    if not daily or any(k not in daily or not (daily[k].get("values") or {}) for k in need):
+        return None
+    raw = {k: daily[k]["values"] for k in need}
+    crack_321, ulsd_brent = _compute_cracks(raw, wti="wti_d", brent="brent_d", gasoline="gasoline_d", ulsd="ulsd_d")
+    if not crack_321 or not ulsd_brent:
+        return None
+    dates = sorted(set(crack_321) | set(ulsd_brent))[-DAILY_HISTORY_DAYS:]
+
+    def latest_of(series, key):
+        ds = sorted(series)
+        last, prev = ds[-1], (ds[-2] if len(ds) > 1 else None)
+        recent = [series[d] for d in ds[-DAILY_AVG_DAYS:]]
+        wk = ((weekly_latest or {}).get(key) or {}).get("value")
+        return {
+            "value": round(series[last], 2), "date": last,
+            "chg_1d": round(series[last] - series[prev], 2) if prev else None,
+            "avg_20d": round(sum(recent) / len(recent), 2) if recent else None,
+            "vs_weekly": round(series[last] - wk, 2) if wk is not None else None,
+        }
+
+    return {
+        "as_of": max(max(crack_321), max(ulsd_brent)),
+        "dates": dates,
+        "crack_321": [round(crack_321[d], 2) if d in crack_321 else None for d in dates],
+        "ulsd_brent": [round(ulsd_brent[d], 2) if d in ulsd_brent else None for d in dates],
+        "latest": {"crack_321": latest_of(crack_321, "crack_321"), "ulsd_brent": latest_of(ulsd_brent, "ulsd_brent")},
+    }
 
 
 def _week_of(dstr):
@@ -300,15 +338,23 @@ def build_data():
 
     # 일간 원자료(외부 공유용) — best-effort. 실패해도 주간 결과는 그대로 반환.
     daily, daily_failed = fetch_daily()
+    # 일간 크랙(주간 확정치 사이 확인용). 판정·백테스트·stale 은 여전히 주간 data_as_of 기준.
+    try:
+        daily_cracks = _compute_daily_cracks(daily, latest)
+    except Exception as e:
+        print(f"[refinery] 일간 크랙 계산 실패(건너뜀): {type(e).__name__}: {e}", flush=True)
+        daily_cracks = None
 
     result = {
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "data_as_of": data_as_of,
+        "data_as_of_daily": daily_cracks["as_of"] if daily_cracks else None,
         "source_note": "EIA 주간 시리즈. 휘발유는 NY하버 Conventional Regular 스팟(RBOB 주간 스팟 부재로 대체).",
         "latest": latest,
         "overall": {"level": level, "message": msg},
         "history": history,
         "daily": daily,
+        "daily_cracks": daily_cracks,
     }
     if daily_failed:
         result["daily_failed"] = daily_failed
@@ -353,8 +399,10 @@ if __name__ == "__main__":
     import sys
     force = ("--refresh" in sys.argv) or ("--force" in sys.argv)
     result = get_refinery_data(force=force)
-    out = {k: v for k, v in result.items() if k not in ("history", "daily")}
+    out = {k: v for k, v in result.items() if k not in ("history", "daily", "daily_cracks")}
     out["history_weeks"] = len(result["history"]["dates"])
+    dc = result.get("daily_cracks")
+    out["daily_cracks"] = {"as_of": dc["as_of"], "latest": dc["latest"], "days": len(dc["dates"])} if dc else None
     daily = result.get("daily", {})
     out["daily_latest"] = {
         k: v.get("latest") for k, v in daily.items()
