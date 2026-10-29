@@ -2578,6 +2578,8 @@
         <span class="period-btn" onclick="loadDigestRange(3, this)">3일</span>
         <span class="period-btn" onclick="loadDigestRange(5, this)">5일</span>
         <span class="period-btn" onclick="loadDigestRange(14, this)">2주</span>
+        <span class="period-btn" onclick="resummarizeDigest()" title="현재 선택된 기간의 공시 요약을 다시 만듭니다" style="margin-left:8px;">요약 다시 만들기</span>
+        <span id="dart-digest-resum-msg" style="font-size:11px;color:#6b7280;"></span>
         <label class="dart-tg-toggle-row" style="margin:0 0 0 auto;">
           <input type="checkbox" id="dart-digest-tg-toggle" onchange="toggleDigestTelegram(this.checked)">
           텔레그램 슬롯 전송
@@ -5912,7 +5914,28 @@
 
     let _digestAllItems = [];
     let _digestPage = 1;
+    let _digestDays = 1;
     const _digestPerPage = 20;
+
+    async function resummarizeDigest() {
+        const msgEl = document.getElementById('dart-digest-resum-msg');
+        msgEl.textContent = '요청 중...';
+        try {
+            const res = await fetch(API_BASE + '/api/dart/daily/resummarize', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({days: _digestDays})
+            });
+            const data = await res.json();
+            if (data.ok) {
+                msgEl.textContent = `${data.queued}건 대기열 등록 · 30초 뒤 새로고침`;
+                setTimeout(() => { loadDigestRange(_digestDays); msgEl.textContent = ''; }, 30000);
+            } else {
+                msgEl.textContent = data.error === 'already_running' ? `이미 실행 중 (${data.state.done}/${data.state.total})` : ('실패: ' + (data.error || ''));
+            }
+        } catch (e) {
+            msgEl.textContent = '요청 실패';
+        }
+    }
 
     async function loadDigestRange(days, btnEl) {
         if (btnEl) {
@@ -5920,6 +5943,7 @@
             btnEl.classList.add('active');
         }
         _digestPage = 1;
+        _digestDays = days;
         try {
             const res = await fetch(API_BASE + '/api/dart/daily?days=' + days);
             const data = await res.json();
@@ -5962,11 +5986,14 @@
                 lastDate = d;
             }
             const link = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${it.rcept_no}`;
-            const summary = it.summary ? `<div class="dart-digest-summary">${it.summary}</div>` : '';
+            const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            const summary = (it.summary && String(it.summary).trim())
+                ? `<div class="dart-digest-summary">${esc(it.summary)}</div>`
+                : `<div class="dart-digest-summary" style="color:#9ca3af;font-size:11px;">요약 대기${it.summary_err ? ' · ' + esc(it.summary_err) : ''}</div>`;
             html += `<div class="dart-digest-row">
-                <div class="dart-digest-corp">${it.corp_name || ''}<span class="sc">${it.stock_code || ''}</span></div>
-                <div class="dart-digest-link"><a href="${link}" target="_blank">${it.title || ''}</a></div>
-                <div style="font-size:12px;color:#1f2937;">${it.summary || ''}</div>
+                <div class="dart-digest-corp">${esc(it.corp_name)}<span class="sc">${esc(it.stock_code)}</span></div>
+                <div class="dart-digest-link"><a href="${link}" target="_blank">${esc(it.title)}</a></div>
+                ${summary}
             </div>`;
         }
         container.innerHTML = html;

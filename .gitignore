@@ -91,3 +91,6 @@ socket_baseline.txt
 
 # LLM 호출·배치 로그
 logs/
+
+# 잠정실적 추출 공유 캐시 (공시 요약·텔레그램 공용)
+cache/earnings_extract/

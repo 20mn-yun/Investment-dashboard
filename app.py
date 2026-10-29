@@ -2893,23 +2893,43 @@ def _llm(task, prompt, json_mode=False):
 
 
 # --- DART 문서 텍스트 추출 ---
+EARNINGS_CACHE_DIR = os.path.join(_BD, "cache", "earnings_extract")
+_DART_DOC_MAX = 8000
+_AMT_UNIT_TO_EOK = {"조원": 10_000.0, "조": 10_000.0, "억원": 1.0, "억": 1.0, "백만원": 0.01, "백만": 0.01, "천원": 0.00001, "천": 0.00001, "원": 0.00000001}
+
+
 def _dart_doc(rcept_no):
+    """공시 원문(document.xml) 텍스트. 반환 (텍스트 ≤8,000자, 사유).
+    사유: None(정상) | "DART점검"(점검 중이거나 HTML 안내 페이지 → kr_financials 차단기와 공유) | "원문없음"(아직 준비 안 됨·오류 응답·네트워크)"""
+    if kr_financials.dart_is_paused():
+        return "", "DART점검"
     try:
         res = requests.get(
             "https://opendart.fss.or.kr/api/document.xml",
             params={"crtfc_key": DART_API_KEY, "rcept_no": rcept_no},
             timeout=30,
         )
-        with zipfile.ZipFile(io.BytesIO(res.content)) as z:
+    except Exception:
+        return "", "원문없음"
+    body = res.content or b""
+    head = body[:200].lstrip().lower()
+    if head.startswith(b"<!doctype") or head.startswith(b"<html") or b"text/html" in (res.headers.get("Content-Type") or "").lower().encode():
+        kr_financials.dart_mark_html_response("document.xml")
+        return "", "DART점검"
+    try:
+        with zipfile.ZipFile(io.BytesIO(body)) as z:
             for name in z.namelist():
                 if name.endswith(".xml"):
                     with z.open(name) as f:
                         raw = f.read().decode("utf-8", errors="ignore")
                         text = re.sub(r"<[^>]+>", " ", raw)
-                        return re.sub(r"\s+", " ", text).strip()[:8000]
+                        text = re.sub(r"\s+", " ", text).strip()[:_DART_DOC_MAX]
+                        return (text, None) if text else ("", "원문없음")
+    except zipfile.BadZipFile:
+        pass                                   # DART 가 JSON 오류({"status":"013",...}) 를 준 경우: 아직 준비 안 됨
     except Exception:
         pass
-    return ""
+    return "", "원문없음"
 
 
 def _mcap_str(stock_code):
@@ -2966,16 +2986,7 @@ def _ck_watchlist():
                     seen.add(rno)
                     chg = True
                     title = it.get("report_nm", "")
-                    doc = _dart_doc(rno)
-                    summary = _llm(
-                        "dart_watch_summary",
-                        f"다음 DART 공시의 핵심 내용을 3줄 이내로 간결하게 한국어로 요약해줘:\n\n{doc[:4000]}"
-                    ) if doc else ""
-                    msg = (f"📢 <b>{info['name']}</b> 새 공시\n\n"
-                           f"📋 {title}\n📅 {it.get('rcept_dt', '')}\n")
-                    if summary:
-                        msg += f"\n📝 {summary}\n"
-                    msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>공시 원문</a>"
+                    msg = _watchlist_message(info["name"], title, it.get("rcept_dt", ""), rno)
                     _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg)
                     _alog("종목", f"{info['name']} - {title}")
                 total_page = int(data.get("total_page", 1))
@@ -2989,7 +3000,20 @@ def _ck_watchlist():
         _save_seen(seen)
 
 
+def _watchlist_message(corp_name, title, rcept_dt, rno):
+    """워치리스트 새 공시 텔레그램 메시지 문자열 (전송은 호출부). 원문이 없으면 요약 줄 생략."""
+    doc, _derr = _dart_doc(rno)
+    summary = _llm("dart_watch_summary", f"다음 DART 공시의 핵심 내용을 3줄 이내로 간결하게 한국어로 요약해줘:\n\n{doc}") if doc else ""
+    msg = (f"📢 <b>{corp_name}</b> 새 공시\n\n"
+           f"📋 {title}\n📅 {rcept_dt}\n")
+    if summary:
+        msg += f"\n📝 {summary}\n"
+    msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>공시 원문</a>"
+    return msg
+
+
 def _fmt_amt(v):
+    """억원 값 → '1.2조' / '980억' / '-210억'. None 이면 '-'"""
     if v is None:
         return "-"
     try:
@@ -3002,17 +3026,172 @@ def _fmt_amt(v):
 
 
 def _pct_change(cur, prev):
+    """증감률 문자열(소수 1자리). 부호가 바뀌면 적자전환/흑자전환, 둘 다 음수면 적자지속. 계산 불가면 ''"""
     try:
         c, p = float(cur), float(prev)
-        if p == 0:
-            return ""
-        pct = (c - p) / abs(p) * 100
-        return f"{pct:+.0f}%"
     except (TypeError, ValueError):
         return ""
+    if p == 0:
+        return ""
+    if p < 0 and c < 0:
+        return "적자지속"
+    if p >= 0 > c:
+        return "적자전환"
+    if p < 0 <= c:
+        return "흑자전환"
+    return f"{(c - p) / abs(p) * 100:+.1f}%"
 
 
+def _num_raw(v):
+    """원문 숫자 문자열 → float (쉼표·공백 제거, 괄호·△ 는 음수). 없으면 None"""
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    t = str(v).strip().replace(",", "").replace(" ", "")
+    neg = t.startswith(("△", "▲", "(", "-")) and not t.startswith("-")
+    t = t.strip("()△▲")
+    try:
+        f = float(t)
+    except ValueError:
+        return None
+    return -abs(f) if neg else f
+
+
+def _to_eok(raw, unit):
+    """원문 숫자 + 단위 → 억원 (코드 환산). 단위를 모르면 None"""
+    v = _num_raw(raw)
+    if v is None:
+        return None
+    u = re.sub(r"\s+", "", str(unit or ""))
+    for k in sorted(_AMT_UNIT_TO_EOK, key=len, reverse=True):
+        if u.startswith(k):
+            return v * _AMT_UNIT_TO_EOK[k]
+    return None
+
+
+def _period_label(s):
+    """'2026년 3분기' / '2026.3Q' / '26.3Q' / '2026-09' → '26.3Q'. 못 알아보면 원문 앞 12자, 없으면 '-'"""
+    t = str(s or "").strip()
+    if not t:
+        return "-"
+    m = re.search(r"(20)?(\d\d)\s*년?\s*[.\-/]?\s*([1-4])\s*(?:분기|Q)", t, flags=re.I)
+    if m:
+        return f"{m.group(2)}.{m.group(3)}Q"
+    m = re.search(r"(20)?(\d\d)[.\-/](\d{1,2})", t)
+    if m:
+        q = (int(m.group(3)) - 1) // 3 + 1
+        return f"{m.group(2)}.{q}Q"
+    m = re.search(r"(20\d\d)", t)
+    if m:
+        return f"FY{m.group(1)}"
+    return t[:12]
+
+
+def _llm_json(task, prompt):
+    """JSON 모드 LLM 호출 1회 + JSON 실패 시 같은 프롬프트로 1회 재시도. 반환 (dict|None, err). err: None | 'JSON실패' | 'LLM실패:<사유>'"""
+    last = "JSON실패"
+    for attempt in range(2):
+        try:
+            r = llm_client.complete(task, prompt, json_mode=True)
+        except Exception as e:
+            return None, f"LLM실패:{(type(e).__name__ + ': ' + str(e))[:60]}"
+        if r.ok and isinstance(r.data, dict):
+            return r.data, None
+        if r.error == "json_parse_failed":
+            last = "JSON실패"
+            continue
+        return None, f"LLM실패:{(r.error or 'unknown')[:60]}"
+    return None, last
+
+
+def _fin_triplet(label, cur, prev, prev_year=None):
+    """'매출 1.2조 (YoY +12.0%, QoQ -3.0%)' — prev_year 없으면 YoY 생략, prev 없으면 QoQ 생략"""
+    parts = []
+    if prev_year is not None and cur is not None:
+        parts.append(f"YoY {_pct_change(cur, prev_year) or '-'}")
+    if prev is not None and cur is not None:
+        parts.append(f"QoQ {_pct_change(cur, prev) or '-'}")
+    return f"{label} {_fmt_amt(cur)}" + (f" ({', '.join(parts)})" if parts else "")
+
+
+# --- 잠정실적 추출 + 공유 캐시 (1-B) ---
+def _earnings_cache_get(rcept_no):
+    try:
+        with open(os.path.join(EARNINGS_CACHE_DIR, f"{rcept_no}.json"), "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _earnings_cache_put(rcept_no, data):
+    try:
+        os.makedirs(EARNINGS_CACHE_DIR, exist_ok=True)
+        tmp = os.path.join(EARNINGS_CACHE_DIR, f"{rcept_no}.json.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, os.path.join(EARNINGS_CACHE_DIR, f"{rcept_no}.json"))
+    except OSError as e:
+        logger.warning("[dart] earnings cache 저장 실패 %s: %s", rcept_no, type(e).__name__)
+
+
+def _earnings_extract(doc, rcept_no=None):
+    """잠정실적 공시 본문 → 수치. 모델은 원문 숫자(raw)·단위만 뽑고 환산(억원)은 코드가 한다.
+    반환(기존 호환): {"fs_type", "period", "revenue"|"op_profit"|"net_income": {"current","prev","prev_year"}(억원), "reason", "raw_unit", "raw", "err"}.
+    실패하면 None. rcept_no 가 있으면 cache/earnings_extract/<rcept_no>.json 에 저장."""
+    if not doc:
+        return None
+    data, err = _llm_json(
+        "earnings_extract",
+        "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+        '{"fs_type":"연결 또는 별도",'
+        '"period":"당기 열의 머리글 그대로(예: 2026년 3분기)",'
+        '"unit":"표에 적힌 금액 단위 그대로(원/천원/백만원/억원/조원)",'
+        '"revenue":{"current_raw":당기 매출액 원문 숫자,"prev_raw":직전분기(전기) 매출액 원문 숫자,"prev_year_raw":전년동기 매출액 원문 숫자},'
+        '"op_profit":{"current_raw":당기 영업이익 원문 숫자,"prev_raw":전기 영업이익 원문 숫자,"prev_year_raw":전년동기 영업이익 원문 숫자},'
+        '"net_income":{"current_raw":당기 순이익 원문 숫자,"prev_raw":전기 순이익 원문 숫자,"prev_year_raw":전년동기 순이익 원문 숫자},'
+        '"reason":"변동요인 2줄 요약"}\n'
+        "규칙: 숫자는 표에 적힌 그대로(쉼표만 제거, 환산 금지), 음수는 -로. '당해실적' 열만 current, '전기실적' 열은 prev, '전년동기실적' 열은 prev_year. "
+        "누계실적 열은 쓰지 않는다. 없는 값은 null.\n\n"
+        f"{doc}",
+    )
+    if not data:
+        return None
+    unit = data.get("unit") or ""
+    out = {"fs_type": data.get("fs_type") or "-", "period": _period_label(data.get("period")), "reason": data.get("reason") or "",
+           "unit": unit, "raw": {}, "raw_unit": {"unit": unit}}
+    for key in ("revenue", "op_profit", "net_income"):
+        node = data.get(key) or {}
+        out["raw"][key] = {k: node.get(k) for k in ("current_raw", "prev_raw", "prev_year_raw")}
+        out[key] = {"current": _to_eok(node.get("current_raw"), unit), "prev": _to_eok(node.get("prev_raw"), unit),
+                    "prev_year": _to_eok(node.get("prev_year_raw"), unit)}
+    out["raw_unit"]["revenue_current"] = (data.get("revenue") or {}).get("current_raw")
+    if rcept_no:
+        out["rcept_no"] = rcept_no
+        out["at"] = datetime.now().isoformat(timespec="seconds")
+        _earnings_cache_put(rcept_no, out)
+    return out
+
+
+def _earnings_data(rcept_no, doc=None):
+    """캐시 우선, 없으면 (doc 받아) 추출해 캐시. 반환 (data|None, err)"""
+    cached = _earnings_cache_get(rcept_no) if rcept_no else None
+    if cached:
+        return cached, None
+    derr = None
+    if doc is None:
+        doc, derr = _dart_doc(rcept_no)
+    if not doc:
+        return None, derr or "원문없음"
+    fd = _earnings_extract(doc, rcept_no)
+    return (fd, None) if fd else (None, "JSON실패")
+
+
+# --- 대량보유: DART majorstock.json 1순위 ---
 def _majorstock_summary(corp_code, rno):
+    """DART majorstock.json 에서 rcept_no 를 찾아 dict {reporter, prev, curr, reason, report_tp} 반환. 없으면 None"""
+    if not corp_code or kr_financials.dart_is_paused():
+        return None
     try:
         res = requests.get(
             "https://opendart.fss.or.kr/api/majorstock.json",
@@ -3021,165 +3200,158 @@ def _majorstock_summary(corp_code, rno):
         )
         data = res.json()
         if data.get("status") != "000":
-            return ""
+            return None
         hit = next((x for x in data.get("list", []) if x.get("rcept_no") == rno), None)
         if not hit:
-            return ""
-        repror = hit.get("repror", "")
-        report_tp = hit.get("report_tp", "")
-        try:
-            curr = float(hit.get("stkrt", "0"))
-            irds = float(hit.get("stkrt_irds", "0"))
-            prev = round(curr - irds, 2)
-        except (TypeError, ValueError):
-            return ""
-        reason = (hit.get("report_resn") or "").lstrip("- ").strip()
-        if len(reason) > 50:
-            reason = reason[:50]
-        parts = []
-        if repror:
-            parts.append(f"보고자: {repror}")
-        parts.append(f"보유비율: {prev}%→{curr}%")
-        if reason:
-            parts.append(f"사유: {reason}")
-        if report_tp:
-            parts.append(f"({report_tp})")
-        return " · ".join(parts)
+            return None
+        curr = float(hit.get("stkrt", "0"))
+        irds = float(hit.get("stkrt_irds", "0"))
+        return {"reporter": hit.get("repror", ""), "prev": round(curr - irds, 2), "curr": curr,
+                "reason": (hit.get("report_resn") or "").lstrip("- ").strip()[:50], "purpose": "", "report_tp": hit.get("report_tp", "")}
     except Exception:
-        return ""
+        return None
+
+
+def _fmt_major(d):
+    pv, cv = d.get("prev"), d.get("curr")
+    ratio = "-"
+    if pv is not None and cv is not None:
+        ratio = f"{float(pv):.2f}% → {float(cv):.2f}% ({float(cv) - float(pv):+.2f}%p)"
+    elif cv is not None:
+        ratio = f"{float(cv):.2f}%"
+    s = f"[대량보유] 보고자: {d.get('reporter') or '-'} | {ratio} | 사유: {d.get('reason') or '-'} | 목적: {d.get('purpose') or '-'}"
+    if d.get("report_tp"):
+        s += f" ({d['report_tp']})"
+    return s
+
+
+def _dart_kind(title):
+    t = title or ""
+    if "잠정실적" in t or "영업(잠정)" in t:
+        return "잠정실적"
+    if "공급계약" in t:
+        return "공급계약"
+    if "대량보유" in t:
+        return "대량보유"
+    if "손익구조" in t:
+        return "손익구조변경"
+    if "전망" in t:
+        return "전망"
+    return "기타"
 
 
 def _dart_summary(title, rno, corp_code=""):
-    try:
-        doc = _dart_doc(rno)
-    except Exception:
-        doc = ""
+    """공시 1건 → (요약, 사유). 요약은 '[종류] 항목 | 항목 | …' 고정 틀, 값이 없으면 '-'.
+    실패하면 ("", err) — err ∈ "원문없음" / "DART점검" / "LLM실패:<사유>" / "JSON실패". 자유 텍스트 폴백 없음."""
+    kind = _dart_kind(title)
 
-    if not doc and "대량보유" in title and corp_code:
-        return _majorstock_summary(corp_code, rno)
-
-    if not doc:
-        return ""
-
-    def _one_line():
-        return _llm("dart_detail", f"다음 DART 공시의 핵심 내용을 1줄로 요약:\n{doc[:3000]}") or ""
-
-    if "공급계약" in title:
-        d = _llm(
-            "dart_detail",
-            "다음 DART 공급계약 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
-            '{"counterparty":"계약상대방","amount":계약금액(억원),'
-            '"recent_revenue":최근매출액(억원),"pct":매출대비퍼센트숫자,'
-            '"period":"계약기간 문자열"}\n'
-            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}",
-            json_mode=True,
-        )
-        try:
-            if d:
-                parts = []
-                if d.get("counterparty"):
-                    parts.append(f"계약상대: {d['counterparty']}")
-                if d.get("amount") is not None:
-                    parts.append(f"금액: {_fmt_amt(d['amount'])}")
-                if d.get("recent_revenue") is not None:
-                    parts.append(f"최근매출: {_fmt_amt(d['recent_revenue'])}")
-                if d.get("pct") is not None:
-                    parts.append(f"매출대비: {d['pct']}%")
-                if d.get("period"):
-                    parts.append(f"기간: {d['period']}")
-                if parts:
-                    return " · ".join(parts)
-        except Exception:
-            pass
-        return _one_line()
-
-    if "대량보유" in title:
-        d = _llm(
+    if kind == "대량보유":
+        d = _majorstock_summary(corp_code, rno)
+        if d:
+            return _fmt_major(d), None
+        doc, derr = _dart_doc(rno)
+        if not doc:
+            return "", derr or "원문없음"
+        data, err = _llm_json(
             "dart_detail",
             "다음 DART 대량보유 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
-            '{"reporter":"보고자","prev_ratio":직전보유비율숫자,'
-            '"curr_ratio":이번보유비율숫자,"reason":"보고사유",'
-            '"purpose":"보유목적"}\n'
-            f"숫자는 퍼센트, 없으면 null.\n\n{doc[:4000]}",
-            json_mode=True,
+            '{"reporter":"보고자","prev_ratio":직전보유비율숫자,"curr_ratio":이번보유비율숫자,"reason":"보고사유(30자 이내)","purpose":"보유목적","report_tp":"약식 또는 일반 또는 null"}\n'
+            f"숫자는 퍼센트, 없으면 null.\n\n{doc}",
         )
-        try:
-            if d:
-                parts = []
-                if d.get("reporter"):
-                    parts.append(f"보고자: {d['reporter']}")
-                pr = d.get("prev_ratio")
-                cr = d.get("curr_ratio")
-                if pr is not None and cr is not None:
-                    parts.append(f"보유비율: {pr}%→{cr}%")
-                elif cr is not None:
-                    parts.append(f"보유비율: {cr}%")
-                if d.get("reason"):
-                    parts.append(f"사유: {d['reason']}")
-                if d.get("purpose"):
-                    parts.append(f"목적: {d['purpose']}")
-                if parts:
-                    return " · ".join(parts)
-        except Exception:
-            pass
-        return _one_line()
+        if not data:
+            return "", err
+        return _fmt_major({"reporter": data.get("reporter"), "prev": _num_raw(data.get("prev_ratio")), "curr": _num_raw(data.get("curr_ratio")),
+                           "reason": data.get("reason"), "purpose": data.get("purpose"), "report_tp": data.get("report_tp") or ""}), None
 
-    if "잠정실적" in title or "영업(잠정)" in title:
-        d = _llm(
+    if kind == "잠정실적":
+        fd, err = _earnings_data(rno)
+        if not fd:
+            return "", err
+        parts = [f"[잠정실적] {fd.get('period') or '-'} {fd.get('fs_type') or '-'}"]
+        for label, key in (("매출", "revenue"), ("영업익", "op_profit"), ("순익", "net_income")):
+            n = fd.get(key) or {}
+            parts.append(_fin_triplet(label, n.get("current"), n.get("prev"), n.get("prev_year")))
+        return " | ".join(parts), None
+
+    doc, derr = _dart_doc(rno)
+    if not doc:
+        return "", derr or "원문없음"
+
+    if kind == "공급계약":
+        data, err = _llm_json(
             "dart_detail",
-            "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
-            '{"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
-            '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)}}\n'
-            f"숫자는 억원 단위, 없으면 null.\n\n{doc[:4000]}",
-            json_mode=True,
+            "다음 DART 단일판매·공급계약 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+            '{"counterparty":"계약상대방(비공개면 \\"비공개\\")","amount_raw":계약금액 원문 숫자,"amount_unit":"계약금액 단위(원/천원/백만원/억원)",'
+            '"recent_revenue_raw":최근 매출액 원문 숫자,"recent_revenue_unit":"단위","pct":원문 표의 매출액 대비 비율 숫자(없으면 null),'
+            '"start_date":"계약 시작일 YYYY-MM-DD","end_date":"계약 종료일 YYYY-MM-DD","subject":"계약 내용(20자 이내)"}\n'
+            f"숫자는 표에 적힌 그대로(쉼표만 제거, 환산 금지). 없는 값은 null.\n\n{doc}",
         )
-        try:
-            if d:
-                rv = d.get("revenue") or {}
-                op = d.get("op_profit") or {}
-                parts = []
-                rc, rp = rv.get("current"), rv.get("prev")
-                oc, op_ = op.get("current"), op.get("prev")
-                if rc is not None:
-                    s = f"매출: {_fmt_amt(rc)}"
-                    if rp is not None:
-                        s += f"(전기 {_fmt_amt(rp)}, {_pct_change(rc, rp)})"
-                    parts.append(s)
-                if oc is not None:
-                    s = f"영업익: {_fmt_amt(oc)}"
-                    if op_ is not None:
-                        s += f"(전기 {_fmt_amt(op_)}, {_pct_change(oc, op_)})"
-                    parts.append(s)
-                if parts:
-                    return " · ".join(parts)
-        except Exception:
-            pass
-        return _one_line()
+        if not data:
+            return "", err
+        amt = _to_eok(data.get("amount_raw"), data.get("amount_unit"))
+        rev = _to_eok(data.get("recent_revenue_raw"), data.get("recent_revenue_unit"))
+        pct = _num_raw(data.get("pct"))
+        if pct is None and amt is not None and rev:
+            pct = amt / rev * 100
+        sd, ed = str(data.get("start_date") or "")[2:10].replace("-", "-"), str(data.get("end_date") or "")[2:10]
+        period = f"{sd}~{ed}" if sd and ed else (sd or ed or "-")
+        return (f"[공급계약] 상대: {data.get('counterparty') or '-'} | {_fmt_amt(amt)}"
+                + (f" (최근매출 대비 {pct:.1f}%)" if pct is not None else " (최근매출 대비 -)")
+                + f" | 기간 {period} | 내용: {(data.get('subject') or '-')[:20]}"), None
 
-    return _one_line()
+    if kind == "손익구조변경":
+        data, err = _llm_json(
+            "dart_detail",
+            "다음 DART 매출액 또는 손익구조 30% 이상 변경 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
+            '{"fs_type":"연결 또는 별도","fiscal_year":"해당 사업연도(예: 2025)","unit":"표의 금액 단위(원/천원/백만원/억원)",'
+            '"revenue":{"current_raw":당해 매출액 원문 숫자,"prev_raw":직전 사업연도 매출액 원문 숫자},'
+            '"op_profit":{"current_raw":당해 영업이익 원문 숫자,"prev_raw":직전 영업이익 원문 숫자},'
+            '"net_income":{"current_raw":당해 당기순이익 원문 숫자,"prev_raw":직전 당기순이익 원문 숫자},'
+            '"reason":"변동 주요원인(30자 이내)"}\n'
+            f"숫자는 표에 적힌 그대로(쉼표만 제거, 환산 금지), 음수는 -로. 없는 값은 null.\n\n{doc}",
+        )
+        if not data:
+            return "", err
+        unit = data.get("unit") or ""
+        fy = str(data.get("fiscal_year") or "").strip()
+        fy = f"FY{fy}" if fy and not fy.upper().startswith("FY") else (fy or "-")
+        parts = [f"[손익구조변경] {fy} {data.get('fs_type') or '-'}"]
+        for label, key in (("매출", "revenue"), ("영업익", "op_profit"), ("순익", "net_income")):
+            node = data.get(key) or {}
+            cur, prev = _to_eok(node.get("current_raw"), unit), _to_eok(node.get("prev_raw"), unit)
+            chg = _pct_change(cur, prev) if cur is not None and prev is not None else ""
+            parts.append(f"{label} {_fmt_amt(cur)}" + (f" ({chg})" if chg else ""))
+        parts.append(f"원인: {(data.get('reason') or '-')[:30]}")
+        return " | ".join(parts), None
+
+    # 전망 / 기타: 자유 1줄 요약 + 접두
+    text = _llm("dart_detail", f"다음 DART 공시의 핵심 내용을 1줄로 요약(숫자는 원문 표기 그대로):\n{doc}")
+    if not text:
+        return "", "LLM실패:빈 응답"
+    return f"[{'전망' if kind == '전망' else '기타'}] {text.strip()}", None
 
 
 # --- Feature 2: 잠정실적 ---
-def _earnings_extract(doc):
-    """잠정실적 공시 본문에서 수치 추출 (llm_client earnings_extract, JSON). 실패하면 None (기존 Gemini 시절과 같은 계약)."""
-    if not doc:
-        return None
-    fd = _llm(
-        "earnings_extract",
-        "다음 DART 잠정실적 공시에서 정보를 추출해. 반드시 JSON만 응답:\n"
-        '{"fs_type":"연결 또는 별도",'
-        '"revenue":{"current":당기매출(억원),"prev":전기매출(억원)},'
-        '"op_profit":{"current":당기영업이익(억원),"prev":전기영업이익(억원)},'
-        '"net_income":{"current":당기순이익(억원),"prev":전기순이익(억원)},'
-        '"reason":"변동요인 2줄 요약",'
-        '"raw_unit":{"unit":"원문 단위 문자열","revenue_current":환산 전 원문 숫자}}\n'
-        "숫자는 억원 단위, 없으면 null.\n"
-        "원문 금액의 단위(원/천원/백만원/억원)를 먼저 확인하고 억원으로 환산해서 적을 것. 백만원 단위면 100으로 나눔. "
-        "환산 전 원문 숫자와 단위도 raw_unit 에 함께 반환.\n\n"
-        f"{doc[:5000]}",
-        json_mode=True,
-    )
-    return fd or None
+def _earnings_message(it, fd):
+    """잠정실적 텔레그램 메시지 문자열 (전송은 호출부)"""
+    corp_name, stock_code, title, rno = it.get("corp_name", ""), it.get("stock_code", ""), it.get("report_nm", ""), it.get("rcept_no", "")
+    mc = _mcap_str(stock_code)
+    msg = "📊 <b>잠정실적 공시 알림</b>\n\n"
+    msg += f"📅 공시일시: {it.get('rcept_dt', '')}\n"
+    msg += f"🏢 기업명: <b>{corp_name}</b> (시총: {mc})\n"
+    msg += f"📋 보고서: {title}\n"
+    if fd:
+        msg += f"📑 재무제표: {fd.get('fs_type', '-')}" + (f" · {fd.get('period')}" if fd.get("period") and fd.get("period") != "-" else "") + "\n\n"
+        for label, key in (("매출액", "revenue"), ("영업이익", "op_profit"), ("순이익", "net_income")):
+            n = fd.get(key) or {}
+            msg += f"💰 {label}: {_fv(n.get('current'))} (전기: {_fv(n.get('prev'))}" + (f", 전년동기: {_fv(n.get('prev_year'))}" if n.get("prev_year") is not None else "") + ")\n"
+        reason = fd.get("reason", "")
+        if reason:
+            msg += f"\n📝 변동요인: {reason}\n"
+    msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>DART 공시 원문</a>"
+    if stock_code:
+        msg += f"\n🔗 <a href='https://finance.naver.com/item/main.naver?code={stock_code}'>네이버 회사정보</a>"
+    return msg
 
 
 def _ck_earnings():
@@ -3218,15 +3390,11 @@ def _ck_earnings():
                 seen.add(key)
                 chg = True
 
-                corp_name = it.get("corp_name", "")
-                stock_code = it.get("stock_code", "")
-
-                doc = _dart_doc(rno)
-                fd = _earnings_extract(doc)
+                fd, _err = _earnings_data(rno)        # 캐시 우선, 없으면 추출 후 캐시 (1-B)
 
                 if fd:
-                    rev = fd.get("revenue", {})
-                    op = fd.get("op_profit", {})
+                    rev = fd.get("revenue") or {}
+                    op = fd.get("op_profit") or {}
                     rg = (rev.get("current") or 0) > (rev.get("prev") or 0) if rev.get("current") and rev.get("prev") else False
                     og = (op.get("current") or 0) > (op.get("prev") or 0) if op.get("current") and op.get("prev") else False
                     ct = conds.get("condition_type", "or")
@@ -3236,27 +3404,8 @@ def _ck_earnings():
                     if not passed:
                         continue
 
-                mc = _mcap_str(stock_code)
-                msg = "📊 <b>잠정실적 공시 알림</b>\n\n"
-                msg += f"📅 공시일시: {it.get('rcept_dt', '')}\n"
-                msg += f"🏢 기업명: <b>{corp_name}</b> (시총: {mc})\n"
-                msg += f"📋 보고서: {title}\n"
-                if fd:
-                    msg += f"📑 재무제표: {fd.get('fs_type', '-')}\n\n"
-                    r_ = fd.get("revenue", {})
-                    o_ = fd.get("op_profit", {})
-                    n_ = fd.get("net_income", {})
-                    msg += f"💰 매출액: {_fv(r_.get('current'))} (전기: {_fv(r_.get('prev'))})\n"
-                    msg += f"💰 영업이익: {_fv(o_.get('current'))} (전기: {_fv(o_.get('prev'))})\n"
-                    msg += f"💰 순이익: {_fv(n_.get('current'))} (전기: {_fv(n_.get('prev'))})\n"
-                    reason = fd.get("reason", "")
-                    if reason:
-                        msg += f"\n📝 변동요인: {reason}\n"
-                msg += f"\n🔗 <a href='https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rno}'>DART 공시 원문</a>"
-                if stock_code:
-                    msg += f"\n🔗 <a href='https://finance.naver.com/item/main.naver?code={stock_code}'>네이버 회사정보</a>"
-                _tg_send(TELEGRAM_TOKEN_EARNINGS, cid, msg)
-                _alog("잠정", f"{corp_name} - {title}")
+                _tg_send(TELEGRAM_TOKEN_EARNINGS, cid, _earnings_message(it, fd))
+                _alog("잠정", f"{it.get('corp_name', '')} - {title}")
             total_page = int(data.get("total_page", 1))
             if page_no >= total_page:
                 break
@@ -3271,6 +3420,66 @@ def _ck_earnings():
 # --- Feature 3: 주요 공시 ---
 _MAJOR_KW = ["대량보유", "실적", "매출액", "공급계약"]
 _MAJOR_EXCLUDE = ["증권발행실적보고서", "주식등의대량보유상황보고서(일반)"]
+
+
+_MAJOR_RETRY_PER_LOOP = 30
+_MAJOR_RETRY_HOURS = 6
+
+
+def _major_retry_due(item, day=None):
+    """접수(rcept_dt, 당일 공시는 detected_at) 후 6시간 안이면 재시도 대상"""
+    day = day or date.today().isoformat()
+    try:
+        rd = str(item.get("rcept_dt") or "")
+        if len(rd) >= 8 and rd[:8] != date.today().strftime("%Y%m%d"):
+            base = datetime.strptime(rd[:8], "%Y%m%d").replace(hour=18)       # 지난 날짜 공시: 그날 18시 접수로 간주
+        else:
+            base = datetime.strptime(f"{day} {item.get('detected_at') or '00:00'}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return True
+    return datetime.now() - base < timedelta(hours=_MAJOR_RETRY_HOURS)
+
+
+_resummarize_lock = threading.Lock()
+_resummarize_state = {"running": False, "started_at": None, "done": 0, "total": 0, "ok": 0, "last_finished": None}
+
+
+def resummarize_item(item):
+    """history 항목 1건 요약 재생성(덮어쓰기). 반환 (summary, err)"""
+    cc = item.get("corp_code", "")
+    if not cc and item.get("stock_code"):
+        entry = load_dart_corp_map().get(item["stock_code"], {})
+        cc = entry.get("corp_code", "") if isinstance(entry, dict) else str(entry)
+        item["corp_code"] = cc
+    s, err = _dart_summary(item.get("title", ""), item.get("rcept_no", ""), corp_code=cc)
+    item["summary"] = s
+    item["summary_err"] = None if s else (err or "원문없음")
+    item["summary_last_try"] = datetime.now().strftime("%m-%d %H:%M")
+    item["summary_tries"] = int(item.get("summary_tries") or 0) + 1
+    return s, err
+
+
+def _resummarize_days(n_days):
+    """최근 n_days 의 history 전체를 다시 요약(백그라운드). 하루 단위로 저장."""
+    try:
+        h = _load_daily_history()
+        cutoff = (date.today() - timedelta(days=n_days - 1)).isoformat()
+        targets = [(d, it) for d, its in sorted(h.get("days", {}).items()) if d >= cutoff for it in its]
+        _resummarize_state.update(total=len(targets), done=0, ok=0)
+        for d, it in targets:
+            try:
+                s, _e = resummarize_item(it)
+                _resummarize_state["ok"] += 1 if s else 0
+            except Exception as e:
+                it["summary_err"] = f"LLM실패:{type(e).__name__}"[:70]
+            _resummarize_state["done"] += 1
+            if _resummarize_state["done"] % 10 == 0:
+                _save_daily_history(h)
+            time.sleep(0.3)
+        _save_daily_history(h)
+        print(f"[DART] 요약 재생성 완료: {_resummarize_state['ok']}/{_resummarize_state['total']}건 (days={n_days})", flush=True)
+    finally:
+        _resummarize_state.update(running=False, last_finished=datetime.now().isoformat(timespec="seconds"))
 
 
 def _ck_major():
@@ -3316,7 +3525,7 @@ def _ck_major():
                     cmap = load_dart_corp_map()
                     entry = cmap.get(stock_code, {})
                     it_corp_code = entry.get("corp_code", "") if isinstance(entry, dict) else str(entry)
-                summary = _dart_summary(title, rno, corp_code=it_corp_code)
+                summary, serr = _dart_summary(title, rno, corp_code=it_corp_code)
                 daily["items"].append({
                     "corp_name": corp_name,
                     "stock_code": stock_code,
@@ -3325,7 +3534,8 @@ def _ck_major():
                     "rcept_dt": it.get("rcept_dt", ""),
                     "detected_at": datetime.now().strftime("%H:%M"),
                     "summary": summary,
-                    "summary_tries": 1 if not summary else 0,
+                    "summary_err": None if summary else (serr or "원문없음"),
+                    "summary_tries": 0 if summary or serr == "DART점검" else 1,
                 })
                 _alog("주요", f"{corp_name} - {title}")
             total_page = int(data.get("total_page", 1))
@@ -3338,12 +3548,15 @@ def _ck_major():
 
     retried = 0
     for item in daily.get("items", []):
-        if retried >= 12:
+        if retried >= _MAJOR_RETRY_PER_LOOP:
             break
         if item.get("summary"):
             continue
-        tries = item.get("summary_tries", 0)
-        if tries >= 5:
+        if not _major_retry_due(item, daily.get("date")):
+            continue                                   # 접수 후 6시간이 지난 건은 포기 (수동 재생성 API 로만)
+        if kr_financials.dart_is_paused():
+            item["summary_err"] = "DART점검"            # 점검 중엔 시도도, tries 증가도 하지 않는다
+            chg = True
             continue
         cc = item.get("corp_code", "")
         if not cc and item.get("stock_code"):
@@ -3351,14 +3564,20 @@ def _ck_major():
             entry = cmap.get(item["stock_code"], {})
             cc = entry.get("corp_code", "") if isinstance(entry, dict) else str(entry)
             item["corp_code"] = cc
+        tries = int(item.get("summary_tries") or 0)
         try:
-            s = _dart_summary(item.get("title", ""), item.get("rcept_no", ""), corp_code=cc)
-            item["summary_tries"] = tries + 1
+            s, serr = _dart_summary(item.get("title", ""), item.get("rcept_no", ""), corp_code=cc)
             if s:
-                item["summary"] = s
-                chg = True
-        except Exception:
+                item["summary"], item["summary_err"] = s, None
+            else:
+                item["summary_err"] = serr or "원문없음"
+                if serr != "DART점검":
+                    item["summary_tries"] = tries + 1
+        except Exception as e:
+            item["summary_err"] = f"LLM실패:{type(e).__name__}"[:70]
             item["summary_tries"] = tries + 1
+        item["summary_last_try"] = datetime.now().strftime("%H:%M")
+        chg = True
         retried += 1
         time.sleep(0.5)
 
@@ -3400,11 +3619,21 @@ def _send_daily_slot(slot):
             return
         header = f"📋 <b>오늘의 전체 공시 정리 ({date.today().isoformat()})</b>"
     msg = f"{header}\n\n"
-    for i, it in enumerate(filtered, 1):
-        msg += f"{i}. <b>{it['corp_name']}</b>\n   📋 {it['title']}\n"
-        msg += f"   🔗 https://dart.fss.or.kr/dsaf001/main.do?rcpNo={it['rcept_no']}\n\n"
+    msg += _daily_slot_body(filtered)
     _tg_send(TELEGRAM_TOKEN_GENERAL, cid, msg)
     _alog("일일", f"{slot['key']}시 공시 {len(filtered)}건 전송")
+
+
+def _daily_slot_body(items):
+    """슬롯 메시지 본문: 번호·종목·제목·(요약)·링크. 요약이 비어 있으면 그 줄 생략. 분할은 _tg_send 가 처리."""
+    import html as _html
+    out = ""
+    for i, it in enumerate(items, 1):
+        out += f"{i}. <b>{_html.escape(it.get('corp_name') or '')}</b>\n   📋 {_html.escape(it.get('title') or '')}\n"
+        if (it.get("summary") or "").strip():
+            out += f"   📝 {_html.escape(it['summary'].strip())}\n"
+        out += f"   🔗 https://dart.fss.or.kr/dsaf001/main.do?rcpNo={it.get('rcept_no', '')}\n\n"
+    return out
 
 
 def _save_excel():
@@ -4274,6 +4503,40 @@ def toggle_dm():
     if cfg["monitor_enabled"]:
         _start_monitor()
     return jsonify({"ok": True, "enabled": cfg["monitor_enabled"]})
+
+
+@app.route("/api/dart/daily/resummarize", methods=["POST"])
+def dart_daily_resummarize():
+    """공시 요약 재생성. body {"rcept_no": "…"} → 그 건만 동기 처리 후 결과 반환, {"days": N} → 기간 전체를 백그라운드로(즉시 {"ok","queued"}). 기존 요약도 덮어쓴다."""
+    body = request.get_json(silent=True) or {}
+    rno = str(body.get("rcept_no") or "").strip()
+    if rno:
+        h = _load_daily_history()
+        for d, its in h.get("days", {}).items():
+            for it in its:
+                if str(it.get("rcept_no")) == rno:
+                    s, err = resummarize_item(it)
+                    _save_daily_history(h)
+                    return jsonify({"ok": bool(s), "rcept_no": rno, "date": d, "summary": s, "summary_err": None if s else err, "title": it.get("title")})
+        return jsonify({"ok": False, "error": "not_found", "rcept_no": rno}), 404
+    try:
+        n = max(1, min(int(body.get("days") or 1), 14))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "days 는 정수"}), 400
+    with _resummarize_lock:
+        if _resummarize_state["running"]:
+            return jsonify({"ok": False, "error": "already_running", "state": _resummarize_state}), 409
+        h = _load_daily_history()
+        cutoff = (date.today() - timedelta(days=n - 1)).isoformat()
+        queued = sum(len(its) for d, its in h.get("days", {}).items() if d >= cutoff)
+        _resummarize_state.update(running=True, started_at=datetime.now().isoformat(timespec="seconds"), done=0, total=queued, ok=0)
+        threading.Thread(target=_resummarize_days, args=(n,), daemon=True).start()
+    return jsonify({"ok": True, "queued": queued, "days": n})
+
+
+@app.route("/api/dart/daily/resummarize", methods=["GET"])
+def dart_daily_resummarize_state():
+    return jsonify(_resummarize_state)
 
 
 @app.route("/api/dart/daily/trigger", methods=["POST"])
