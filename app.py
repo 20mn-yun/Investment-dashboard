@@ -3236,6 +3236,36 @@ def _major_reason_clean(reason):
     return s[:50] if s else "-"
 
 
+_MAJOR_PURPOSE_RE = re.compile(r"보유목적\s*[:：]?\s*(경영권에\s*영향을\s*주기\s*위한\s*목적|경영권\s*영향|경영\s*참가|경영\s*참여|일반\s*투자|단순\s*투자)")
+_MAJOR_REPORTER_RE = re.compile(r"보고자\s*[:：]\s*(.+?)\s*(?:위\s*대리인|요약정보|보고특례)")
+_MAJOR_REPORTER_RE2 = re.compile(r"성명\(명칭\)\s*한글\s*(.+?)\s*한자\(영문\)")
+
+
+def _major_from_doc(doc):
+    """공시 원문(태그 제거·공백 압축 텍스트)에서 보유목적·보고자를 정규식으로 추출. 반환 {"purpose", "reporter"} (없는 키는 생략). LLM 없음.
+    '보유목적이 발행인의 경영권…' 같은 안내문은 '보유목적' 뒤에 조사가 붙어 패턴에 걸리지 않는다."""
+    out = {}
+    if not doc:
+        return out
+    m = _MAJOR_PURPOSE_RE.search(doc)
+    if m:
+        out["purpose"] = _major_purpose(m.group(1))
+    m = _MAJOR_REPORTER_RE.search(doc)
+    name = re.sub(r"\s+", " ", m.group(1)).strip(" -:") if m else ""
+    if not name or len(name) > 80:
+        m2 = _MAJOR_REPORTER_RE2.search(doc)
+        name = re.sub(r"\s+", " ", m2.group(1)).strip(" -:") if m2 else ""
+    if name and len(name) <= 80:
+        out["reporter"] = name
+    return out
+
+
+def _major_needs_purpose(item):
+    """대량보유 요약이 있는데 목적이 '-' 로 저장된 건(원문 지연 등) — 6시간 창 안에서 다시 시도"""
+    s = item.get("summary") or ""
+    return s.startswith("[대량보유]") and "목적: -" in s
+
+
 def _fmt_major(d):
     pv, cv = d.get("prev"), d.get("curr")
     ratio = "-"
@@ -3272,9 +3302,14 @@ def _dart_summary(title, rno, corp_code=""):
 
     if kind == "대량보유":
         d = _majorstock_summary(corp_code, rno)
+        doc, derr = _dart_doc(rno)                       # 보유목적·보고자(공백 복원)는 원문 정규식이 1순위
+        extra = _major_from_doc(doc)
         if d:
-            return _fmt_major(d), None
-        doc, derr = _dart_doc(rno)
+            if extra.get("purpose") and extra["purpose"] != "-":
+                d["purpose"] = extra["purpose"]
+            if extra.get("reporter"):
+                d["reporter"] = extra["reporter"]
+            return _fmt_major(d), None                    # 원문이 없어도 majorstock 만으로 요약 (summary_err 없음)
         if not doc:
             return "", derr or "원문없음"
         data, err = _llm_json(
@@ -3285,8 +3320,9 @@ def _dart_summary(title, rno, corp_code=""):
         )
         if not data:
             return "", err
-        return _fmt_major({"reporter": data.get("reporter"), "prev": _num_raw(data.get("prev_ratio")), "curr": _num_raw(data.get("curr_ratio")),
-                           "reason": data.get("reason"), "purpose": data.get("purpose"), "report_tp": data.get("report_tp") or ""}), None
+        return _fmt_major({"reporter": extra.get("reporter") or data.get("reporter"), "prev": _num_raw(data.get("prev_ratio")), "curr": _num_raw(data.get("curr_ratio")),
+                           "reason": data.get("reason"), "purpose": extra.get("purpose") if extra.get("purpose") not in (None, "-") else data.get("purpose"),
+                           "report_tp": data.get("report_tp") or ""}), None
 
     if kind == "잠정실적":
         fd, err = _earnings_data(rno)
@@ -3585,7 +3621,7 @@ def _ck_major():
     for item in daily.get("items", []):
         if retried >= _MAJOR_RETRY_PER_LOOP:
             break
-        if item.get("summary"):
+        if item.get("summary") and not _major_needs_purpose(item):
             continue
         if not _major_retry_due(item, daily.get("date")):
             continue                                   # 접수 후 6시간이 지난 건은 포기 (수동 재생성 API 로만)
@@ -3604,6 +3640,8 @@ def _ck_major():
             s, serr = _dart_summary(item.get("title", ""), item.get("rcept_no", ""), corp_code=cc)
             if s:
                 item["summary"], item["summary_err"] = s, None
+                if _major_needs_purpose(item):
+                    item["summary_tries"] = tries + 1      # 목적 '-' 그대로면 시도 횟수만 올리고 다음 루프에 재시도
             else:
                 item["summary_err"] = serr or "원문없음"
                 if serr != "DART점검":
