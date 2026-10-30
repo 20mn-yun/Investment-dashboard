@@ -961,6 +961,31 @@ def _us_wrap_select():
         from zoneinfo import ZoneInfo
         base_date = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
+    # 관심종목(통합 워치리스트 US): 등락 크기와 무관하게 전부 포함. 등락률을 못 받아도 pct=None 으로 넣는다(누락 금지).
+    watch = []
+    try:
+        wl = [i for i in watchlist_store.load_watchlist() if i.get("market") == "US"]
+        tmap = {i["code"]: watchlist_store.to_source_ticker(i["code"], "yahoo") for i in wl}
+        quotes = fetch_batch_data(tmap) if tmap else {}
+        for i in wl:
+            q = quotes.get(i["code"]) or {}
+            ok = bool(q.get("price"))
+            watch.append({
+                "ticker": i["code"],
+                "name": i.get("name_kr") or watchlist_store.get_name_kr("US", i["code"]) or telegram_report.us_short_name(i["code"], i.get("name")) or i["code"],
+                "name_en": telegram_report.us_short_name(i["code"], i.get("name")) or i["code"],
+                "pct": q.get("change_pct") if ok else None,
+                "price": q.get("price") if ok else None,
+            })
+        watch.sort(key=lambda w: -(abs(w["pct"]) if w["pct"] is not None else -1))
+        if len(watch) > _US_WRAP_WATCH_MAX:
+            print(f"[us-wrap] 관심종목 {len(watch)}개 → |등락률| 상위 {_US_WRAP_WATCH_MAX}개만 사용", flush=True)
+            watch = watch[:_US_WRAP_WATCH_MAX]
+        wset = {w["ticker"] for w in watch}
+        movers = [m for m in movers if m["ticker"] not in wset]          # 특징주와 중복 제거
+    except Exception as e:
+        print(f"[us-wrap] 관심종목 선별 실패(건너뜀): {type(e).__name__}: {e}", flush=True)
+
     sector_pcts = fetch_batch_data(SECTOR_TICKERS)
     diffs = sorted(
         ((k, v["change_pct"], v["change_pct"] - spx)
@@ -974,9 +999,10 @@ def _us_wrap_select():
     rate = {"level": macro.get("us10y", {}).get("price", 0), "bp": rate_bp}
     oil = {"price": macro.get("brent", {}).get("price", 0),
            "pct": macro.get("brent", {}).get("change_pct", 0)}
-    return indices, spx, movers, sel_sectors, rate, oil, base_date
+    return indices, spx, movers, sel_sectors, rate, oil, base_date, watch
 
 
+_US_WRAP_WATCH_MAX = 20
 _us_wrap_run_lock = threading.Lock()
 
 
@@ -1001,9 +1027,12 @@ def _generate_us_wrap(mode=None):
             mode = _us_wrap_auto_mode()
         from zoneinfo import ZoneInfo
         as_of = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M ET")
-        indices, spx, movers, sel_sectors, rate, oil, base_date = _us_wrap_select()
+        indices, spx, movers, sel_sectors, rate, oil, base_date, watch = _us_wrap_select()
 
         news = {}
+        for w in watch:                                   # A-2 관심종목 뉴스 (실패 허용)
+            news[w["ticker"]] = _fetch_news_for(f"{w.get('name_en') or w['ticker']} stock", limit=3)
+            time.sleep(0.3)
         for m in movers:
             news[m["ticker"]] = _fetch_news_for(f"{m['name']} stock")
             time.sleep(0.3)
@@ -1025,7 +1054,16 @@ def _generate_us_wrap(mode=None):
         when = (f"{as_of} 장중 (아직 마감 전, 전일 종가 대비 현재 등락)" if mode == "intraday"
                 else f"{base_date} (미국 직전 거래일 마감)")
         lines = [f"[기준] {when}", f"[지수] {idx_line}", ""]
-        lines.append("[특징 종목 (S&P500 시총 상위 100 중 지수 대비 ±1.5%p 이상)]")
+        lines.append("[관심종목 (워치리스트 — 등락 크기와 무관하게 전부 다룰 것)]")
+        if watch:
+            for w in watch:
+                pct_s = f"{w['pct']:+.2f}%" if w.get("pct") is not None else "등락률 미수신"
+                lines.append(f"{w['name']}({w['ticker']}) {pct_s}")
+                lines.append(_news_block(w["ticker"]))
+        else:
+            lines.append("해당 없음")
+        lines.append("")
+        lines.append("[특징 종목 (S&P500 시총 상위 100 중 지수 대비 ±1.5%p 이상, 관심종목 제외)]")
         if movers:
             for m in movers:
                 lines.append(f"{m['name']}({m['ticker']}) {m['pct']:+.2f}%")
@@ -1059,9 +1097,12 @@ def _generate_us_wrap(mode=None):
             "(2) 헤드라인에서 사유를 찾으면 그 근거로 쓰고, 못 찾으면 '뚜렷한 재료 없이 "
             "지수 흐름에 동조' 또는 '사유 불분명'이라고 솔직히 쓸 것. 사유를 지어내지 말 것.\n"
             "(3) 추정이면 '~로 보인다'로 표기.\n"
-            "(4) 반드시 아래 JSON으로만 응답:\n"
+            "(4) 관심종목은 등락 크기와 상관없이 전부 다뤄라. 특이 움직임이 없으면 '지수 흐름 수준, 특이 재료 없음'처럼 짧게. "
+            "실적 발표 임박·공시·뉴스가 있으면 반드시 언급. 사유를 지어내지 말 것. 관심종목 pct 는 입력값을 그대로(미수신이면 null).\n"
+            "(5) 반드시 아래 JSON으로만 응답:\n"
             '{\n'
             '  "market_line": "지수 전반 요약 + 주된 동인 1문장",\n'
+            '  "watchlist": [{"ticker":"AAPL","name":"애플","pct":0.4,"reason":"사유 1~2문장"}],\n'
             '  "movers": [{"ticker":"NVDA","name":"엔비디아","pct":3.2,"reason":"사유 1~2문장"}],\n'
             '  "sectors": [{"name":"에너지","pct":-1.8,"reason":"사유 1문장"}],\n'
             '  "rates": {"change":"10년물 +7bp","reason":"상승/하락 사유 1~2문장"},\n'
@@ -1072,7 +1113,7 @@ def _generate_us_wrap(mode=None):
         parsed = None
         raw_text = None
         try:
-            _r = llm_client.complete("us_wrap", prompt, json_mode=True, max_tokens=1500)
+            _r = llm_client.complete("us_wrap", prompt, json_mode=True, max_tokens=2500)
             raw_text = (_r.text or "").strip() or None
             if _r.ok and isinstance(_r.data, dict):
                 parsed = _r.data
@@ -1087,11 +1128,16 @@ def _generate_us_wrap(mode=None):
                "last_updated": datetime.now().astimezone().isoformat()}
         if isinstance(parsed, dict) and parsed.get("market_line"):
             out.update({k: parsed.get(k) for k in ("market_line", "movers", "sectors", "rates", "oil")})
+            # 관심종목: 응답에서 빠진 종목은 "사유 수집 실패"로 채워 누락 없이 전부 넣는다. pct 는 우리 수치로 통일.
+            got = {str(x.get("ticker", "")).upper(): x for x in (parsed.get("watchlist") or []) if isinstance(x, dict)}
+            out["watchlist"] = [{"ticker": w["ticker"], "name": w["name"], "pct": w["pct"],
+                                 "reason": (got.get(w["ticker"].upper()) or {}).get("reason") or "사유 수집 실패"} for w in watch]
         elif raw_text:
             out["raw"] = raw_text
         else:
             out["raw"] = (
                 f"{base_date} 미국증시: {idx_line}. "
+                + ("관심종목: " + ", ".join(f"{w['name']} {w['pct']:+.1f}%" if w.get("pct") is not None else f"{w['name']} -" for w in watch) + ". " if watch else "")
                 + ("특징주: " + ", ".join(f"{m['name']} {m['pct']:+.1f}%" for m in movers) + ". " if movers else "")
                 + f"미 10년물 {rate['bp']:+d}bp, 브렌트 {oil['pct']:+.2f}%. (요약 생성 실패 — 수치만 표시)"
             )
@@ -1101,7 +1147,7 @@ def _generate_us_wrap(mode=None):
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False)
         os.replace(tmp, path)
-        print(f"[us-wrap] 생성 완료 ({mode}, {as_of}, movers {len(movers)}개, "
+        print(f"[us-wrap] 생성 완료 ({mode}, {as_of}, 관심종목 {len(watch)}개, movers {len(movers)}개, "
               f"{'JSON' if 'market_line' in out else 'raw 폴백'})", flush=True)
         return True
     except Exception as e:

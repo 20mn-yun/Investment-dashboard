@@ -4800,7 +4800,7 @@
             `<span class="${(m.startsWith('-') || m.startsWith('−')) ? 'negative' : 'positive'}" style="font-weight:600;">${m}</span>`);
     }
     function usWrapPct(pct) {
-        if (pct == null || isNaN(pct)) return '';
+        if (pct == null || isNaN(pct)) return '<span style="color:var(--text-muted);font-weight:700;">-</span>';
         return `<span class="${pct >= 0 ? 'positive' : 'negative'}" style="font-weight:700;">${pct >= 0 ? '+' : ''}${Number(pct).toFixed(1)}%</span>`;
     }
     function usWrapRow(label, reason) {
@@ -4823,6 +4823,13 @@
             }
             if (data.market_line) {
                 let html = `<div style="font-size:15px; font-weight:600; margin-bottom:10px;">${usWrapColorNums(data.market_line)}</div>`;
+                if ((data.watchlist || []).length) {
+                    html += `<div style="font-size:12px; color:var(--text-muted); margin:6px 0 2px;">★ 관심종목</div>`;
+                    data.watchlist.forEach(w => {
+                        html += usWrapRow(`★ ${usWrapEsc(w.name)} ${usWrapPct(w.pct)}`, w.reason);
+                    });
+                    html += `<div style="height:8px;"></div>`;
+                }
                 (data.movers || []).forEach(m => {
                     html += usWrapRow(`${usWrapEsc(m.name)} ${usWrapPct(m.pct)}`, m.reason);
                 });
