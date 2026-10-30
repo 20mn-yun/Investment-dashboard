@@ -2363,6 +2363,16 @@ def stock_reports_refresh_api():
     return jsonify({"ok": True, "job": job})
 
 
+def _calls_open_bg(code, name):
+    """종목종합정보 열 때 뒤에서: 최근 2개 분기 녹취록 받기(요약 X) → 워치리스트 종목이면 새 컨콜 텔레그램 알림(비교 자동 실행 X)"""
+    try:
+        earnings_calls.ensure_recent(code, name, 2, False)
+        if watchlist_store.is_in_watchlist("US", code):
+            earnings_calls.notify_new_calls(code, name, run_compare=False)
+    except Exception as e:
+        print(f"[calls] {code} 열기 작업 실패: {type(e).__name__}: {e}", flush=True)
+
+
 @app.route("/api/stock/calls", methods=["GET"])
 def stock_calls_api():
     """컨콜: 미국은 분기별 녹취록·요약·번역 상태(+요약 내용), 한국은 실적발표·컨콜 관련 리포트·텔레그램 목록.
@@ -2373,7 +2383,7 @@ def stock_calls_api():
     market, code, name, corp_code = r
     if market == "US":
         if request.args.get("start", "1") != "0":
-            threading.Thread(target=earnings_calls.ensure_recent, args=(code, name, 2, False), daemon=True).start()
+            threading.Thread(target=_calls_open_bg, args=(code, name), daemon=True).start()
         return jsonify(earnings_calls.status_us(code, name))
     return jsonify(earnings_calls.status_kr(code, name))
 
@@ -4037,6 +4047,12 @@ def _krfin_prefetch_run(reason):
             results[key] += ", 컨콜 " + " ".join(f"{c['quarter']}:{c.get('transcript')}/{c.get('summary', '-')}" for c in calls)
         except Exception as e:
             results[key] += f", 컨콜 실패({type(e).__name__})"
+        try:   # 새 컨콜·요약 완료 텔레그램 알림 (워치리스트 미국 종목, 직전분기 비교는 call_compare 한도 안에서)
+            nt = earnings_calls.notify_new_calls(code, items_name.get(code, ""), run_compare=True)
+            if nt.get("init") or nt.get("sent") or nt.get("skipped"):
+                results[key] += f", 컨콜알림 {'초기화 ' + str(nt.get('recorded')) + '건' if nt.get('init') else ''}{'발송 ' + str(nt['sent']) if nt.get('sent') else ''}{' 실패 ' + str(nt['skipped']) if nt.get('skipped') else ''}".rstrip()
+        except Exception as e:
+            results[key] += f", 컨콜알림 실패({type(e).__name__})"
         try:   # 증권사 리포트(미국): 한글명·영문명 검색 → 관련성 판정 → 받기 → AI 정리 (ai_budget reports_us 한도)
             rj = stock_reports.run_blocking("US", code, items_name.get(code, ""))
             results[f"reports:US_{code}"] = (f"{rj.get('stage')} 검색 {rj.get('found', 0)}/판정 {rj.get('relevance_checked', 0)}/신규 {rj.get('new', 0)}/AI {rj.get('ai_done', 0)}"

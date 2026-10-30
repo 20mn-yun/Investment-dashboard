@@ -166,7 +166,7 @@ def fetch_transcript(code, quarter, force=False):
         return {"status": "ok", "cached": True}
     if st == "none" and not force:
         checked = d.get("_checked") or ""
-        if checked and (date.today() - date.fromisoformat(checked[:10])).days < NONE_RECHECK_DAYS:
+        if checked and (date.today() - date.fromisoformat(checked[:10])).days < recheck_days(code):
             return {"status": "none", "cached": True}
     key = _api_key()
     if not key:
@@ -719,6 +719,223 @@ def ensure_recent(code, name="", n=2, summarize_too=True, summary_limit=None):
         out.append(row)
         if r.get("status") == "waiting":
             break
+    return out
+
+
+
+# ---------- 재확인 창 (워치리스트 미국 종목은 실적 발표 전후 매일) ----------
+RECHECK_WINDOW_BEFORE = 1        # 발표일 D-1 부터
+RECHECK_WINDOW_AFTER = 10        # 발표일 D+10 까지 "없음" 표시를 매일 다시 확인
+_edates_cache = {}               # code → (조회일, [date, ...])
+
+
+def _is_watch_us(code):
+    try:
+        import watchlist
+        return watchlist.is_in_watchlist("US", code)
+    except Exception:
+        return False
+
+
+def earnings_dates(code):
+    """실적 발표(예정)일 후보. yfinance calendar(캘린더 탭과 같은 조회) + 재무 저장본 최근 분기말+30일 추정. 하루 1회 조회."""
+    today = date.today()
+    hit = _edates_cache.get(code)
+    if hit and hit[0] == today:
+        return hit[1]
+    out = []
+    try:
+        import yfinance as yf
+        cal = yf.Ticker(code).calendar
+        eds = (cal or {}).get("Earnings Date") if isinstance(cal, dict) else None
+        for ed in (eds if isinstance(eds, list) else [eds]) if eds else []:
+            ds = ed.strftime("%Y-%m-%d") if hasattr(ed, "strftime") else str(ed)[:10]
+            try:
+                out.append(date.fromisoformat(ds))
+            except ValueError:
+                pass
+    except Exception as e:
+        print(f"[earnings_calls] {code} 실적일 조회 실패(yfinance): {type(e).__name__}", flush=True)
+    try:   # 추정: 저장본 최근 분기말 + 30일 (yfinance 가 다음 분기 날짜만 줄 때 직전 발표 창을 놓치지 않도록 함께 둔다)
+        qs = quarters(code)
+        if qs:
+            y, m = qs[-1]["end"].split(".")
+            import us_financials
+            out.append(us_financials._month_end(int(y), int(m)) + timedelta(days=30))
+    except Exception:
+        pass
+    out = sorted(set(out))
+    _edates_cache[code] = (today, out)
+    return out
+
+
+def in_recheck_window(code, today=None):
+    """워치리스트 미국 종목이고 오늘이 어느 실적 발표일의 D-1 ~ D+10 안이면 True"""
+    if not _is_watch_us(code):
+        return False
+    today = today or date.today()
+    return any(-RECHECK_WINDOW_BEFORE <= (today - ed).days <= RECHECK_WINDOW_AFTER for ed in earnings_dates(code))
+
+
+def recheck_days(code):
+    """'녹취록 없음' 표시를 다시 확인하는 간격(일). 발표 창 안의 워치리스트 종목은 1일, 그 외 NONE_RECHECK_DAYS"""
+    return 1 if in_recheck_window(code) else NONE_RECHECK_DAYS
+
+
+# ---------- 텔레그램 알림 (워치리스트 미국 종목 새 컨콜·요약 완료) ----------
+NOTIFIED_PATH = os.path.join(CACHE_DIR, "_notified.json")
+NOTIFY_QUARTERS = 2              # 알림 대상: 최근 2개 분기
+_notify_lock = threading.Lock()
+
+
+def _load_notified():
+    return _load_json(NOTIFIED_PATH, None)
+
+
+def _save_notified(d):
+    _save_json(NOTIFIED_PATH, d)
+
+
+def _tg_send_html(text):
+    """기존 알림 경로 재사용(env TELEGRAM_TOKEN_GENERAL + dart_monitor_config.json general). HTML parse_mode, 4000자 분할. 성공 여부."""
+    try:
+        import tg_inbox
+        token, chat_id = tg_inbox._tg_creds()
+    except Exception:
+        token, chat_id = None, None
+    if not token or not chat_id:
+        print("[earnings_calls] telegram creds 없음 — 알림 생략", flush=True)
+        return False
+    chunks, cur = [], ""
+    for line in (text or "").split("\n"):
+        if len(cur) + len(line) + 1 > 4000:
+            chunks.append(cur)
+            cur = line
+        else:
+            cur = (cur + "\n" + line) if cur else line
+    if cur:
+        chunks.append(cur)
+    for ch in chunks:
+        body = json.dumps({"chat_id": chat_id, "text": ch, "parse_mode": "HTML", "disable_web_page_preview": True}).encode("utf-8")
+        req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=body,
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                res = json.loads(r.read().decode("utf-8"))
+            if not res.get("ok"):
+                print(f"[earnings_calls] 텔레그램 발송 실패: {str(res)[:200]}", flush=True)
+                return False
+        except Exception as e:
+            print(f"[earnings_calls] 텔레그램 발송 실패: {type(e).__name__}", flush=True)
+            return False
+    return True
+
+
+def _tone_ko(summ):
+    t = (summ or {}).get("톤") or {}
+    v = str(t.get("판정") or "").strip()
+    m = {"positive": "긍정", "neutral": "중립", "negative": "부정"}
+    return m.get(v.lower(), v or "미정"), str(t.get("근거") or "").strip()
+
+
+def notify_message(code, name, quarter, summ, compare_line=None):
+    """알림 본문(HTML). summ: _summary.json 의 summary dict 또는 None"""
+    import html as _h
+    try:
+        import watchlist
+        kr = watchlist.get_name_kr("US", code)
+    except Exception:
+        kr = None
+    lines = [f"📞 <b>컨콜 업데이트</b> — {_h.escape(kr or name or code)} ({_h.escape(code)}) {_h.escape(quarter)}"]
+    if summ:
+        tone, why = _tone_ko(summ)
+        lines.append(f"톤: {_h.escape(tone)}" + (f" · {_h.escape(why)}" if why else ""))
+        core = [str(x) for x in (summ.get("실적핵심") or [])][:3]
+        if core:
+            lines.append("실적 핵심:")
+            lines += [f"• {_h.escape(x)}" for x in core]
+        nxt = ((summ.get("가이던스") or {}).get("다음분기") or [])
+        if nxt:
+            lines.append(f"다음 분기 가이던스: {_h.escape(str(nxt[0]))}")
+        if compare_line:
+            lines.append(f"직전 분기 대비: {_h.escape(compare_line)}")
+    else:
+        lines.append("요약은 AI 한도 회복 후 자동 생성됩니다")
+    lines.append("대시보드 ▸ 종목종합정보 ▸ 컨콜에서 전문·비교 확인")
+    return "\n".join(lines)
+
+
+def _summary_ok(code, quarter):
+    d = _load_json(_p(code, quarter, "_summary"), None)
+    return d.get("summary") if d and d.get("status") == "ok" else None
+
+
+def _compare_line(code, quarter, name, run_compare):
+    """직전 분기 비교 한줄결론. 캐시가 있으면 그대로, run_compare 면 한도(call_compare) 안에서 생성. 없으면 None"""
+    prev = prev_quarter(code, quarter)
+    if not prev:
+        return None
+    cur = _load_json(_compare_path(code, quarter, prev), None)
+    if cur and cur.get("status") == "ok":
+        return (cur.get("compare") or {}).get("한줄결론") or None
+    if not run_compare or transcript_state(code, prev)[0] != "ok":
+        return None
+    try:
+        res = compare(code, quarter, name)
+    except Exception as e:
+        print(f"[earnings_calls] {code} {quarter} 알림용 비교 실패: {type(e).__name__}", flush=True)
+        return None
+    if res.get("status") in ("ok", "cached"):
+        return (res.get("compare") or {}).get("한줄결론") or None
+    return None
+
+
+def notify_new_calls(code, name="", run_compare=False):
+    """워치리스트 미국 종목의 새 녹취록(+요약)·요약 완료를 텔레그램으로 1회씩 알린다.
+    상태 파일이 없으면 초기화: 현재 녹취록 ok 인 분기를 모두 '이미 알림'으로 기록만 하고 발송 0건.
+    반환 {init, sent, recorded, skipped}"""
+    out = {"init": False, "sent": 0, "recorded": 0, "skipped": 0}
+    with _notify_lock:
+        st = _load_notified()
+        if st is None:   # 초기화: 워치리스트 미국 종목 전체의 현재 녹취록 ok 분기를 '이미 알림'으로 기록만 (발송 0건)
+            st, out["init"] = {}, True
+            try:
+                import watchlist
+                codes = [i["code"] for i in watchlist.load_watchlist() if i.get("market") == "US"]
+            except Exception:
+                codes = []
+            for c in sorted(set(codes) | {code}):
+                for q in quarters(c):
+                    if transcript_state(c, q["quarter"])[0] == "ok":
+                        st.setdefault(f"US_{c}", {})[q["quarter"]] = {"transcript": _now(), "summary": _now() if _summary_ok(c, q["quarter"]) else None}
+                        out["recorded"] += 1
+            _save_notified(st)
+            print(f"[earnings_calls] 알림 상태 초기화: 종목 {len(st)}개·분기 {out['recorded']}건 기록(발송 없음)", flush=True)
+            return out
+        key = f"US_{code}"
+        rec = st.setdefault(key, {})
+        for q in list(reversed(quarters(code)))[:NOTIFY_QUARTERS]:   # 최근 2개 분기만 (ensure_recent 와 같은 범위, 오래된 분기 소급 알림 방지)
+            quarter = q["quarter"]
+            if transcript_state(code, quarter)[0] != "ok":
+                continue
+            summ = _summary_ok(code, quarter)
+            r = rec.get(quarter)
+            if not r:   # 새 컨콜
+                cmp_line = _compare_line(code, quarter, name, run_compare) if summ else None
+                if _tg_send_html(notify_message(code, name, quarter, summ, cmp_line)):
+                    rec[quarter] = {"transcript": _now(), "summary": _now() if summ else None}
+                    out["sent"] += 1
+                else:
+                    out["skipped"] += 1
+            elif r.get("summary") is None and summ:   # 요약 완료 후속 1회
+                cmp_line = _compare_line(code, quarter, name, run_compare)
+                if _tg_send_html("✅ <b>요약 완료</b>\n" + notify_message(code, name, quarter, summ, cmp_line)):
+                    r["summary"] = _now()
+                    out["sent"] += 1
+                else:
+                    out["skipped"] += 1
+        if out["sent"]:
+            _save_notified(st)
     return out
 
 
