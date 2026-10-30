@@ -2401,6 +2401,16 @@
                 <div class="sv-call-tools" id="sv-call-tools"></div>
                 <div id="sv-call-progress" class="sv-note"></div>
                 <div id="sv-call-full" class="sv-call-full" style="display:none;"></div>
+                <div id="sv-call-cmp" style="margin-top:14px; border-top:1px solid var(--border); padding-top:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h4 style="margin:0;">컨콜 비교: 직전분기 vs 이번분기 <span id="sv-call-cmp-pair" class="sv-note" style="margin:0;"></span></h4>
+                        <span style="display:flex; gap:8px; align-items:center;">
+                            <span id="sv-call-cmp-counter" class="sv-note" style="margin:0;"></span>
+                            <span class="period-btn" id="sv-call-cmp-btn" data-act="compare">비교 생성</span>
+                        </span>
+                    </div>
+                    <div id="sv-call-cmp-body"></div>
+                </div>
             </div>
             <div id="sv-call-kr" style="display:none;"></div>
         </div>
@@ -9598,6 +9608,13 @@
             else if (act === 'lang') { sv.callLang = sv.callLang === 'ko' ? 'en' : 'ko'; svCallRenderFull(); }
             else if (act === 'copy') svCallCopy(b);
         });
+        document.getElementById('sv-call-cmp').addEventListener('click', e => {
+            const b = e.target.closest('[data-act]');
+            if (!b) return;
+            if (b.dataset.act === 'compare') svCallCompareGen(false);
+            else if (b.dataset.act === 'compare-force') svCallCompareGen(true);
+            else if (b.dataset.act === 'fetch-prev') svCallFetchPrev(b.dataset.q);
+        });
         document.getElementById('sv-call-kr').addEventListener('click', e => {
             const row = e.target.closest('.sv-call-item');
             if (!row || e.target.closest('a')) return;
@@ -9643,6 +9660,87 @@
         svCallRenderSummary();
         svCallRenderTools();
         svCallRenderFull();
+        svCallLoadCompare();
+    }
+    // --- 컨콜 비교 (직전분기 vs 이번분기) ---
+    async function svCallLoadCompare() {
+        const q = svCallQ(), body = document.getElementById('sv-call-cmp-body'), pair = document.getElementById('sv-call-cmp-pair');
+        const ai = (sv.calls && sv.calls.ai) || {};
+        document.getElementById('sv-call-cmp-counter').textContent = ai.compare_limit != null ? `비교 ${ai.compare_used || 0}/${ai.compare_limit}` : '';
+        if (!q) { body.innerHTML = ''; pair.textContent = ''; return; }
+        const t = sv.token, quarter = q.quarter;
+        body.innerHTML = '<div class="sv-note">비교 자료를 확인하는 중…</div>';
+        try {
+            const res = await fetch(API_BASE + `/api/stock/calls/compare?code=${encodeURIComponent(sv.code)}&quarter=${quarter}`);
+            const d = await res.json();
+            if (t !== sv.token || quarter !== sv.callQ) return;
+            sv.callCmp = d;
+            svCallRenderCompare();
+        } catch (e) { if (t === sv.token) body.innerHTML = '<div class="sv-note">비교 자료를 불러오지 못했습니다</div>'; }
+    }
+    function svCallRenderCompare() {
+        const d = sv.callCmp || {}, q = svCallQ(), body = document.getElementById('sv-call-cmp-body'), pair = document.getElementById('sv-call-cmp-pair');
+        const btn = document.getElementById('sv-call-cmp-btn');
+        const prev = d.prev_quarter;
+        pair.textContent = q ? `${q.quarter} ← ${prev || '-'}` : '';
+        if (!prev) { body.innerHTML = '<div class="sv-note">직전 분기가 없어 비교할 수 없습니다</div>'; btn.style.display = 'none'; return; }
+        if (d.status !== 'ok') {
+            const missing = d.missing || [];
+            if (missing.length) {
+                body.innerHTML = `<div class="sv-note">${missing.map(m => `${svEsc(m)} 분기 녹취록이 아직 없습니다`).join(' · ')} — ` +
+                    missing.map(m => `<span class="period-btn" data-act="fetch-prev" data-q="${svEsc(m)}">${svEsc(m)} 받기</span>`).join(' ') + `</div>`;
+                btn.style.display = 'none';
+            } else {
+                body.innerHTML = `<div class="sv-note">아직 비교를 만들지 않았습니다. 두 분기 녹취록이 준비됐습니다 — "비교 생성"을 누르세요 (1~2분).</div>`;
+                btn.style.display = ''; btn.textContent = '비교 생성'; btn.dataset.act = 'compare';
+            }
+            return;
+        }
+        btn.style.display = ''; btn.textContent = '다시 생성'; btn.dataset.act = 'compare-force';
+        const c = d.compare || {}, e = svEsc;
+        const row3 = (label, v) => `<tr><td><b>${e(label)}</b></td><td>${e((v || {}).직전 || '-')}</td><td>${e((v || {}).이번 || '-')}</td><td>${e((v || {}).변화 || (v || {}).해석 || '-')}</td></tr>`;
+        const jCls = j => j === '상회' ? 'positive' : j === '하회' ? 'negative' : '';
+        const cCls = c2 => c2 === '진전' ? 'positive' : c2 === '후퇴' ? 'negative' : '';
+        const kf = d.키워드빈도 || {};
+        const kfRows = Object.keys(kf).map(k => { const v = kf[k]; const s = v.증감 > 0 ? 'positive' : v.증감 < 0 ? 'negative' : ''; return `<tr><td>${e(k)}</td><td>${v.직전}</td><td>${v.이번}</td><td class="${s}">${v.증감 > 0 ? '+' : ''}${v.증감}</td></tr>`; }).join('');
+        const risk = c.리스크변화 || {};
+        const ul = arr => (arr && arr.length) ? '<ul style="margin:2px 0 6px 18px;">' + arr.map(x => `<li>${e(x)}</li>`).join('') + '</ul>' : '<div class="sv-note" style="margin:2px 0 6px;">없음</div>';
+        body.innerHTML =
+            `<div style="font-size:14px; font-weight:600; padding:8px 10px; margin:6px 0 10px; border-left:3px solid var(--accent); background:var(--bg-panel);">${e(c.한줄결론 || '-')}</div>` +
+            `<div class="sv-scroll"><table class="sv-table"><thead><tr><th>항목</th><th>직전 ${e(prev)}</th><th>이번 ${e(d.quarter)}</th><th>변화</th></tr></thead><tbody>` +
+            row3('실적', c.실적) + row3('가이던스 변화', c.가이던스변화) + row3('섹터 전망', c.섹터전망) + row3('경영진 view', c.경영진view) + row3('자본배분', c.자본배분) + row3('질문 초점', c.질문초점변화) +
+            `</tbody></table></div>` +
+            `<h4>가이던스 이행</h4>` + ((c.가이던스이행 || []).length ? `<div class="sv-scroll"><table class="sv-table"><thead><tr><th>직전 가이던스</th><th>이번 실제</th><th>판정</th></tr></thead><tbody>` +
+                c.가이던스이행.map(x => `<tr><td>${e(x.직전가이던스)}</td><td>${e(x.이번실제)}</td><td class="${jCls(x.판정)}" style="font-weight:600;">${e(x.판정)}</td></tr>`).join('') + `</tbody></table></div>` : '<div class="sv-note">없음</div>') +
+            `<h4>직전 언급 추적</h4>` + ((c.직전언급추적 || []).length ? `<div class="sv-scroll"><table class="sv-table"><thead><tr><th>직전 내용</th><th>이번 내용</th><th>변화</th></tr></thead><tbody>` +
+                c.직전언급추적.map(x => `<tr><td>${e(x.직전내용)}</td><td>${e(x.이번내용)}</td><td class="${cCls(x.변화)}" style="font-weight:600;">${e(x.변화)}</td></tr>`).join('') + `</tbody></table></div>` : '<div class="sv-note">없음</div>') +
+            `<h4>리스크 변화</h4><div class="sv-note" style="margin:2px 0;">새로 등장</div>${ul(risk.새로등장)}<div class="sv-note" style="margin:2px 0;">사라짐</div>${ul(risk.사라짐)}<div class="sv-note" style="margin:2px 0;">지속</div>${ul(risk.지속)}` +
+            `<h4>키워드 빈도 (녹취록 전체, 코드 집계)</h4><div class="sv-scroll"><table class="sv-table"><thead><tr><th>키워드</th><th>직전</th><th>이번</th><th>증감</th></tr></thead><tbody>${kfRows}</tbody></table></div>` +
+            `<div class="sv-note">AI 비교 (${e(d.model || 'sonnet')}) · 토큰 ${d.tokens ? (d.tokens.input || 0).toLocaleString() + '+' + (d.tokens.output || 0).toLocaleString() : '-'} · 입력 ${(d.input_meta && d.input_meta.chars || 0).toLocaleString()}자${d.input_meta && d.input_meta.truncated ? ' · <b>준비된 발언 일부가 길어서 뒤쪽이 생략됐습니다</b>' : ''} · 생성 ${e(d.at || '')}</div>`;
+    }
+    async function svCallCompareGen(force) {
+        const q = svCallQ(); if (!q) return;
+        const body = document.getElementById('sv-call-cmp-body'), btn = document.getElementById('sv-call-cmp-btn');
+        btn.style.display = 'none';
+        body.innerHTML = '<div class="sv-note">비교를 만드는 중… (1~2분)</div>';
+        try {
+            const res = await fetch(API_BASE + '/api/stock/calls/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                           body: JSON.stringify({ market: 'US', code: sv.code, quarter: q.quarter, force: !!force }) });
+            const d = await res.json();
+            if (d.status === 'ai_limit') { body.innerHTML = `<div class="sv-note">비교 일일 한도 도달 (오늘 ${d.used}건)</div>`; btn.style.display = ''; return; }
+            if (d.status && d.status.startsWith('ai_error')) { body.innerHTML = `<div class="sv-note">비교 실패: ${svEsc(d.status)}</div>`; btn.style.display = ''; return; }
+            if (d.status === 'need_transcript') { sv.callCmp = d; svCallRenderCompare(); return; }
+        } catch (e) { body.innerHTML = '<div class="sv-note">비교 요청 실패</div>'; btn.style.display = ''; return; }
+        await svLoadCalls(false);
+    }
+    async function svCallFetchPrev(quarter) {
+        const body = document.getElementById('sv-call-cmp-body');
+        body.innerHTML = `<div class="sv-note">${svEsc(quarter)} 녹취록을 받는 중… (Alpha Vantage, 몇 초)</div>`;
+        try {
+            await fetch(API_BASE + '/api/stock/calls/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                 body: JSON.stringify({ market: 'US', code: sv.code, quarter, limit: 0 }) });
+        } catch (e) {}
+        await svLoadCalls(false);
     }
     function svCallRenderSummary() {
         const q = svCallQ(), box = document.getElementById('sv-call-sum');

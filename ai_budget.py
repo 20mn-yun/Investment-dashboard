@@ -21,6 +21,7 @@ DEFAULT_LIMITS = {
     "concept_map": 200,      # 2단계 계정 대응 (KR·US 공유)
     "call_summary": 20,      # 3-B 컨콜 요약
     "call_translate": 5,     # 3-B 컨콜 전문 번역 (녹취록 1건 = 1건)
+    "call_compare": 10,      # 3-B 컨콜 직전분기 vs 이번분기 비교
     "peers": 50,             # 3-C 관련 기업 제안
     "reports_us": 80,        # 3-A 미국 종목 리포트 정리 (한국 reports 와 별도 한도)
     "ir_release": 20,        # 8-K 실적 보도자료 요약 (sec_filings)

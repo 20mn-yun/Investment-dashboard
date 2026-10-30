@@ -2400,6 +2400,36 @@ def stock_calls_summarize_api():
     return jsonify(res)
 
 
+@app.route("/api/stock/calls/compare", methods=["GET"])
+def stock_calls_compare_get():
+    """컨콜 비교(직전분기 vs 이번분기) 캐시 조회. 없으면 {"status":"none","prev_quarter","ready"}"""
+    r, err = _resolve_stock("US", request.args.get("code", ""))
+    if err:
+        return err
+    q = request.args.get("quarter", "")
+    if not q:
+        return jsonify({"error": "bad_request", "message": "quarter 가 필요합니다"}), 400
+    return jsonify(earnings_calls.compare_status(r[1], q))
+
+
+@app.route("/api/stock/calls/compare", methods=["POST"])
+def stock_calls_compare_post():
+    """컨콜 비교 생성(한도 kind=call_compare). body: {code, quarter, name?, force?, limit?}"""
+    body = request.get_json(silent=True) or {}
+    r, err = _resolve_stock(body.get("market", "US"), body.get("code", ""))
+    if err:
+        return err
+    market, code, name, corp_code = r
+    if market != "US" or not body.get("quarter"):
+        return jsonify({"error": "bad_request", "message": "미국 종목과 quarter 가 필요합니다"}), 400
+    try:
+        limit = ai_budget.parse_limit_param(body.get("limit"))
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
+    res = earnings_calls.compare(code, body["quarter"], body.get("name") or name, limit=limit, force=bool(body.get("force")))
+    return jsonify(res)
+
+
 @app.route("/api/stock/calls/translate", methods=["POST"])
 def stock_calls_translate_api():
     """전문 번역 시작(뒤에서, 진행률은 GET /api/stock/calls 의 translate_job). body: {market, code, quarter, limit?}"""

@@ -486,6 +486,200 @@ def export_drive(code, quarter, name=""):
     return written
 
 
+# ---------- 비교: 직전분기 vs 이번분기 ----------
+COMPARE_MAX_CHARS = 80_000
+COMPARE_KEYWORDS = ["AI", "tariff", "China", "pricing", "inventory", "demand", "margin", "capex", "buyback",
+                    "guidance", "headwind", "macro", "supply", "backlog", "hiring/layoff"]
+_COMPARE_KW_RE = {"hiring/layoff": re.compile(r"\b(hiring|layoffs?|headcount reductions?)\b", re.I)}
+COMPARE_SYSTEM = """당신은 미국 상장사의 연속된 두 분기 실적 컨퍼런스콜을 비교·분석하는 애널리스트 보조자입니다. 주어진 두 분기 자료(요약 JSON, 경영진 준비된 발언 전문, 애널리스트 질문 문장)만 근거로 JSON 하나를 만듭니다.
+
+규칙
+- 두 녹취록에 실제로 있는 내용만 쓸 것. 직전 컨콜에 없던 내용을 "직전"에 쓰지 말 것.
+- 수치는 녹취록 표기 그대로($46.7B, 75% 등). 환산·추정 금지.
+- 판정 불가 항목은 "미확인", 해당 언급이 없으면 "언급없음"으로 적는다.
+- 항목별 각 1~3문장, 한국어. 출력은 JSON 하나만(설명·마크다운·코드펜스 금지). 형식:
+{"한줄결론": "두 컨콜 종합 방향(개선/악화/혼재)과 주가 관점 포인트 1~2문장",
+ "실적": {"직전": "매출·EPS·마진 핵심", "이번": "...", "변화": "개선/둔화/유지 + 근거"},
+ "가이던스이행": [{"직전가이던스": "직전 컨콜이 제시한 수치·방향", "이번실제": "이번 컨콜 실제", "판정": "상회|부합|하회|미확인"}],
+ "가이던스변화": {"직전": "직전이 제시한 다음분기·연간 전망", "이번": "이번 제시", "변화": "상향|하향|유지|신규|철회 + 근거"},
+ "직전언급추적": [{"직전내용": "직전 컨콜의 주요 언급(신제품, 투자, 수요 코멘트 등)", "이번내용": "이번 컨콜에서 어떻게 됐는지", "변화": "진전|후퇴|유지|언급없음"}],
+ "섹터전망": {"직전": "...", "이번": "...", "변화": "..."},
+ "경영진view": {"직전": "톤 판정 + 핵심 메시지", "이번": "...", "변화": "더 낙관|더 신중|유지 + 근거"},
+ "리스크변화": {"새로등장": ["..."], "사라짐": ["..."], "지속": ["..."]},
+ "질문초점변화": {"직전": "애널리스트 질문의 주된 주제", "이번": "...", "해석": "시장 관심사 이동"},
+ "자본배분": {"직전": "capex·자사주·배당·M&A 언급", "이번": "...", "변화": "..."}}"""
+
+
+def prev_quarter(code, quarter):
+    """quarters(code) 목록(회계연도 기준, 오래된 순)에서 quarter 바로 앞 분기. 없으면 None"""
+    qs = [q["quarter"] for q in quarters(code)]
+    if quarter in qs:
+        i = qs.index(quarter)
+        return qs[i - 1] if i > 0 else None
+    return None
+
+
+def _compare_path(code, quarter, prev):
+    return _p(code, f"{quarter}_vs_{prev}", "_compare")
+
+
+def keyword_freq(transcript):
+    """녹취록 전체에서 COMPARE_KEYWORDS 언급 횟수(대소문자 무시, 단어 경계)."""
+    text = " ".join((s.get("content") or "") for s in transcript)
+    out = {}
+    for kw in COMPARE_KEYWORDS:
+        rx = _COMPARE_KW_RE.get(kw) or re.compile(r"\b" + re.escape(kw) + r"s?\b", re.I)
+        out[kw] = len(rx.findall(text))
+    return out
+
+
+def _compare_block(code, quarter, data, max_prepared=None):
+    """분기 1개의 LLM 입력 블록: (1) 요약 JSON (2) 준비된 발언 전문 (3) 애널리스트 질문 문장. 반환 (텍스트, prepared_text, meta)"""
+    summ = _load_json(_p(code, quarter, "_summary"), None)
+    summ_txt = json.dumps(summ["summary"], ensure_ascii=False) if summ and summ.get("status") == "ok" else "(요약 없음)"
+    prepared, qa = split_sections(data["transcript"])
+    p_txt = _fmt(prepared)
+    truncated = False
+    if max_prepared is not None and len(p_txt) > max_prepared:
+        p_txt = p_txt[:max_prepared] + "\n…(뒤쪽 생략)"
+        truncated = True
+    questions = [f"- {s.get('speaker')} ({s.get('title')}): {(s.get('content') or '').strip()}" for s in qa if _is_analyst(s)]
+    q_txt = "\n".join(questions) if questions else "(애널리스트 질문 없음)"
+    text = (f"### [{quarter}] 요약 JSON\n{summ_txt}\n\n"
+            f"### [{quarter}] 경영진 준비된 발언 ({len(prepared)}개 발언{', 뒤쪽 생략' if truncated else ''})\n{p_txt}\n\n"
+            f"### [{quarter}] 애널리스트 질문 ({len(questions)}개, 답변은 요약 JSON의 질의응답으로 갈음)\n{q_txt}")
+    return text, {"prepared": len(prepared), "questions": len(questions), "prepared_chars": len(p_txt), "truncated": truncated, "has_summary": summ_txt != "(요약 없음)"}
+
+
+def _compare_input(code, quarter, prev, d_cur, d_prev):
+    """두 분기 블록을 합쳐 80,000자 안으로. 넘으면 준비된 발언을 각 분기 뒤쪽부터 잘라 맞춘다."""
+    t_prev, m_prev = _compare_block(code, prev, d_prev)
+    t_cur, m_cur = _compare_block(code, quarter, d_cur)
+    total = len(t_prev) + len(t_cur)
+    if total > COMPARE_MAX_CHARS:
+        over = total - COMPARE_MAX_CHARS
+        pc_prev, pc_cur = m_prev["prepared_chars"], m_cur["prepared_chars"]
+        cut_total = pc_prev + pc_cur
+        # 준비된 발언 비율대로 줄임 (최소 5,000자는 남긴다)
+        keep_prev = max(5000, pc_prev - int(over * (pc_prev / cut_total)) - 200) if cut_total else pc_prev
+        keep_cur = max(5000, pc_cur - int(over * (pc_cur / cut_total)) - 200) if cut_total else pc_cur
+        t_prev, m_prev = _compare_block(code, prev, d_prev, max_prepared=keep_prev)
+        t_cur, m_cur = _compare_block(code, quarter, d_cur, max_prepared=keep_cur)
+    text = f"# 직전 분기 {prev}\n\n{t_prev}\n\n\n# 이번 분기 {quarter}\n\n{t_cur}"
+    meta = {"prev": m_prev, "cur": m_cur, "chars": len(text), "truncated": bool(m_prev["truncated"] or m_cur["truncated"])}
+    return text, meta
+
+
+def _s(v):
+    return str(v) if v is not None else ""
+
+
+def _check_compare(d):
+    """키 누락·타입 보정 (요약의 _check_summary 방식). 판정값은 네 가지 중 하나로 강제."""
+    d = d if isinstance(d, dict) else {}
+    tri = lambda node, keys=("직전", "이번", "변화"): {k: _s((node or {}).get(k) if isinstance(node, dict) else "") for k in keys}
+    out = {"한줄결론": _s(d.get("한줄결론")),
+           "실적": tri(d.get("실적")),
+           "가이던스이행": [], "가이던스변화": tri(d.get("가이던스변화")),
+           "직전언급추적": [], "섹터전망": tri(d.get("섹터전망")), "경영진view": tri(d.get("경영진view")),
+           "리스크변화": {k: [_s(x) for x in ((d.get("리스크변화") or {}).get(k) or [])][:6] if isinstance(d.get("리스크변화"), dict) else [] for k in ("새로등장", "사라짐", "지속")},
+           "질문초점변화": tri(d.get("질문초점변화"), ("직전", "이번", "해석")),
+           "자본배분": tri(d.get("자본배분"))}
+    for x in (d.get("가이던스이행") or [])[:8]:
+        if isinstance(x, dict):
+            j = _s(x.get("판정")).strip()
+            if j not in ("상회", "부합", "하회", "미확인"):
+                j = "미확인"
+            out["가이던스이행"].append({"직전가이던스": _s(x.get("직전가이던스")), "이번실제": _s(x.get("이번실제")), "판정": j})
+    for x in (d.get("직전언급추적") or [])[:8]:
+        if isinstance(x, dict):
+            c = _s(x.get("변화")).strip()
+            if c not in ("진전", "후퇴", "유지", "언급없음"):
+                c = "언급없음" if not c else c
+            out["직전언급추적"].append({"직전내용": _s(x.get("직전내용")), "이번내용": _s(x.get("이번내용")), "변화": c})
+    return out
+
+
+def _compare_md(code, quarter, prev, name, res):
+    c = res["compare"]
+    L = [f"# {name or code} ({code}) 컨콜 비교: {quarter} ← {prev}", "",
+         f"- 생성: {res.get('at')} · 모델 {res.get('model')} · 토큰 {res.get('tokens')}" + (" · 입력 일부 생략" if (res.get("input_meta") or {}).get("truncated") else ""), "",
+         "## 한줄결론", "", c.get("한줄결론", ""), ""]
+    for key in ("실적", "가이던스변화", "섹터전망", "경영진view", "자본배분"):
+        v = c.get(key) or {}
+        L += [f"## {key}", f"- 직전: {v.get('직전', '')}", f"- 이번: {v.get('이번', '')}", f"- 변화: {v.get('변화', '')}", ""]
+    L += ["## 가이던스 이행"] + [f"- [{x['판정']}] 직전: {x['직전가이던스']} → 이번: {x['이번실제']}" for x in c.get("가이던스이행", [])] + [""]
+    L += ["## 직전 언급 추적"] + [f"- [{x['변화']}] {x['직전내용']} → {x['이번내용']}" for x in c.get("직전언급추적", [])] + [""]
+    r = c.get("리스크변화") or {}
+    L += ["## 리스크 변화", f"- 새로 등장: {', '.join(r.get('새로등장', [])) or '-'}", f"- 사라짐: {', '.join(r.get('사라짐', [])) or '-'}", f"- 지속: {', '.join(r.get('지속', [])) or '-'}", ""]
+    q = c.get("질문초점변화") or {}
+    L += ["## 질문 초점 변화", f"- 직전: {q.get('직전', '')}", f"- 이번: {q.get('이번', '')}", f"- 해석: {q.get('해석', '')}", ""]
+    kf = res.get("키워드빈도") or {}
+    L += ["## 키워드 빈도 (직전 → 이번, 증감)", "", "| 키워드 | 직전 | 이번 | 증감 |", "|---|---:|---:|---:|"]
+    L += [f"| {k} | {v['직전']} | {v['이번']} | {v['증감']:+d} |" for k, v in kf.items()]
+    return "\n".join(L) + "\n"
+
+
+def compare_status(code, quarter):
+    """GET 용: 캐시가 있으면 그대로, 없으면 {"status": "none", "prev_quarter", "ready"}"""
+    prev = prev_quarter(code, quarter)
+    if not prev:
+        return {"status": "none", "prev_quarter": None, "ready": False, "reason": "직전 분기 없음"}
+    cur = _load_json(_compare_path(code, quarter, prev), None)
+    if cur and cur.get("status") == "ok":
+        return dict(cur, cached=True)
+    ready = transcript_state(code, quarter)[0] == "ok" and transcript_state(code, prev)[0] == "ok"
+    return {"status": "none", "prev_quarter": prev, "ready": ready,
+            "missing": [q for q in (prev, quarter) if transcript_state(code, q)[0] != "ok"]}
+
+
+def compare(code, quarter, name="", limit=None, force=False):
+    """직전분기 vs 이번분기 비교 1건 (한도 kind='call_compare'). 반환 {status: ok|cached|need_transcript|ai_limit|ai_error, ...}"""
+    import us_financials
+    prev = prev_quarter(code, quarter)
+    if not prev:
+        return {"status": "need_transcript", "missing": [], "prev_quarter": None, "reason": "직전 분기 없음(재무 저장본의 분기 목록 기준)"}
+    path = _compare_path(code, quarter, prev)
+    if not force:
+        cur = _load_json(path, None)
+        if cur and cur.get("status") == "ok":
+            return dict(cur, status="cached")
+    st_c, d_cur = transcript_state(code, quarter)
+    st_p, d_prev = transcript_state(code, prev)
+    missing = [q for q, st in ((prev, st_p), (quarter, st_c)) if st != "ok"]
+    if missing:
+        return {"status": "need_transcript", "missing": missing, "prev_quarter": prev}
+    allowed, n = ai_budget.take("call_compare", limit=limit)
+    if not allowed:
+        return {"status": "ai_limit", "used": n, "prev_quarter": prev}
+    text, meta = _compare_input(code, quarter, prev, d_cur, d_prev)
+    user = f"종목: {name or code} ({code})\n이번 분기: {quarter} / 직전 분기: {prev} (회계연도 기준)\n\n{text}"
+    t0 = time.time()
+    try:
+        tx, tin, tout, model = us_financials._call_ai_full(COMPARE_SYSTEM, user, max_tokens=4000, task="call_compare")
+        comp = _check_compare(_parse_json(tx))
+    except Exception as e:
+        print(f"[earnings_calls] {code} {quarter}←{prev} 비교 실패: {type(e).__name__}: {str(e)[:120]}", flush=True)
+        res = {"status": f"ai_error:{type(e).__name__}", "error": str(e)[:300], "at": _now(), "prev_quarter": prev}
+        _save_json(path, res)
+        return res
+    kf_prev, kf_cur = keyword_freq(d_prev["transcript"]), keyword_freq(d_cur["transcript"])
+    kf = {k: {"직전": kf_prev[k], "이번": kf_cur[k], "증감": kf_cur[k] - kf_prev[k]} for k in COMPARE_KEYWORDS}
+    res = {"status": "ok", "code": code, "quarter": quarter, "prev_quarter": prev, "compare": comp, "키워드빈도": kf,
+           "tokens": {"input": tin, "output": tout}, "input_meta": meta, "seconds": round(time.time() - t0, 1), "at": _now(), "model": model}
+    _save_json(path, res)
+    print(f"[earnings_calls] {code} {quarter}←{prev} 비교 완료: 입력 {meta['chars']:,}자, 토큰 {tin}+{tout}, {res['seconds']}s, 오늘 {n}/{ai_budget.resolve_limit('call_compare', limit)}", flush=True)
+    try:
+        folder = call_dir(code, name)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, f"{quarter}_직전비교.md"), "w", encoding="utf-8") as f:
+                f.write(_compare_md(code, quarter, prev, name, res))
+    except Exception as e:
+        print(f"[earnings_calls] Drive 내보내기 실패(비교): {type(e).__name__}", flush=True)
+    return res
+
+
 # ---------- 상태 (API) ----------
 def status_us(code, name=""):
     qs = quarters(code)
@@ -509,7 +703,8 @@ def status_us(code, name=""):
         })
     return {"market": "US", "code": code, "name": name, "quarters": rows, "av": av_counters(),
             "ai": {"summary_used": ai_budget.used("call_summary"), "summary_limit": ai_budget.DEFAULT_LIMITS["call_summary"],
-                   "translate_used": ai_budget.used("call_translate"), "translate_limit": ai_budget.DEFAULT_LIMITS["call_translate"]}}
+                   "translate_used": ai_budget.used("call_translate"), "translate_limit": ai_budget.DEFAULT_LIMITS["call_translate"],
+                   "compare_used": ai_budget.used("call_compare"), "compare_limit": ai_budget.DEFAULT_LIMITS["call_compare"]}}
 
 
 def ensure_recent(code, name="", n=2, summarize_too=True, summary_limit=None):
