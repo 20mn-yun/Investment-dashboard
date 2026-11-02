@@ -2363,6 +2363,12 @@ def stock_reports_refresh_api():
     return jsonify({"ok": True, "job": job})
 
 
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    """워치독용 생존 확인. DB·외부 API·파일 접근 없이 즉시 응답."""
+    return jsonify({"ok": True, "ts": datetime.now().isoformat(timespec="seconds")})
+
+
 def _calls_open_bg(code, name):
     """종목종합정보 열 때 뒤에서: 최근 2개 분기 녹취록 받기(요약 X) → 워치리스트 종목이면 새 컨콜 텔레그램 알림(비교 자동 실행 X)"""
     try:
