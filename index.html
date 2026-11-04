@@ -1097,6 +1097,13 @@
         #tab-inbox .inbox-topic-item.hidden-topic { opacity: 0.5; cursor: default; }
         #tab-inbox .inbox-topic-item.hidden-topic:hover { background: transparent; color: var(--text-muted); }
         #tab-inbox .inbox-channels { margin-bottom: 14px; }
+        #tab-inbox .inbox-channels.collapsed { margin-bottom: 8px; }   /* 접힘: 공간 회수 */
+        #tab-inbox .inbox-ch-toggle { display: flex; align-items: center; gap: 6px; min-height: 36px; cursor: pointer; user-select: none; font-size: var(--fs-md); font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+        #tab-inbox .inbox-ch-toggle:hover { color: var(--text); }
+        #tab-inbox .inbox-ch-toggle .arrow { display: inline-block; width: 1em; text-align: center; }
+        #tab-inbox .inbox-ch-toggle .summary { font-weight: normal; font-size: var(--fs-sm); }
+        #tab-inbox .inbox-ch-toggle.has-warn, #tab-inbox .inbox-ch-toggle.has-warn:hover { color: #f85149; }
+        #tab-inbox .inbox-channels:not(.collapsed) .inbox-ch-toggle { margin-bottom: 6px; }
         #tab-inbox .inbox-subtabs { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
         #tab-inbox .inbox-subtab { padding: 8px 16px; cursor: pointer; color: var(--text-muted); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
         #tab-inbox .inbox-subtab.active { color: var(--text); border-bottom-color: var(--accent); }
@@ -2677,13 +2684,18 @@
 
 <!-- 텔레 인박스 탭 -->
 <div class="tab-content active" id="tab-inbox">
-    <div class="inbox-channels" id="inbox-channels-bar">
-        <div class="inbox-chips" id="inbox-chips"></div>
-        <div class="inbox-ch-add">
-            <input type="text" id="inbox-ch-input" placeholder="채널 추가 (@이름 또는 t.me/이름)" autocomplete="off">
-            <button id="inbox-ch-add-btn" onclick="addInboxChannel()">채널 추가</button>
+    <div class="inbox-channels collapsed" id="inbox-channels-bar">
+        <div class="inbox-ch-toggle" id="inbox-ch-toggle" role="button" tabindex="0" aria-expanded="false" onclick="toggleInboxChannels()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleInboxChannels();}">
+            <span class="arrow" id="inbox-ch-arrow">▸</span> 구독 채널 <span class="summary" id="inbox-ch-summary"></span>
         </div>
-        <div class="inbox-ch-err" id="inbox-ch-err"></div>
+        <div id="inbox-ch-body" style="display:none;">
+            <div class="inbox-chips" id="inbox-chips"></div>
+            <div class="inbox-ch-add">
+                <input type="text" id="inbox-ch-input" placeholder="채널 추가 (@이름 또는 t.me/이름)" autocomplete="off">
+                <button id="inbox-ch-add-btn" onclick="addInboxChannel()">채널 추가</button>
+            </div>
+            <div class="inbox-ch-err" id="inbox-ch-err"></div>
+        </div>
     </div>
     <div class="inbox-subtabs">
         <span class="inbox-subtab active" id="inbox-subtab-inbox" onclick="switchInboxView('inbox')">인박스</span>
@@ -6409,6 +6421,25 @@
                 ${pinBtn}${eyeBtn}${refreshBtn}<span class="x" onclick="removeInboxChannel('${inboxEsc(c.channel)}')">×</span></span>`;
         }
         cont.innerHTML = html || '<span style="font-size:var(--fs-sm);color:#6b7280;">등록된 채널이 없습니다</span>';
+        // 토글 헤더 요약: "N개" · 숨김 n · ⚠ 수집 실패 n (실패 있으면 has-warn)
+        const nHid = channels.filter(c => c.hidden === true).length, nBad = channels.filter(c => c.healthy === false).length;
+        const sum = document.getElementById('inbox-ch-summary'), tg = document.getElementById('inbox-ch-toggle');
+        if (sum) sum.textContent = `${channels.length}개` + (nHid ? ` · 숨김 ${nHid}` : '') + (nBad ? ` · ⚠ ${nBad}` : '');
+        if (tg) tg.classList.toggle('has-warn', nBad > 0);
+    }
+
+    // 채널 칩 바 접기/펼치기 (상태 저장 안 함 — 로드 때 항상 접힘)
+    function toggleInboxChannels(open) {
+        const bar = document.getElementById('inbox-channels-bar'), body = document.getElementById('inbox-ch-body');
+        const show = open === undefined ? body.style.display === 'none' : !!open;
+        body.style.display = show ? '' : 'none';
+        bar.classList.toggle('collapsed', !show);
+        document.getElementById('inbox-ch-arrow').textContent = show ? '▾' : '▸';
+        document.getElementById('inbox-ch-toggle').setAttribute('aria-expanded', show ? 'true' : 'false');
+    }
+    function inboxChErr(msg) {   // 채널 추가 에러: 접혀 있어도 펼쳐서 보이게
+        document.getElementById('inbox-ch-err').textContent = msg || '';
+        if (msg) toggleInboxChannels(true);
     }
 
     async function refreshInboxChannel(channel) {
@@ -6479,10 +6510,9 @@
     async function addInboxChannel() {
         const inp = document.getElementById('inbox-ch-input');
         const btn = document.getElementById('inbox-ch-add-btn');
-        const err = document.getElementById('inbox-ch-err');
-        err.textContent = '';
+        inboxChErr('');
         const val = inp.value.trim();
-        if (!val) { err.textContent = '채널을 입력하세요'; return; }
+        if (!val) { inboxChErr('채널을 입력하세요'); return; }
         btn.disabled = true;
         try {
             const res = await fetch(API_BASE + '/api/tg-inbox/channels', {
@@ -6490,11 +6520,11 @@
                 body: JSON.stringify({channel: val})
             });
             const data = await res.json();
-            if (data.error) { err.textContent = data.error; return; }
+            if (data.error) { inboxChErr(data.error); return; }
             inp.value = '';
             await loadInboxChannels();
             loadInbox(_inboxPeriod);
-        } catch (e) { err.textContent = '추가 실패'; }
+        } catch (e) { inboxChErr('추가 실패'); }
         finally { btn.disabled = false; }
     }
 
