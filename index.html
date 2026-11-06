@@ -1030,16 +1030,22 @@
         .dart-digest-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
         .dart-digest-toolbar .period-btn { font-size: var(--fs-sm); padding: 4px 10px; }
         .dart-digest-row {
-            display: grid; grid-template-columns: 100px 1fr 2fr; gap: 8px;
+            display: grid; grid-template-columns: minmax(160px, auto) 1.2fr 2fr; gap: 8px;
             padding: 7px 0; border-bottom: 1px solid var(--bg-panel); font-size: var(--fs-md); align-items: baseline;
         }
         .dart-digest-row:last-child { border-bottom: none; }
         .dart-digest-date { font-size: var(--fs-xs); color: var(--text-dim); white-space: nowrap; }
         .dart-digest-corp { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .dart-digest-corp .sc { font-size: var(--fs-xs); color: var(--text-dim); margin-left: 3px; }
+        .dart-digest-corp .go { color: var(--accent); cursor: pointer; }   /* 종목명 클릭 → 종목종합정보 */
+        .dart-digest-corp .go:hover { text-decoration: underline; }
         .dart-digest-link a { color: var(--accent); text-decoration: none; }
         .dart-digest-link a:hover { text-decoration: underline; }
-        .dart-digest-summary { font-size: var(--fs-sm); color: var(--text); margin-top: 2px; grid-column: 1 / -1; padding-left: 108px; }
+        .dart-digest-summary { font-size: var(--fs-sm); color: var(--text); margin-top: 2px; grid-column: 1 / -1; padding-left: 168px; }
+        @media (max-width: 640px) {   /* 1행 종목명+공시명, 2행 요약 전체 폭 */
+            .dart-digest-row { grid-template-columns: minmax(120px, auto) 1fr; }
+            .dart-digest-summary { padding-left: 0; }
+        }
         .dart-digest-empty { font-size: var(--fs-md); color: var(--text-dim); text-align: center; padding: 20px 0; }
         .dart-digest-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; font-size: var(--fs-sm); color: var(--text-muted); }
         .dart-digest-pager button {
@@ -3063,6 +3069,14 @@
             indicatorsLoaded = true;
             loadIndicators();
         }
+    }
+
+    // 다른 탭에서 종목종합정보 열기 (공용). stockview 미초기화면 switchTab 이 initStockView 를 동기 실행하므로 바로 svOpen 가능.
+    // 노트 미저장 가드는 svOpen 안에서 작동 (force 넘기지 않음)
+    function goStockView(market, code, name) {
+        switchTab('stockview');
+        if (!stockviewLoaded) { stockviewLoaded = true; initStockView(); }
+        svOpen(market, code, name);
     }
 
     // PER/PBR
@@ -6165,7 +6179,9 @@
                 ? `<div class="dart-digest-summary">${esc(it.summary)}</div>`
                 : `<div class="dart-digest-summary" style="color:#9ca3af;font-size:var(--fs-xs);">요약 대기${it.summary_err ? ' · ' + esc(it.summary_err) : ''}</div>`;
             html += `<div class="dart-digest-row">
-                <div class="dart-digest-corp">${esc(it.corp_name)}<span class="sc">${esc(it.stock_code)}</span></div>
+                <div class="dart-digest-corp" title="${esc(it.corp_name)}${it.stock_code ? ' ' + esc(it.stock_code) : ''}">${it.stock_code
+                    ? `<span class="go" onclick="goStockView('KR','${esc(it.stock_code)}','${esc(it.corp_name)}')">${esc(it.corp_name)}</span>`
+                    : esc(it.corp_name)}<span class="sc">${esc(it.stock_code)}</span></div>
                 <div class="dart-digest-link"><a href="${link}" target="_blank">${esc(it.title)}</a></div>
                 ${summary}
             </div>`;

@@ -3581,8 +3581,48 @@ def _major_excluded(title):
     return any(ex in t for ex in _MAJOR_EXCLUDE)
 
 
+MAJOR_MIN_MCAP_WON = 5_000 * 1e8      # 기본 5,000억원. dart_monitor_config.json 의 major_min_mcap_eok 로 변경 가능
+
+
+def _major_min_mcap_won():
+    try:
+        v = load_dm_cfg().get("major_min_mcap_eok")
+        return float(v) * 1e8 if v is not None else MAJOR_MIN_MCAP_WON
+    except (TypeError, ValueError):
+        return MAJOR_MIN_MCAP_WON
+
+
+def _major_mcap_reason(stock_code):
+    """시총 판정 사유: "ok" | "비상장" | "마스터 없음" | "기준 미달" | "마스터 장애"(필터 건너뜀)"""
+    code = (stock_code or "").strip()
+    if not code:
+        return "비상장"
+    try:
+        import stock_profile
+        master = stock_profile._kr_master()
+    except Exception as e:
+        print(f"[dart] 시총 마스터 조회 실패({type(e).__name__}) — 시총 필터 건너뜀", flush=True)
+        return "마스터 장애"
+    if not master:
+        print("[dart] 시총 마스터 비어 있음 — 시총 필터 건너뜀", flush=True)
+        return "마스터 장애"
+    m = master.get(code)
+    if not m:
+        return "마스터 없음"
+    cap = m.get("prev_cap")
+    if cap is None:
+        return "마스터 없음"
+    return "ok" if cap >= _major_min_mcap_won() else "기준 미달"
+
+
+def _major_mcap_ok(stock_code):
+    """시가총액 기준(전일, KIS 종목 마스터) 통과 여부. 마스터 장애면 True(필터 건너뛰고 수집 계속)."""
+    return _major_mcap_reason(stock_code) in ("ok", "마스터 장애")
+
+
 def _major_visible(items):
-    return [it for it in (items or []) if not _major_excluded(it.get("title"))]
+    """표시 필터(/api/dart/daily·텔레그램 슬롯·엑셀 공용): 제외어 + 시총 기준. history 원본은 지우지 않음"""
+    return [it for it in (items or []) if not _major_excluded(it.get("title")) and _major_mcap_ok(it.get("stock_code"))]
 
 
 _MAJOR_RETRY_PER_LOOP = 30
@@ -3679,10 +3719,12 @@ def _ck_major():
                 key = f"m_{rno}"
                 if key in seen:
                     continue
+                stock_code = it.get("stock_code", "")
+                if not _major_mcap_ok(stock_code):      # 시총 기준 미달·비상장: seen 에도 넣지 않음 (기준을 낮추면 다시 잡히도록), 요약 LLM 호출 전
+                    continue
                 seen.add(key)
                 chg = True
                 corp_name = it.get("corp_name", "")
-                stock_code = it.get("stock_code", "")
                 it_corp_code = it.get("corp_code", "")
                 if not it_corp_code and stock_code:
                     cmap = load_dart_corp_map()
