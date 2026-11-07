@@ -2110,17 +2110,28 @@ def stock_financials_api():
     years = request.args.get("years", "5")
     if years not in ("5", "10"):
         return jsonify({"error": "years 는 5 또는 10"}), 400
+    cache_only = request.args.get("cache_only", "0") == "1"   # MCP 용: 저장본만 계산, 받아오기·AI 대응 작업을 시작하지 않음
     if market == "US":
         r, err = _resolve_us_sec(code)
         if err:
             return err
         code, name, cik10 = r
+        if cache_only:
+            cache = us_financials._load_cache(code)
+            if not cache or not cache.get("facts"):
+                return jsonify({"error": "not_cached", "market": "US", "code": code, "name": name}), 404
+            return jsonify(dict(us_financials.compute(cache, int(years), name), status="ready", updating=None))
         return jsonify(us_financials.get_financials_nowait(code, cik10, name, int(years)))
     if market != "KR":
         return jsonify({"error": "not_supported", "message": f"아직 지원하지 않음: market={market}"}), 501
     info = load_dart_corp_map().get(code)
     if not info:
         return jsonify({"error": "not_found", "message": f"종목코드를 찾을 수 없음: {code}"}), 404
+    if cache_only:
+        cache = kr_financials._load_cache(code)
+        if not cache or not cache.get("acc_mt"):
+            return jsonify({"error": "not_cached", "market": "KR", "code": code, "name": info.get("name", "")}), 404
+        return jsonify(dict(kr_financials.compute(cache, int(years), info.get("name", "")), status="ready", updating=None))
     return jsonify(kr_financials.get_financials_nowait(code, info["corp_code"], info.get("name", ""), int(years)))
 
 
