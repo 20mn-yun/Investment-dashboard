@@ -141,13 +141,13 @@ RULES = [
     ("CF", "cfo", "영업현금흐름", "flow", ["ifrs-full_CashFlowsFromUsedInOperatingActivities"],
      ["영업활동현금흐름", "영업활동으로인한현금흐름"]),
     ("CF", "depreciation", "유형자산 감가상각비", "flow",
-     ["ifrs-full_AdjustmentsForDepreciationExpense", "ifrs-full_DepreciationExpense",
+     ["ifrs-full_AdjustmentsForDepreciationExpense", "dart_AdjustmentsForDepreciationExpense", "ifrs-full_DepreciationExpense",
       "dart_DepreciationExpense"],
-     ["감가상각비", "유형자산감가상각비", "유형자산상각비"]),
+     ["감가상각비", "유형자산감가상각비", "유형자산상각비", "감가상각비에대한조정"]),      # 5-A: dart_ 접두 표준코드·"에 대한 조정" 이름 추가
     ("CF", "amortization", "무형자산 상각비", "flow",
-     ["ifrs-full_AdjustmentsForAmortisationExpense", "ifrs-full_AmortisationExpense",
+     ["ifrs-full_AdjustmentsForAmortisationExpense", "dart_AdjustmentsForAmortisationExpense", "ifrs-full_AmortisationExpense",
       "dart_AmortisationExpense"],
-     ["무형자산상각비", "무형자산상각"]),
+     ["무형자산상각비", "무형자산상각", "무형자산상각비에대한조정"]),
     ("CF", "cfi", "투자현금흐름", "flow", ["ifrs-full_CashFlowsFromUsedInInvestingActivities"],
      ["투자활동현금흐름", "투자활동으로인한현금흐름"]),
     ("CF", "capex_ppe", "유형자산 취득", "flow",
@@ -199,6 +199,7 @@ DERIVED = [
     ("IS", "sga", "판매관리비", "매출총이익 - 영업이익", False),
     ("CF", "capex", "CAPEX", "유형자산 취득 + 무형자산 취득 (지출 크기, 양수)", True),
     ("CF", "fcf", "FCF", "영업현금흐름 - CAPEX", True),
+    ("IS", "ebitda", "EBITDA", "영업이익 + 유형자산 감가상각비 + 무형자산 상각비 (둘 다 없으면 빈 값, 하나만 있으면 그것만 더하고 일부 표시)", True),
     ("BS", "fin_assets_total", "금융자산 합계", "현금및현금성자산 + 단기금융상품 + 장기금융상품 (있는 항목의 합)", True),
     ("BS", "fin_liab_total", "금융부채 합계", "유동금융부채 + 비유동금융부채 (있는 항목의 합)", True),
     ("BS", "net_fin_assets", "순금융자산", "금융자산 합계 - 금융부채 합계 (금융부채 없으면 금융자산 합계)", True),
@@ -211,6 +212,7 @@ OWNER_FALLBACK = {
     "equity_owner": ("total_equity", "equity_minority", "지배/비지배 구분 없음: 자본총계"),
 }
 
+EBITDA_FORMULA = "영업이익 + 유형자산 감가상각비 + 무형자산 상각비"
 SHEET_ORDER = ["IS", "BS", "CF"]
 SHEET_NAMES = {"IS": "손익계산서", "BS": "재무상태표", "CF": "현금흐름표"}
 
@@ -1009,6 +1011,7 @@ def compute(cache, years=5, name="", persist=True):
 
     # 계산 항목
     calculated = {}
+    ebitda_partial = {"quarter": {}, "ttm": {}, "annual": {}}   # EBITDA 가 상각비 한쪽만으로 계산된 기간 → 사유
 
     def mark(key, view, label, formula):
         c = calculated.setdefault(key, {"formula": formula, "periods": {"quarter": [], "ttm": [], "annual": []}})
@@ -1044,6 +1047,12 @@ def compute(cache, years=5, name="", persist=True):
                 if v.get("cfo") is not None:
                     v["fcf"] = v["cfo"] - v["capex"]
                     mark("fcf", view, lb, "영업현금흐름 - CAPEX")
+            dep_, amo_ = v.get("depreciation"), v.get("amortization")
+            if "ebitda" not in v and v.get("operating_income") is not None and (dep_ is not None or amo_ is not None):
+                v["ebitda"] = v["operating_income"] + abs(dep_ or 0) + abs(amo_ or 0)
+                mark("ebitda", view, lb, EBITDA_FORMULA)
+                if dep_ is None or amo_ is None:
+                    ebitda_partial[view][lb] = "유형자산 감가상각비 없음" if dep_ is None else "무형자산 상각비 없음"
             for key, (src, minority, formula) in OWNER_FALLBACK.items():
                 if key not in v and key not in blocked and minority not in v and v.get(src) is not None:
                     v[key] = v[src]
@@ -1138,6 +1147,9 @@ def compute(cache, years=5, name="", persist=True):
         if key in HIDDEN_KEYS:
             continue
         sheet_keys[sheet].append(key)
+        # 5-B: 한국은 DART 요약 API 에 상각 행이 대부분 없어 EBITDA 를 표·차트에 내보내지 않음 (계산은 유지, 상각비 보완되면 아래 줄만 되살릴 것)
+        # if key == "operating_income":
+        #     sheet_keys[sheet].append("ebitda")
         if key == "capex_intangible":
             sheet_keys[sheet].append("capex")
         if key == "noncur_fin_assets":
@@ -1220,6 +1232,7 @@ def compute(cache, years=5, name="", persist=True):
         "metrics": metrics_out,
         "missing": missing,
         "calculated": calculated,
+        "ebitda_partial": {view: {lb: r for lb, r in d.items() if lb in keep[view]} for view, d in ebitda_partial.items()},
         "notes": [
             "분기 손익은 3개월 값, 4분기는 연간 - (1~3분기 합)",
             "분기 현금흐름은 누적 값의 차이",

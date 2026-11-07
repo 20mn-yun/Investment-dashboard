@@ -700,11 +700,145 @@ def status_us(code, name=""):
             "summary_tokens": summ.get("tokens") if summ else None,
             "translation": bool(ko and ko.get("status") == "ok"),
             "translate_job": tj,
+            # 5-A 조정 EBITDA (달러 원값·단위·인용). 추출 전이면 None
+            "adjusted": ({k: d["adjusted"].get(k) for k in ("status", "adj_ebitda", "value", "unit", "label", "quote", "reason")}
+                         if st == "ok" and d.get("adjusted") else None),
         })
     return {"market": "US", "code": code, "name": name, "quarters": rows, "av": av_counters(),
             "ai": {"summary_used": ai_budget.used("call_summary"), "summary_limit": ai_budget.DEFAULT_LIMITS["call_summary"],
                    "translate_used": ai_budget.used("call_translate"), "translate_limit": ai_budget.DEFAULT_LIMITS["call_translate"],
                    "compare_used": ai_budget.used("call_compare"), "compare_limit": ai_budget.DEFAULT_LIMITS["call_compare"]}}
+
+
+# ---------- 조정 EBITDA 추출 (5-A): 원문에서 "Adjusted EBITDA"(non-GAAP EBITDA) 해당 분기 금액만 뽑아 분기 파일 "adjusted" 키에 저장 ----------
+ADJ_EBITDA_SYSTEM = """You extract one number from excerpts of a US earnings call transcript.
+Task: find the company's Adjusted EBITDA (or "non-GAAP EBITDA", "EBITDA excluding ...") reported FOR THE QUARTER JUST ENDED (the quarter being discussed), as stated by management.
+Rules:
+- Use only the excerpts. Do not compute, estimate, or annualize. Ignore guidance, full-year, trailing-twelve-month, prior-quarter and segment-level figures.
+- If management only reports plain "EBITDA" (not adjusted) for the quarter, use that and set "label" to "EBITDA".
+- If no quarterly figure is stated, return null.
+Output JSON only, no prose: {"adj_ebitda": <number or null>, "unit": "USD M" | "USD B" | null, "label": "<term used, e.g. Adjusted EBITDA>", "quote": "<one verbatim sentence containing the figure, or empty>"}"""
+ADJ_CONTEXT_PARAS = 2        # EBITDA 가 들어간 문단 앞뒤로 함께 보낼 문단 수
+ADJ_MAX_CHARS = 12000
+_ADJ_RE = re.compile(r"ebitda", re.I)
+
+
+def _adj_excerpts(transcript):
+    """EBITDA 가 들어간 문단 ±2문단만 모아 텍스트로. 문단 = 세그먼트 content 를 빈 줄로 나눈 뒤, 긴 것은 문장 단위로 600자 안팎씩 묶은 것.
+    길이 상한(ADJ_MAX_CHARS)을 넘으면 앞뒤 문단을 먼저 줄이고, 그래도 넘으면 EBITDA 문단만 남긴다 (언급 문단은 잘리지 않게)."""
+    paras = []
+    for s in transcript:
+        who = f"{s.get('speaker') or ''} ({s.get('title') or ''})"
+        for p in re.split(r"\n\s*\n", s.get("content") or ""):
+            p = p.strip()
+            if not p:
+                continue
+            if len(p) <= 700:
+                paras.append((who, p))
+                continue
+            buf = ""
+            for sent in re.split(r"(?<=[.!?])\s+", p):
+                if buf and len(buf) + len(sent) > 600:
+                    paras.append((who, buf.strip()))
+                    buf = ""
+                buf += sent + " "
+            if buf.strip():
+                paras.append((who, buf.strip()))
+    hits = [i for i, (_, p) in enumerate(paras) if _ADJ_RE.search(p)]
+    if not hits:
+        return "", 0
+
+    def build(ctx):
+        keep = set()
+        for i in hits:
+            keep.update(range(max(0, i - ctx), min(len(paras), i + ctx + 1)))
+        out, last = [], None
+        for i in sorted(keep):
+            who, p = paras[i]
+            out.append((f"[{who}]\n" if who != last else "") + p)
+            last = who
+        return "\n\n".join(out)
+
+    for ctx in (ADJ_CONTEXT_PARAS, 1, 0):
+        text = build(ctx)
+        if len(text) <= ADJ_MAX_CHARS:
+            return text, len(hits)
+    return text[:ADJ_MAX_CHARS], len(hits)
+
+
+def _adj_amount(v, unit):
+    """(금액, 단위) → 달러 원값. unit 이 비면 금액 크기로 추정하지 않고 None."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    u = (unit or "").upper().replace("$", "").strip()
+    if u in ("USD M", "M", "MILLION", "MILLIONS", "USD MILLION"):
+        return v * 1e6
+    if u in ("USD B", "B", "BILLION", "BILLIONS", "USD BILLION"):
+        return v * 1e9
+    if u in ("USD K", "K", "THOUSAND", "THOUSANDS"):
+        return v * 1e3
+    if u in ("USD",):
+        return v
+    return None
+
+
+def extract_adjusted(code, quarter, name="", limit=None, force=False):
+    """조정 EBITDA 1건 (한도 kind='adj_ebitda', Haiku). 반환 {status: ok|none|cached|no_transcript|no_mention|ai_limit|ai_error, adjusted}.
+    결과는 분기 파일(<분기>.json)의 "adjusted" 키에 저장하고, 한 번 뽑으면(ok·none) 다시 부르지 않는다."""
+    import us_financials
+    st, d = transcript_state(code, quarter)
+    if st != "ok":
+        return {"status": "no_transcript"}
+    cur = d.get("adjusted")
+    if cur and not force and cur.get("status") in ("ok", "none"):
+        return {"status": "cached", "adjusted": cur}
+    text, n_hits = _adj_excerpts(d["transcript"])
+    if not text:
+        res = {"status": "none", "adj_ebitda": None, "unit": None, "quote": "", "reason": "원문에 EBITDA 언급 없음", "at": _now()}
+        d["adjusted"] = res
+        _save_json(_p(code, quarter), d)
+        return {"status": "none", "adjusted": res}
+    allowed, n = ai_budget.take("adj_ebitda", limit=limit)
+    if not allowed:
+        return {"status": "ai_limit", "used": n}
+    user = f"Company: {name or code} ({code})\nQuarter being discussed: {quarter} (fiscal)\n\nExcerpts ({n_hits} EBITDA mentions):\n\n{text}"
+    t0 = time.time()
+    try:
+        out, tin, tout, model = us_financials._call_ai_full(ADJ_EBITDA_SYSTEM, user, max_tokens=400, task="adj_ebitda")
+        j = _parse_json(out)
+    except Exception as e:
+        print(f"[earnings_calls] {code} {quarter} 조정 EBITDA 추출 실패: {type(e).__name__}: {str(e)[:120]}", flush=True)
+        return {"status": f"ai_error:{type(e).__name__}", "error": str(e)[:300]}
+    amount = _adj_amount(j.get("adj_ebitda"), j.get("unit"))
+    res = {"status": "ok" if amount is not None else "none",
+           "adj_ebitda": amount,                       # 달러 원값
+           "value": j.get("adj_ebitda"), "unit": j.get("unit"), "label": str(j.get("label") or "")[:60],
+           "quote": str(j.get("quote") or "")[:400], "mentions": n_hits,
+           "tokens": {"input": tin, "output": tout}, "seconds": round(time.time() - t0, 1), "at": _now(), "model": model}
+    if amount is None:
+        res["reason"] = "해당 분기 금액을 찾지 못함"
+    d["adjusted"] = res
+    _save_json(_p(code, quarter), d)
+    print(f"[earnings_calls] {code} {quarter} 조정 EBITDA: {res['status']} {res.get('value')} {res.get('unit')} (오늘 {n}/{ai_budget.resolve_limit('adj_ebitda', limit)})", flush=True)
+    return {"status": res["status"], "adjusted": res}
+
+
+def extract_adjusted_missing(code, name="", limit=None, max_n=None):
+    """원문이 있는 분기 중 adjusted 가 없는 것만 추출 (05:30 루프). 반환 [{quarter, status}]"""
+    out = []
+    for q in reversed(quarters(code)):
+        st, d = transcript_state(code, q["quarter"])
+        if st != "ok" or (d.get("adjusted") or {}).get("status") in ("ok", "none"):
+            continue
+        r = extract_adjusted(code, q["quarter"], name, limit=limit)
+        out.append({"quarter": q["quarter"], "status": r.get("status")})
+        if r.get("status") == "ai_limit":
+            break
+        if max_n and len(out) >= max_n:
+            break
+    return out
 
 
 def ensure_recent(code, name="", n=2, summarize_too=True, summary_limit=None):

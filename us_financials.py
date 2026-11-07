@@ -184,6 +184,7 @@ DERIVED = [
     ("IS", "sga", "판매관리비", "매출총이익 - 영업이익", False),
     ("CF", "capex", "CAPEX", "유형자산 취득 + 무형자산 취득 (지출 크기, 양수)", True),
     ("CF", "fcf", "FCF", "영업현금흐름 - CAPEX", True),
+    ("IS", "ebitda", "EBITDA", "영업이익 + 유형자산 감가상각비 + 무형자산 상각비 (둘 다 없으면 빈 값, 하나만 있으면 그것만 더하고 일부 표시)", True),
     ("BS", "fin_assets_total", "금융자산 합계", "현금및현금성자산 + 단기금융상품 + 장기금융상품 (있는 항목의 합)", True),
     ("BS", "fin_liab_total", "금융부채 합계", "유동금융부채 + 비유동금융부채 (있는 항목의 합)", True),
     ("BS", "net_fin_assets", "순금융자산", "금융자산 합계 - 금융부채 합계 (금융부채 없으면 금융자산 합계)", True),
@@ -197,6 +198,7 @@ SHARES_CONCEPTS = {"bs": "us-gaap:CommonStockSharesOutstanding", "cover": "dei:E
 WA_SHARES_LABEL = "가중평균(대체)"                      # 발행주식수 계정이 없어 가중평균 주식수(AI·사용자 지정)로 대체했을 때 표시
 BANDS_DIR = os.path.join(_BD, "cache", "us_bands")      # 종목별 밸류에이션 밴드 (종목을 열 때 계산, 하루 보관)
 
+EBITDA_FORMULA = "영업이익 + 유형자산 감가상각비 + 무형자산 상각비"
 SHEET_ORDER = ["IS", "BS", "CF"]
 SHEET_NAMES = {"IS": "손익계산서", "BS": "재무상태표", "CF": "현금흐름표"}
 SLOTS = ["Q1", "H1", "Q3", "FY"]          # 회계연도 안의 네 보고 시점 (kr_financials 와 같은 이름)
@@ -1160,6 +1162,7 @@ def compute(cache, years=5, name="", persist=True):
 
     # 계산 항목 (kr_financials 와 같음)
     calculated = {}
+    ebitda_partial = {"quarter": {}, "ttm": {}, "annual": {}}   # EBITDA 가 상각비 한쪽만으로 계산된 기간 → 사유
 
     def mark(key, view, label, formula):
         c = calculated.setdefault(key, {"formula": formula, "periods": {"quarter": [], "ttm": [], "annual": []}})
@@ -1195,6 +1198,12 @@ def compute(cache, years=5, name="", persist=True):
                 if v.get("cfo") is not None:
                     v["fcf"] = v["cfo"] - v["capex"]
                     mark("fcf", view, lb, "영업현금흐름 - CAPEX")
+            dep_, amo_ = v.get("depreciation"), v.get("amortization")
+            if "ebitda" not in v and v.get("operating_income") is not None and (dep_ is not None or amo_ is not None):
+                v["ebitda"] = v["operating_income"] + abs(dep_ or 0) + abs(amo_ or 0)
+                mark("ebitda", view, lb, EBITDA_FORMULA)
+                if dep_ is None or amo_ is None:
+                    ebitda_partial[view][lb] = "유형자산 감가상각비 없음" if dep_ is None else "무형자산 상각비 없음"
             for key, (src, minority, formula) in OWNER_FALLBACK.items():
                 if key not in v and minority not in v and v.get(src) is not None:
                     v[key] = v[src]
@@ -1249,6 +1258,8 @@ def compute(cache, years=5, name="", persist=True):
         if key in HIDDEN_KEYS:
             continue
         sheet_keys[sheet].append(key)
+        if key == "operating_income":
+            sheet_keys[sheet].append("ebitda")
         if key == "capex_intangible":
             sheet_keys[sheet].append("capex")
         if key == "noncur_fin_assets":
@@ -1397,6 +1408,7 @@ def compute(cache, years=5, name="", persist=True):
         "metrics": metrics_out,
         "missing": missing,
         "calculated": calculated,
+        "ebitda_partial": {view: {lb: r for lb, r in d.items() if lb in keep[view]} for view, d in ebitda_partial.items()},
         "notes": [
             "출처: SEC XBRL companyfacts (10-K·10-Q). 기간 이름은 실제 종료 월 (달력 기준)",
             "분기 손익은 3개월 값, 4분기는 연간 - (1~3분기 합)",

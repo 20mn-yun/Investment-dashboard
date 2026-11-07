@@ -29,6 +29,7 @@ TASK_TIERS = {
     "peers": "sonnet", "dart_watch_summary": "sonnet", "dart_detail": "sonnet", "earnings_extract": "sonnet",
     "reports": "sonnet", "tg_topic": "sonnet", "report_relevance": "sonnet", "tg_image_topic": "sonnet", "tg_ocr": "sonnet", "ir_release": "sonnet",
     "concept_map": "haiku", "ksic": "haiku", "call_translate": "haiku", "stock_news": "haiku", "dart_excel_line": "haiku",
+    "adj_ebitda": "haiku",
 }
 TASK_BACKEND = {"call_translate": "api",            # 값: "cli" | "codex" | "api". codex 지정 task 는 Claude CLI 를 거치지 않는다
                 "tg_image_topic": "codex", "tg_ocr": "codex", "dart_excel_line": "codex"}   # 옛 Gemini 자리: 이미지 2종 + 엑셀 1줄

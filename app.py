@@ -4106,6 +4106,12 @@ def _krfin_prefetch_run(reason):
             results[key] += ", 컨콜 " + " ".join(f"{c['quarter']}:{c.get('transcript')}/{c.get('summary', '-')}" for c in calls)
         except Exception as e:
             results[key] += f", 컨콜 실패({type(e).__name__})"
+        try:   # 5-A 조정 EBITDA: 원문 있는 분기 중 아직 안 뽑은 것만 (adj_ebitda 한도 안에서)
+            adj = earnings_calls.extract_adjusted_missing(code, items_name.get(code, ""))
+            if adj:
+                results[key] += ", 조정EBITDA " + " ".join(f"{a['quarter']}:{a['status']}" for a in adj)
+        except Exception as e:
+            results[key] += f", 조정EBITDA 실패({type(e).__name__})"
         try:   # 새 컨콜·요약 완료 텔레그램 알림 (워치리스트 미국 종목, 직전분기 비교는 call_compare 한도 안에서)
             nt = earnings_calls.notify_new_calls(code, items_name.get(code, ""), run_compare=True)
             if nt.get("init") or nt.get("sent") or nt.get("skipped"):

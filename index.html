@@ -8562,7 +8562,7 @@
 
     // ===== 재무정보 탭 (내부 식별자 stockview) =====
     const SV_KEYS = {
-        IS: [['revenue', '매출액'], ['operating_income', '영업이익'], ['net_income', '순이익']],
+        IS: [['revenue', '매출액'], ['operating_income', '영업이익'], ['ebitda', 'EBITDA', true], ['net_income', '순이익'], ['fcf', 'FCF', true]],   // 세 번째 true = 값이 없으면 행 생략
         BS: [['total_assets', '자산총계'], ['total_liabilities', '부채총계'], ['total_equity', '자본총계']],
         CF: [['cfo', '영업현금흐름'], ['capex', 'CAPEX'], ['fcf', 'FCF']],
     };
@@ -8781,6 +8781,8 @@
                        usd && s.shares ? `${s.market_cap_basis || ''} · 주식수 ${svShares(s.shares)}` : s.market_cap_basis)}
                 ${stat('PER', s.per == null ? '-' : s.per.toFixed(1) + '배', s.valuation_basis)}
                 ${stat('PBR', s.pbr == null ? '-' : s.pbr.toFixed(2) + '배', s.valuation_basis)}
+                ${svEbitdaOn() ? (() => { const e = svEvEbitdaLatest(); return stat('EV/EBITDA', e.deficit ? '적자' : e.nm ? 'n/m' : e.v == null ? '-' : e.v.toFixed(1) + '배',
+                    e.lb ? `${e.lb} 분기 말 EV(시가총액 + 금융부채 - 금융자산) / 4분기누적 EBITDA(영업이익 + 감가상각비 + 무형자산상각비)${e.nm ? ` — 실제 ${e.raw.toFixed(1)}배 (200배 초과는 n/m)` : ''}` : '재무 3표·월말 주가·EBITDA가 모두 있어야 계산'); })() : ''}
                 ${stat('fPER', s.fper == null ? '-' : s.fper.toFixed(1) + '배', s.fsource ? `현재가 / ${s.f_year || '올해'} 예상 EPS ${s.f_eps != null ? Number(s.f_eps).toLocaleString() : '-'} (출처 ${s.fsource}${s.f_asof ? ', ' + s.f_asof : ''})` : '컨센서스 없음')}
                 ${stat('fPBR', s.fpbr == null ? '-' : s.fpbr.toFixed(2) + '배', s.fsource ? `현재가 / ${s.f_year || '올해'} 예상 BPS ${s.f_bps != null ? Number(s.f_bps).toLocaleString() : '-'} (출처 ${s.fsource})` : '컨센서스 없음')}
                 ${stat('목표주가 평균', s.target_price_mean == null ? '-' : (sv.market === 'US' ? '$' + Number(s.target_price_mean).toFixed(0) : Number(s.target_price_mean).toLocaleString() + '원'), `투자의견 평균 ${s.opinion_mean ?? '-'} (${s.opinion_scale || ''})${s.analysts_n ? ' · 추정 기관 ' + s.analysts_n : ''}`)}
@@ -8851,6 +8853,7 @@
         }
         svRenderFinancials();
         if (sv.summary && !sv.summary.error && !sv.summary.financials_ready) svLoadSummary();
+        else if (sv.summary && !sv.summary.error) svRenderSummary();   // 5-A: EV/EBITDA 칸 갱신
     }
 
     async function svLoadPrices() {
@@ -8864,6 +8867,7 @@
             if (t === sv.token) sv.prices = null;
         }
         if (sv.fin && sv.mode === 'chart') svRenderCharts();
+        if (sv.fin && sv.summary && !sv.summary.error) svRenderSummary();   // 5-A: EV/EBITDA 칸 갱신
     }
 
     // 값 꺼내기와 계산 (성장률·비율은 화면에서 계산)
@@ -8891,7 +8895,7 @@
     // 표 보기 행 꾸밈: 부호 (+)/(-), 들여쓰기 수준, 핵심 행, 계산 행(앞에 끼워 넣음)
     const SV_LAYOUT = {
         IS: {
-            revenue: { key: 1 }, cogs: { sign: '-' }, gross_profit: { key: 1 }, sga: { sign: '-' }, operating_income: { key: 1 },
+            revenue: { key: 1 }, cogs: { sign: '-' }, gross_profit: { key: 1 }, sga: { sign: '-' }, operating_income: { key: 1 }, ebitda: { lv: 1 },
             other_income: { lv: 2, before: { id: 'other_net', label: '기타손익', sign: '+', lv: 1, fn: svOtherNet, formula: '기타수익 - 기타비용' } },
             other_expense: { lv: 2 },
             finance_income: { lv: 2, before: { id: 'finance_net', label: '금융손익', sign: '+', lv: 1, fn: svFinNet, formula: '금융수익 - 금융비용' } },
@@ -9027,6 +9031,7 @@
         if (v == null) return '-';
         if (unit === 'pct') return v.toFixed(1) + '%';
         if (unit === 'turn') return v.toFixed(2) + '회';
+        if (unit === 'x') return v.toFixed(1) + '배';
         if (unit === 'price') return svIsUsd() ? '$' + v.toFixed(2) : Math.round(v).toLocaleString() + '원';
         return svAmt(v);
     }
@@ -9064,6 +9069,53 @@
         return (sv.view === 'annual' ? it.annual[lb] : it.ttm[lb]) ?? null;
     }
     function svDelta(fn) { return lb => svSub(fn(lb), fn(svPrevPeriodLabel(lb))); }   // 전분기말 대비 증감
+    // --- 5-A: EV / EBITDA ---
+    function svEbitdaPartial(lb) {   // EBITDA 가 상각비 한쪽만으로 계산된 기간의 사유 (서버 ebitda_partial)
+        const p = sv.fin && sv.fin.ebitda_partial && sv.fin.ebitda_partial[sv.view];
+        return p ? (p[lb] || null) : null;
+    }
+    function svEv(lb) {              // 기간 말 EV = 기간 말 시가총액(월말 종가 × 기간 주식수, svMcap) + 금융부채 합계 - 금융자산 합계 (리스부채는 기존 금융부채 규칙 그대로)
+        const m = svMcap(lb), cash = svV('fin_assets_total', lb);
+        if (m == null || cash == null) return null;
+        return m + (svV('fin_liab_total', lb) || 0) - cash;
+    }
+    function svEbitdaTtm(lb, adj) {  // 4분기누적 EBITDA (연도 보기는 연간). adj=true 면 컨콜 조정 EBITDA 4개 분기 합 (분기 보기, 4개 다 있을 때만)
+        if (!adj) return svTtm('ebitda', lb);
+        if (sv.view !== 'quarter') return null;
+        let s = 0, cur = lb;
+        for (let i = 0; i < 4; i++) { const v = svAdj(cur); if (v == null) return null; s += v; cur = svPrevPeriodLabel(cur); }
+        return s;
+    }
+    const SV_EV_NM = 200;             // 5-B: 이 배수를 넘으면 점 없이 "n/m" (툴팁에는 실제 배수)
+    function svEbitdaOn() { return sv.market === 'US'; }   // 5-B: EBITDA 계열은 미국만
+    function svEvEbitdaRaw(lb, adj) { const ev = svEv(lb), e = svEbitdaTtm(lb, adj); return ev == null || e == null || e <= 0 ? null : ev / e; }
+    function svEvEbitda(lb, adj) { const r = svEvEbitdaRaw(lb, adj); return r == null || r > SV_EV_NM ? null : r; }
+    function svEvNm(lb, adj) { const r = svEvEbitdaRaw(lb, adj); return r != null && r > SV_EV_NM; }
+    function svEvDeficit(lb, adj) { const e = svEbitdaTtm(lb, adj); return e != null && e <= 0 && svEv(lb) != null; }
+    function svAdjMap() {            // 컨콜 저장본의 조정 EBITDA: 기간 말(YYYY.MM) → {v, quote}
+        const out = {};
+        if (sv.market !== 'US' || !sv.calls) return out;
+        (sv.calls.quarters || []).forEach(q => { const a = q.adjusted; if (a && a.status === 'ok' && a.adj_ebitda != null) out[q.label] = { v: a.adj_ebitda, quote: a.quote, label: a.label, unit: a.unit, value: a.value }; });
+        return out;
+    }
+    function svAdjOn() { return sv.view === 'quarter' && Object.keys(svAdjMap()).length >= 2; }   // 미국이고 2개 분기 이상일 때만 그린다
+    function svAdj(lb) { const a = svAdjMap()[lb]; return a ? a.v : null; }
+    function svAdjPlain(lb) { const a = svAdjMap()[lb]; return !!a && !/adjust|non-?gaap/i.test(a.label || ''); }   // 5-B: 회사가 "EBITDA" 라고만 발표(조정 표기 없음)
+    function svAdjQuote(lb) { const a = svAdjMap()[lb]; return a ? `${svAdjPlain(lb) ? '(회사 발표 EBITDA, 조정 표기 없음) ' : ''}${a.label || 'Adjusted EBITDA'} ${a.value} ${a.unit || ''} — "${a.quote || ''}"` : null; }
+    function svEvEbitdaLatest() {    // 종목 요약 상단용: 가장 최근 분기의 EV/EBITDA (분기 보기와 같은 계산). 미국만
+        if (!svEbitdaOn() || !sv.fin || !sv.prices) return { v: null, lb: null, deficit: false, nm: false };
+        const view = sv.view; sv.view = 'quarter';
+        try {
+            const qs = (sv.fin.periods.quarter || []);
+            for (let i = qs.length - 1; i >= 0 && i >= qs.length - 2; i--) {
+                const lb = qs[i], v = svEvEbitda(lb, false);
+                if (v != null) return { v, lb, deficit: false, nm: false };
+                if (svEvNm(lb, false)) return { v: null, lb, deficit: false, nm: true, raw: svEvEbitdaRaw(lb, false) };
+                if (svEvDeficit(lb, false)) return { v: null, lb, deficit: true, nm: false };
+            }
+            return { v: null, lb: null, deficit: false, nm: false };
+        } finally { sv.view = view; }
+    }
     function svTurnover(ttmKey, stockKey) {   // 회전율(회) = 4분기누적 / 시점 값
         return lb => { const d = svV(stockKey, lb), n = svTtm(ttmKey, lb); return d == null || n == null || d <= 0 ? null : n / d; };
     }
@@ -9086,7 +9138,7 @@
     // 요약 표: 행 = 핵심 3개, 열 = 최근 5개 기간(최신이 왼쪽), 칸 = 값 + 전년 대비
     function svRenderSumTable() {
         const periods = svPeriods().slice(-5).reverse();
-        const keys = SV_KEYS[sv.table];
+        const keys = SV_KEYS[sv.table].filter(([k, , optional]) => (k !== 'ebitda' || svEbitdaOn()) && (!optional || periods.some(lb => svV(k, lb) != null)));
         let h = `<thead><tr><th><small>단위 ${svUnitName()}</small></th>` + periods.map(lb =>
             `<th data-lb="${lb}" class="${lb === sv.selLb ? 'sv-sel' : ''}">${lb}</th>`).join('') + '</tr></thead><tbody>';
         keys.forEach(([k, label]) => {
@@ -9194,6 +9246,22 @@
                 { group: '실적', title: '영업이익', need: ['operating_income', 'revenue'], s: [
                     B('영업이익', K('operating_income'), C.c3), L('영업이익 성장률(YoY)', Y(K('operating_income')), C.c6, RP),
                     L(`영업이익 성장률(${qn})`, Q(K('operating_income')), C.c2, RP), L('영업이익률', margin('operating_income'), C.c4, RP)] },
+                // 5-A: EBITDA = 영업이익 + 감가상각비 + 무형자산상각비 (서버 계산, 한쪽 상각비만 있으면 "일부"). 5-B: 미국만 (한국은 상각 행이 없어 계열 전체 숨김)
+                ...(svEbitdaOn() ? [
+                { group: '실적', title: 'EBITDA', need: ['ebitda'], s: [
+                    B('EBITDA', K('ebitda'), C.c3, { neg: true, partial: svEbitdaPartial }), L('EBITDA 성장률(YoY)', Y(K('ebitda')), C.c6, RP),
+                    L('EBITDA 마진', margin('ebitda'), C.c4, RP)] },
+                ...(svAdjOn() ? [{ group: '실적', title: '조정 EBITDA (컨콜 발표치)', need: [], s: [
+                    B('조정 EBITDA', svAdj, C.c5, { neg: true, tip: svAdjQuote, light: svAdjPlain }), L('EBITDA (재무제표)', K('ebitda'), C.c3)] }] : []),
+                ...(priceOn ? [{ group: '실적', title: 'EV/EBITDA', need: ['ebitda'], note: 'EV = 시가총액 + 금융부채 − 금융자산(리스부채는 금융부채로 공시된 경우만 포함)', s: [
+                    L('EV/EBITDA (4분기누적)', lb => svEvEbitda(lb, false), C.c6, { unit: 'x', deficit: lb => svEvDeficit(lb, false), nm: lb => svEvNm(lb, false), raw: lb => svEvEbitdaRaw(lb, false) }),
+                    B('EBITDA', K('ebitda'), C.c3, { axis: 'R', neg: true })] }] : []),
+                ...(priceOn && svAdjOn() ? [{ group: '실적', title: 'EV/조정 EBITDA', need: [], s: [
+                    L('EV/조정 EBITDA (4분기누적)', lb => svEvEbitda(lb, true), C.c6, { unit: 'x', deficit: lb => svEvDeficit(lb, true), nm: lb => svEvNm(lb, true), raw: lb => svEvEbitdaRaw(lb, true) }),
+                    B('조정 EBITDA', svAdj, C.c5, { axis: 'R', neg: true, tip: svAdjQuote, light: svAdjPlain })] }] : []),
+                ] : []),
+                { group: '실적', title: 'FCF', need: ['fcf'], s: [
+                    B('FCF', K('fcf'), C.c5, { neg: true }), L('FCF 성장률(YoY)', Y(K('fcf')), C.c6, RP), L('영업현금흐름', K('cfo'), C.c3)] },
                 { group: '매출액', title: '매출액 구성', need: ['cogs', 'sga'], stacked: true, s: [
                     B('매출원가', K('cogs'), C.c5, { stack: 's' }), B('판매관리비', K('sga'), C.c4, { stack: 's' }),
                     B('영업이익', K('operating_income'), C.c3, { stack: 's' })] },
@@ -9352,7 +9420,7 @@
         let html = '';
         groups.forEach((g, gi) => {
             html += `<div class="sv-group-title" id="sv-grp-${gi}">${svEsc(g)}</div><div class="sv-chart-grid">`;
-            byGroup[g].forEach((d, ci) => { html += `<div class="sv-chart-card"><div class="sv-chart-wrap"><canvas id="sv-ch-${gi}-${ci}"></canvas></div></div>`; });
+            byGroup[g].forEach((d, ci) => { html += `<div class="sv-chart-card"><div class="sv-chart-wrap"><canvas id="sv-ch-${gi}-${ci}"></canvas></div>${d.note ? `<div class="sv-note" style="font-size:var(--fs-sm);margin-top:4px;">${svEsc(d.note)}</div>` : ''}</div>`; });
             html += '</div>';
         });
         if (skipped.length) html += `<div class="sv-note" style="margin-top:10px;">필요한 항목이 없어 그리지 않은 차트: ${svEsc(skipped.join(', '))}</div>`;
@@ -9364,6 +9432,24 @@
         const xTicks = { color: C.text, autoSkip: false, maxRotation: 45, minRotation: n > 12 ? 45 : 0,
                          font: fzf(n > 30 ? 8 : n > 16 ? 9 : 10, 'tab-stockview') };
         const unitSuffix = ` (${svUnitName()})`;
+        const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0969da';
+        // 5-A: 막대 위 "일부"(EBITDA 상각비 한쪽만) · 선 자리 "적자"(EV/EBITDA 분모 0 이하) 표시
+        const svMarkPlugin = { id: 'svMark', afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            chart.data.datasets.forEach((ds, di) => {
+                const meta = chart.getDatasetMeta(di);
+                if (meta.hidden) return;
+                ctx.save(); ctx.font = `${fzf(9, 'tab-stockview').size || 9}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.fillStyle = C.muted;
+                meta.data.forEach((el, i) => {
+                    const lb = periods[i];
+                    if (ds.partialFn && ds.partialFn(lb) && ds.data[i] != null) { ctx.textBaseline = 'bottom'; ctx.fillText('일부', el.x, Math.min(el.y, el.base ?? el.y) - 2); }
+                    if (ds.deficitFn && ds.deficitFn(lb)) { ctx.textBaseline = 'bottom'; ctx.fillText('적자', el.x, chart.scales[ds.yAxisID || 'y'].bottom - 2); }
+                    if (ds.nmFn && ds.nmFn(lb)) { ctx.textBaseline = 'bottom'; ctx.fillText('n/m', el.x, chart.scales[ds.yAxisID || 'y'].bottom - 2); }
+                });
+                ctx.restore();
+            });
+        } };
         const zeroGrid = { color: ctx => ctx.tick.value === 0 ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.06)',
                            lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1 };
         const zeroOnly = { color: ctx => ctx.tick.value === 0 ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0)',
@@ -9375,17 +9461,18 @@
                 data: periods.map(lb => { const v = s.fn(lb); return v == null || !isFinite(v) ? null : v; }),
                 type: s.type,
                 yAxisID: s.axis === 'R' ? 'y1' : 'y',
-                // 음수 막대는 반투명 + 테두리로 양수와 구분 (아래로 뻗음)
-                backgroundColor: s.type === 'bar' ? (ctx => (ctx.raw != null && ctx.raw < 0) ? s.color + '66' : s.color) : s.color,
-                borderColor: s.color,
+                // 음수 막대는 반투명 + 테두리로 양수와 구분 (아래로 뻗음). neg 지정 막대(EBITDA·FCF)는 손실 색(--accent)
+                backgroundColor: s.type === 'bar' ? (ctx => (ctx.raw != null && ctx.raw < 0) ? (s.neg ? accent : s.color + '66') : (s.light && s.light(periods[ctx.dataIndex]) ? s.color + '55' : s.color)) : s.color,
+                borderColor: s.neg ? (ctx => (ctx.raw != null && ctx.raw < 0) ? accent : s.color) : s.color,
                 borderWidth: s.type === 'line' ? 2 : (ctx => (ctx.raw != null && ctx.raw < 0) ? 1.5 : 0),
+                partialFn: s.partial || null, deficitFn: s.deficit || null, tipFn: s.tip || null, nmFn: s.nm || null, rawFn: s.raw || null,
                 pointRadius: s.type === 'line' ? 2.5 : 0, pointBackgroundColor: s.color,
                 tension: 0.1, spanGaps: false,
                 stack: s.stack || ('solo-' + i),
                 order: s.type === 'line' ? 0 : 1,
                 unit: s.unit,
             }));
-            const axisTick = unit => v => unit === 'pct' ? v + '%' : unit === 'turn' ? v + '회' : unit === 'price' ? (svIsUsd() ? '$' + v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : Math.round(v).toLocaleString() + '원') : svAxisAmt(v);
+            const axisTick = unit => v => unit === 'pct' ? v + '%' : unit === 'turn' ? v + '회' : unit === 'x' ? v + '배' : unit === 'price' ? (svIsUsd() ? '$' + v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : Math.round(v).toLocaleString() + '원') : svAxisAmt(v);
             const scales = {
                 x: { stacked: !!d.stacked, grid: { display: false }, ticks: xTicks },
                 y: { stacked: !!d.stacked, position: 'left', ticks: { color: C.muted, font: fzf(10, 'tab-stockview'), callback: axisTick(units.L) },
@@ -9403,10 +9490,19 @@
                         tooltip: { callbacks: {
                             title: items => items.length ? periods[items[0].dataIndex] : '',
                             label: c => `${c.dataset.label}: ${svFmtUnit(c.dataset.unit, c.parsed.y)}`,
+                            afterLabel: c => {   // 5-A: 일부 사유 · 적자 · 컨콜 인용
+                                const lb = periods[c.dataIndex], ds = c.dataset, out = [];
+                                if (ds.partialFn && ds.partialFn(lb) && c.parsed.y != null) out.push('일부: ' + ds.partialFn(lb));
+                                if (ds.deficitFn && ds.deficitFn(lb)) out.push('적자 (4분기누적 EBITDA 0 이하)');
+                                if (ds.nmFn && ds.nmFn(lb)) out.push(`n/m — 실제 ${ds.rawFn(lb).toFixed(1)}배 (${SV_EV_NM}배 초과)`);
+                                if (ds.tipFn && ds.tipFn(lb)) out.push(ds.tipFn(lb));
+                                return out.join('\n') || undefined;
+                            },
                         } },
                     },
                     scales,
                 },
+                plugins: [svMarkPlugin],
             }));
         }));
     }
@@ -9821,6 +9917,7 @@
             return;
         }
         svCallRender();
+        if (sv.fin && sv.mode === 'chart' && sv.table === 'IS' && svAdjOn()) svRenderCharts();   // 5-A: 조정 EBITDA 차트
         // 녹취록 받는 중(최근 2개 분기 missing)이거나 번역 진행 중이면 3초마다 갱신
         const qs = (sv.calls.quarters || []);
         const busy = qs.some(q => q.translate_job && !['done', 'failed'].includes(q.translate_job.stage)) ||
