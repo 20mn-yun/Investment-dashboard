@@ -1,5 +1,5 @@
 """
-대시보드용 MCP 서버 (Gate 0: Google OAuth + ping).
+대시보드용 MCP 서버 (Google OAuth + 종목 도구 + 운영 진단).
 
 - 외부 주소: https://mcp.20mn.app (Cloudflare 터널 → localhost:8100)
 - 인증: FastMCP GoogleProvider(OAuth Proxy). 허용 계정 1개(MCP_ALLOWED_EMAIL).
@@ -704,6 +704,416 @@ def save_note(market: str, code: str, field: str, text: str, date_memo: str = ""
     out["note"] = _note_public(note)
     log.info("save_note %s %s field=%s changed=%s", market, code, key, out["changed"])
     return out
+
+
+# ====================================================================== 운영 진단 (읽기 전용)
+import subprocess  # noqa: E402
+
+_HOME = os.path.expanduser("~")
+_CACHE = os.path.join(BASE_DIR, "cache")
+_ULOGS = os.path.join(_HOME, "Library", "Logs")
+RESP_MAX = 60_000          # json.dumps 길이 상한
+TAIL_MAX_BYTES = 2_000_000  # read_log 가 파일 끝에서 읽는 최대 바이트
+LLM_MAX_BYTES = 20_000_000  # llm_stats 가 읽는 최대 바이트
+
+LOG_FILES = {
+    "app": os.path.join(BASE_DIR, "app.log"),
+    "live_scheduler": os.path.join(_CACHE, "live_scheduler.log"),
+    "mcp": os.path.join(LOG_DIR, "mcp_server.log"),
+    "mcp_launchd": os.path.join(LOG_DIR, "mcp_server.launchd.log"),
+    "watchdog": os.path.join(LOG_DIR, "watchdog.log"),
+    "watchdog_launchd": os.path.join(LOG_DIR, "watchdog_launchd.log"),
+    "nightly_restart": os.path.join(BASE_DIR, "nightly_restart.log"),
+    "socket_monitor": os.path.join(BASE_DIR, "socket_monitor.log"),
+    "refinery": os.path.join(_ULOGS, "refinery-cache.log"),
+    "stockbot": os.path.join(_ULOGS, "stockbot.log"),
+    "stockbot_error": os.path.join(_ULOGS, "stockbot_error.log"),
+    "valuation_band": os.path.join(BASE_DIR, "valuation_band.log"),
+    "valuation_band_err": os.path.join(BASE_DIR, "valuation_band.err"),
+    "valuation_screener": os.path.join(BASE_DIR, "valuation_screener.log"),
+    "valuation_screener_err": os.path.join(BASE_DIR, "valuation_screener.err"),
+    "stock_leaders_kr": os.path.join(BASE_DIR, "stock_leaders_kr.log"),
+    "sector_leaders_kr": os.path.join(BASE_DIR, "sector_leaders_kr.log"),
+    "sector_leaders_us": os.path.join(BASE_DIR, "sector_leaders_us.log"),
+    "consensus_snapshot": os.path.join(BASE_DIR, "consensus_snapshot.log"),
+    "quarterly_eps": os.path.join(LOG_DIR, "quarterly_eps.log"),
+    "indicators_tracker": os.path.join(_CACHE, "indicators_tracker.log"),
+    "korea_export": os.path.join(BASE_DIR, "korea_export_update.log"),
+}
+for _m in ("us", "kr", "jp", "eu"):
+    LOG_FILES[f"batch_{_m}"] = os.path.join(_CACHE, f"batch_top_gainers_{_m}.log")
+    LOG_FILES[f"batch_launchd_{_m}"] = f"/tmp/dashboard_batch_{_m}.log"
+    LOG_FILES[f"batch_launchd_err_{_m}"] = f"/tmp/dashboard_batch_{_m}.err"
+
+CACHE_GROUPS = {
+    "market": ["cache/top_gainers_us.json", "cache/top_gainers_kr.json", "cache/top_gainers_jp.json", "cache/top_gainers_eu.json",
+               "cache/market_map_us.json", "cache/market_map_jp.json", "cache/live_scheduler.log"],
+    "stock": ["cache/kr_financials/", "cache/us_financials/", "cache/us_disclosures/", "cache/concept_maps/", "cache/reports/", "cache/calls/",
+              "cache/peers/", "cache/earnings_extract/", "cache/forward_estimates/", "cache/us_bands/", "cache/valuation_bands.json", "stock_notes/"],
+    "daily": ["cache/refinery.json", "cache/sector_leaders.json", "cache/stock_leaders.json", "cache/indicators_history.json", "cache/disparity.json",
+              "cache/consensus_snapshots/", "cache/analyst_actions/", "cache/briefs/", "cache/yahoo_backoff.json", "cache/tg_inbox.json"],
+    "llm": ["cache/_ai_state.json", "logs/llm_calls.jsonl"],
+}
+_STAMP_KEYS = ("as_of", "data_as_of", "updated_at", "cache_updated_at", "date", "computed_at")
+_NO_PARSE = {"cache/tg_inbox.json"}  # 크기·mtime 만
+_STALE_HOURS = 26  # app.py top_gainers 자가치유 기준과 동일
+
+_MASK_RES = [
+    (re.compile(r"\d{8,}:[A-Za-z0-9_-]{30,}"), "***"),
+    (re.compile(r"sk-[A-Za-z0-9_-]{16,}"), "***"),
+    (re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{32,}(?![0-9a-fA-F])"), "***"),
+    (re.compile(r"(?i)\b(key|token|secret|api_key|crtfc_key)=[^&\s\"']+"), r"\1=***"),
+]
+
+
+def _mask(s):
+    """로그·명령 출력에서 비밀값 모양(봇 토큰, sk-키, 긴 16진수, key=값)을 *** 로 가린다."""
+    if not s:
+        return s or ""
+    for rx, rep in _MASK_RES:
+        s = rx.sub(rep, s)
+    return s
+
+
+def _file_info(path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return {"exists": False}
+    mtime = datetime.fromtimestamp(st.st_mtime, KST)
+    return {"exists": True, "size": st.st_size, "mtime": mtime.isoformat(timespec="seconds"),
+            "age_hours": round((datetime.now(KST) - mtime).total_seconds() / 3600, 1)}
+
+
+def _dir_info(path):
+    if not os.path.isdir(path):
+        return {"exists": False}
+    n = 0
+    newest = 0.0
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            try:
+                st = os.stat(os.path.join(root, f))
+            except OSError:
+                continue
+            n += 1
+            total += st.st_size
+            newest = max(newest, st.st_mtime)
+    out = {"exists": True, "files": n, "total_mb": round(total / 1_048_576, 1)}
+    if newest:
+        mt = datetime.fromtimestamp(newest, KST)
+        out["newest_mtime"] = mt.isoformat(timespec="seconds")
+        out["newest_age_hours"] = round((datetime.now(KST) - mt).total_seconds() / 3600, 1)
+    else:
+        out["newest_mtime"] = None
+        out["newest_age_hours"] = None
+    return out
+
+
+def _tail_lines(path, max_bytes):
+    """파일 끝에서 max_bytes 만 읽어 줄 목록으로. (잘린 첫 줄은 버림)"""
+    with open(path, "rb") as f:
+        f.seek(0, os.SEEK_END)
+        size = f.tell()
+        start = max(0, size - max_bytes)
+        f.seek(start)
+        data = f.read()
+    text = data.decode("utf-8", errors="replace")
+    lines = text.split("\n")
+    if start > 0 and lines:
+        lines = lines[1:]
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines, start > 0
+
+
+def _fit(payload, shrink):
+    """응답이 RESP_MAX 를 넘으면 shrink(payload) 로 줄여 가며 맞춘다. shrink 는 더 줄일 수 없으면 False."""
+    hint = None
+    for _ in range(12):
+        if len(json.dumps(payload, ensure_ascii=False)) <= RESP_MAX:
+            break
+        if not shrink(payload):
+            break
+        hint = f"응답 {RESP_MAX // 1000}KB 상한을 넘어 줄을 절반씩 줄였음. lines 를 줄이거나 grep 을 쓸 것"
+    if hint:
+        payload["hint"] = hint
+    return payload
+
+
+@mcp.tool
+def read_log(name: str, lines: int = 100, grep: str = "") -> dict:
+    """운영 로그 마지막 N줄 읽기(읽기 전용). name 은 allowlist 이름(name='list' 로 전체 목록·존재·크기 확인), lines 1~500,
+    grep 은 대소문자 무시 부분 문자열 필터. 경로는 받지 않으며 비밀값 모양은 *** 로 가려진다. 배치·스케줄러·MCP·watchdog 오류 확인용."""
+    require_allowed_email()
+    key = (name or "").strip()
+    if key == "list":
+        return {"ok": True, "server_time": datetime.now(KST).isoformat(timespec="seconds"), "count": len(LOG_FILES),
+                "logs": {k: {"path": p, **_file_info(p)} for k, p in sorted(LOG_FILES.items())}}
+    path = LOG_FILES.get(key)
+    if not path:
+        return {"ok": False, "error": "bad_name", "message": f"모르는 로그 이름: {key}", "available": sorted(LOG_FILES)}
+    info = _file_info(path)
+    if not info["exists"]:
+        return {"ok": False, "error": "not_found", "name": key, "path": path, "file": info, "message": "로그 파일 없음"}
+    try:
+        n = max(1, min(500, int(lines)))
+    except (TypeError, ValueError):
+        n = 100
+    try:
+        all_lines, truncated = _tail_lines(path, TAIL_MAX_BYTES)
+    except OSError as e:
+        return {"ok": False, "error": "read_error", "name": key, "path": path, "file": info, "message": type(e).__name__}
+    g = (grep or "").strip()
+    if g:
+        gl = g.lower()
+        picked = [ln for ln in all_lines if gl in ln.lower()]
+    else:
+        picked = all_lines
+    out = {"ok": True, "name": key, "path": path, "file": info, "lines_requested": n, "lines_total_scanned": len(all_lines),
+           "scanned_tail_only": truncated, "grep": g or None}
+
+    def _render(p, k):
+        p["lines_returned"] = k
+        p["text"] = _mask("\n".join(picked[-k:])) if k else ""
+
+    def _shrink(p):
+        cur = p["lines_returned"]
+        if cur <= 1:
+            return False
+        _render(p, max(1, cur // 2))
+        return True
+
+    _render(out, min(n, len(picked)))
+    return _fit(out, _shrink)
+
+
+def _stamps(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(d, dict):
+        return None
+    return {k: d[k] for k in _STAMP_KEYS if k in d and isinstance(d[k], (str, int, float))} or None
+
+
+@mcp.tool
+def cache_status(group: str = "all") -> dict:
+    """캐시·산출물 신선도 점검(읽기 전용). group: market(시장지도·등락 상위, stale 표시) | stock(종목별 캐시 디렉터리) |
+    daily(일간 배치 산출물) | llm(AI 예산 상태·호출 로그) | all. 파일은 크기·mtime·경과시간·내부 as_of 류 스탬프, 디렉터리는 파일 수·최신 mtime·용량."""
+    require_allowed_email()
+    g = (group or "all").strip().lower()
+    if g != "all" and g not in CACHE_GROUPS:
+        return {"ok": False, "error": "bad_group", "message": f"모르는 group: {g}", "available": ["all"] + list(CACHE_GROUPS)}
+    rels = [r for k, lst in CACHE_GROUPS.items() if g in ("all", k) for r in lst]
+    items = {}
+    for rel in rels:
+        path = os.path.join(BASE_DIR, rel.rstrip("/"))
+        if rel.endswith("/"):
+            items[rel] = _dir_info(path)
+            continue
+        info = _file_info(path)
+        if info["exists"] and rel.endswith(".json") and rel not in _NO_PARSE and info["size"] <= 5_000_000:
+            st = _stamps(path)
+            if st:
+                info["stamps"] = st
+        if rel.startswith("cache/top_gainers_"):
+            info["stale"] = (not info["exists"]) or info["age_hours"] > _STALE_HOURS
+        items[rel] = info
+    return {"ok": True, "group": g, "server_time": datetime.now(KST).isoformat(timespec="seconds"), "count": len(items), "items": items}
+
+
+def _p90(vals):
+    if not vals:
+        return None
+    s = sorted(vals)
+    return s[min(len(s) - 1, int(round(0.9 * (len(s) - 1))))]
+
+
+@mcp.tool
+def llm_stats(days: int = 1, task: str = "") -> dict:
+    """llm_client 호출 로그(logs/llm_calls.jsonl) 집계(읽기 전용). 최근 days일(1~30) 동안 총/성공/실패/대체(fallback) 건수,
+    backend·model·task 별 건수와 평균·p90 소요시간, 최근 실패·대체 20건. task 를 주면 그 작업만."""
+    require_allowed_email()
+    path = os.path.join(LOG_DIR, "llm_calls.jsonl")
+    info = _file_info(path)
+    if not info["exists"]:
+        return {"ok": False, "error": "not_found", "path": path, "file": info}
+    try:
+        d = max(1, min(30, int(days)))
+    except (TypeError, ValueError):
+        d = 1
+    since = datetime.now(KST) - timedelta(days=d)
+    t_filter = (task or "").strip() or None
+    try:
+        lines, _trunc = _tail_lines(path, LLM_MAX_BYTES)
+    except OSError as e:
+        return {"ok": False, "error": "read_error", "path": path, "message": type(e).__name__}
+    rows = []
+    scanned = 0
+    for ln in lines:
+        if not ln.strip():
+            continue
+        scanned += 1
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue
+        ts = r.get("ts")
+        try:
+            t = datetime.fromisoformat(ts)
+            if t.tzinfo is None:
+                t = t.replace(tzinfo=KST)
+        except (TypeError, ValueError):
+            continue
+        if t < since:
+            continue
+        if t_filter and r.get("task") != t_filter:
+            continue
+        rows.append(r)
+    by_backend, by_model, by_task = {}, {}, {}
+    ok_n = fail_n = fb_n = 0
+    durs = {}
+    for r in rows:
+        ok = bool(r.get("ok"))
+        fb = bool(r.get("fallback"))
+        ok_n += ok
+        fail_n += not ok
+        fb_n += fb
+        b = r.get("backend") or "?"
+        m = r.get("model") or "?"
+        tk = r.get("task") or "?"
+        by_backend[b] = by_backend.get(b, 0) + 1
+        by_model[m] = by_model.get(m, 0) + 1
+        bt = by_task.setdefault(tk, {"n": 0, "failed": 0, "fallback": 0, "avg_ms": None, "p90_ms": None, "output_tokens_sum": 0})
+        bt["n"] += 1
+        bt["failed"] += not ok
+        bt["fallback"] += fb
+        bt["output_tokens_sum"] += int(r.get("output_tokens") or 0)
+        if isinstance(r.get("duration_ms"), (int, float)):
+            durs.setdefault(tk, []).append(r["duration_ms"])
+    for tk, ds in durs.items():
+        by_task[tk]["avg_ms"] = int(sum(ds) / len(ds))
+        by_task[tk]["p90_ms"] = int(_p90(ds))
+    failures = [{"ts": r.get("ts"), "task": r.get("task"), "backend": r.get("backend"), "error": _mask(str(r.get("error") or ""))[:150]}
+                for r in rows if not r.get("ok")][-20:]
+    fallbacks = [{"ts": r.get("ts"), "task": r.get("task"), "primary_backend": (r.get("extra") or {}).get("primary_backend") if isinstance(r.get("extra"), dict) else None,
+                  "backend": r.get("backend"), "fallback_reason": _mask(str(r.get("fallback_reason") or ""))[:150]}
+                 for r in rows if r.get("fallback")][-20:]
+    return {"ok": True, "days": d, "task": t_filter, "server_time": datetime.now(KST).isoformat(timespec="seconds"), "file": info,
+            "total": len(rows), "ok_n": ok_n, "failed": fail_n, "fallback_n": fb_n, "by_backend": by_backend, "by_model": by_model, "by_task": by_task,
+            "recent_failures": failures, "recent_fallbacks": fallbacks,
+            "first_ts": rows[0].get("ts") if rows else None, "last_ts": rows[-1].get("ts") if rows else None, "rows_scanned": scanned}
+
+
+@mcp.tool
+def ai_budget_status() -> dict:
+    """AI 호출 일일 예산(ai_budget) 현황(읽기 전용): 오늘 날짜, kind 별 사용량·한도·잔여. 한도를 넘어 AI 요약이 멈췄는지 확인할 때."""
+    require_allowed_email()
+    try:
+        if BASE_DIR not in sys.path:
+            sys.path.insert(0, BASE_DIR)
+        import ai_budget  # noqa: E402
+        snap = ai_budget.snapshot()
+    except Exception as e:
+        return {"ok": False, "error": "import_failed", "message": f"{type(e).__name__}: {_mask(str(e))[:200]}"}
+    counts = snap.get("counts") or {}
+    limits = snap.get("limits") or {}
+    remaining = {}
+    for kind in sorted(set(counts) | set(limits)):
+        lim = ai_budget.resolve_limit(kind)
+        used = int(counts.get(kind) or 0)
+        remaining[kind] = {"used": used, "limit": lim, "remaining": (None if lim is None else max(0, lim - used))}
+    return {"ok": True, "server_time": datetime.now(KST).isoformat(timespec="seconds"), **snap, "remaining": remaining}
+
+
+def _git(*args, timeout=10):
+    env = dict(os.environ)
+    env["PATH"] = "/usr/bin:/usr/local/bin:" + env.get("PATH", "")
+    try:
+        p = subprocess.run(["git", *args], cwd=BASE_DIR, capture_output=True, text=True, timeout=timeout, env=env)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, f"{type(e).__name__}"
+    if p.returncode != 0:
+        return None, _mask((p.stderr or p.stdout).strip())[:300] or f"exit {p.returncode}"
+    return p.stdout.rstrip("\n"), None
+
+
+@mcp.tool
+def git_status() -> dict:
+    """저장소 상태(읽기 전용): 현재 브랜치, HEAD, 최근 커밋 8건, 변경 파일 수·경로(최대 40), upstream 대비 ahead/behind. diff 내용은 돌려주지 않는다."""
+    require_allowed_email()
+    out = {"ok": True, "server_time": datetime.now(KST).isoformat(timespec="seconds"), "cwd": BASE_DIR}
+    v, e = _git("rev-parse", "--abbrev-ref", "HEAD")
+    out["branch"] = v if e is None else {"error": e}
+    v, e = _git("log", "-1", "--format=%h %ci %s")
+    out["head"] = _mask(v) if e is None else {"error": e}
+    v, e = _git("log", "-8", "--format=%h|%ci|%s")
+    if e is None:
+        rec = []
+        for ln in v.splitlines():
+            parts = ln.split("|", 2)
+            if len(parts) == 3:
+                rec.append({"hash": parts[0], "date": parts[1], "subject": _mask(parts[2])})
+        out["recent"] = rec
+    else:
+        out["recent"] = {"error": e}
+    v, e = _git("status", "--porcelain")
+    if e is None:
+        lines = [ln for ln in v.splitlines() if ln.strip()]
+        out["dirty"] = len(lines)
+        out["dirty_files"] = [_mask(ln[3:].strip()) for ln in lines[:40]]
+    else:
+        out["dirty"] = {"error": e}
+        out["dirty_files"] = []
+    v, e = _git("rev-list", "--left-right", "--count", "HEAD...@{u}")
+    if e is None and v:
+        parts = v.split()
+        out["ahead_behind"] = {"ahead": int(parts[0]), "behind": int(parts[1])} if len(parts) == 2 else {"error": "parse"}
+    else:
+        el = (e or "").lower()
+        out["ahead_behind"] = None if ("upstream" in el or "@{u}" in el) else {"error": e}
+    if any(isinstance(out.get(k), dict) and "error" in out[k] for k in ("branch", "head", "recent", "dirty")):
+        out["ok"] = False
+    return out
+
+
+@mcp.tool
+def launchd_status() -> dict:
+    """launchd 에이전트(com.yun.*) 상태(읽기 전용): label·pid(None 이면 대기/미실행)·마지막 종료코드, launchd/ 폴더 plist 와 대조해
+    로드되지 않은 label 을 not_loaded 로. 배치가 안 돌 때 먼저 볼 것."""
+    require_allowed_email()
+    env = dict(os.environ)
+    env["PATH"] = "/bin:/usr/bin:/usr/local/bin:" + env.get("PATH", "")
+    try:
+        p = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=10, env=env)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "error": type(e).__name__}
+    if p.returncode != 0:
+        return {"ok": False, "error": "launchctl_failed", "stderr": _mask(p.stderr or "")[:300]}
+    agents = []
+    loaded = set()
+    for ln in p.stdout.splitlines():
+        parts = ln.split("\t")
+        if len(parts) < 3 or not parts[2].startswith("com.yun."):
+            continue
+        pid = None if parts[0] in ("-", "") else int(parts[0]) if parts[0].isdigit() else parts[0]
+        try:
+            status = int(parts[1])
+        except ValueError:
+            status = parts[1]
+        agents.append({"label": parts[2], "pid": pid, "last_exit_status": status})
+        loaded.add(parts[2])
+    agents.sort(key=lambda a: a["label"])
+    plist_dir = os.path.join(BASE_DIR, "launchd")
+    plist_labels = sorted(f[:-6] for f in os.listdir(plist_dir) if f.endswith(".plist")) if os.path.isdir(plist_dir) else []
+    not_loaded = [lb for lb in plist_labels if lb not in loaded]
+    return {"ok": True, "server_time": datetime.now(KST).isoformat(timespec="seconds"), "running": sum(1 for a in agents if isinstance(a["pid"], int)),
+            "count": len(agents), "agents": agents, "plist_count": len(plist_labels), "not_loaded": not_loaded,
+            "nonzero_exit": [a["label"] for a in agents if a["last_exit_status"] not in (0, None)]}
 
 
 if __name__ == "__main__":
