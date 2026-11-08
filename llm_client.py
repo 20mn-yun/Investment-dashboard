@@ -54,6 +54,11 @@ logger = logging.getLogger("llm_client")
 _log_lock = threading.Lock()
 _sem = threading.Semaphore(max(1, int(os.environ.get("LLM_MAX_CONCURRENT", "2") or 2)))
 _codex_sem = threading.Semaphore(max(1, int(os.environ.get("LLM_CODEX_MAX_CONCURRENT", "2") or 2)))
+# Codex rate_limit 처리: 1차 rate_limit → RETRY_WAIT 초 뒤 1회 재시도, 재시도도 rate_limit 이면 COOLDOWN 동안 codex 를 건너뛰고 바로 폴백
+CODEX_RATE_LIMIT_RETRY_WAIT = int(os.environ.get("CODEX_RATE_LIMIT_RETRY_WAIT", "15"))
+CODEX_COOLDOWN_SEC = int(os.environ.get("CODEX_COOLDOWN_SEC", "600"))
+_codex_cooldown_until = 0.0
+_codex_cooldown_lock = threading.Lock()
 
 try:
     from dotenv import load_dotenv
@@ -357,7 +362,8 @@ def _log(res, prompt_chars):
            "model": res.model, "duration_ms": res.duration_ms, "cost_usd": res.cost_usd, "input_tokens": res.input_tokens,
            "output_tokens": res.output_tokens, "cache_tokens": res.cache_tokens, "fallback": res.fallback,
            "fallback_reason": res.fallback_reason, "error": res.error, "prompt_chars": prompt_chars, "ok": res.ok,
-           "num_turns": res.num_turns}
+           "num_turns": res.num_turns,
+           "primary_backend": (res.extra or {}).get("primary_backend"), "primary_error": (res.extra or {}).get("primary_error")}
     try:
         os.makedirs(LOG_DIR, exist_ok=True)
         with _log_lock:
@@ -383,7 +389,21 @@ def _run_backend(name, task, tier, prompt, sys_prompt, max_tokens, timeout, imag
     return r, r.error
 
 
+def _codex_in_cooldown():
+    with _codex_cooldown_lock:
+        return time.time() < _codex_cooldown_until
+
+
+def _set_codex_cooldown():
+    global _codex_cooldown_until
+    with _codex_cooldown_lock:
+        _codex_cooldown_until = time.time() + CODEX_COOLDOWN_SEC
+
+
 def complete(task, prompt, system=None, json_mode=False, max_tokens=None, timeout=None, images=None):
+    """task 설정에 따라 백엔드를 고르고, 실패하면 폴백 체인으로 넘어간다.
+    Codex rate_limit: 1회 대기 후 재시도, 연속이면 쿨다운 동안 codex 를 건너뛴다 (11/04 dart_excel_line 101건 전부 폴백 사건 대응).
+    이미지 호출은 api 로 못 가므로 쿨다운 중에도 codex 를 시도한다."""
     tier = _tier(task)
     sys_prompt = (system or DEFAULT_SYSTEM).rstrip()
     if json_mode:
@@ -400,7 +420,19 @@ def complete(task, prompt, system=None, json_mode=False, max_tokens=None, timeou
     if backend == "api":
         chain = []                                      # api 지정 task(call_translate)는 기존처럼 폴백 없음
     try:
-        res, reason = _run_backend(backend, task, tier, prompt, sys_prompt, max_tokens, timeout, images)
+        if backend == "codex" and not images and allow_fallback and chain and _codex_in_cooldown():
+            res = LLMResult(backend="codex", tier=tier, task=task, error="codex_cooldown")
+            reason = "rate_limit"
+        else:
+            res, reason = _run_backend(backend, task, tier, prompt, sys_prompt, max_tokens, timeout, images)
+            if backend == "codex" and not res.ok and reason == "rate_limit":
+                time.sleep(CODEX_RATE_LIMIT_RETRY_WAIT)       # 세마포어 바깥에서 대기
+                res, reason = _run_backend(backend, task, tier, prompt, sys_prompt, max_tokens, timeout, images)
+                if res.ok:
+                    res.extra = dict(res.extra or {}, codex_retried=True)
+                elif reason == "rate_limit":
+                    _set_codex_cooldown()
+                    logger.warning("llm_client: codex rate_limit 연속 → %d초 쿨다운", CODEX_COOLDOWN_SEC)
         if not res.ok and reason and allow_fallback and chain:
             first_err, first_reason = res.error, reason
             for nxt in chain:

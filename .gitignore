@@ -2,6 +2,8 @@ cache/*
 !cache/refinery.json
 !cache/.gitkeep
 *.log
+*.log.[0-9]*
+*.log.*.gz
 *.err
 __pycache__/
 *.pyc
