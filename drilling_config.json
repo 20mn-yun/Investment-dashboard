@@ -58,7 +58,7 @@
    },
    {
     "name": "Esgian",
-    "url": "https://esgian.com/insights/",
+    "url": "https://esgian.com/category/rigs/",
     "link_pattern": "esgian\\.com/20\\d\\d/\\d\\d/\\d\\d/(?!.*wind).*(rig|drill).*"
    }
   ]
@@ -66,5 +66,11 @@
  "eight_k_items": [
   "7.01",
   "8.01"
- ]
+ ],
+ "benchmark": {
+  "sector": "OIH",
+  "oil": "BZ=F",
+  "oil_fallback": "BNO"
+ },
+ "telegram_daily": true
 }

@@ -205,8 +205,29 @@ def _extract_article(title, source_name, day, body, url, src="news", max_ai=None
 
 
 # ---------- 1) 뉴스 ----------
-def _article_body(url):
-    """본문 받기 (10초, html2text, 8,000자). 실패하면 ''"""
+def _annotate_tables(txt):
+    """html2text 표(| 구분)의 각 데이터 행 앞에 머리글을 '열=값' 형식으로 붙인다 (AI 인용이 'Drillship| 23| …' 꼴이 되지 않게)."""
+    out, header = [], None
+    for line in txt.split("\n"):
+        if line.strip().startswith("|") and line.count("|") >= 2:
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if all(re.fullmatch(r":?-{2,}:?", c or "-") for c in cells):
+                continue                                   # 구분선
+            if header is None or (cells and not any(re.search(r"\d", c) for c in cells)):
+                header = cells
+                out.append(line)
+                continue
+            pairs = [f"{h}={v}" for h, v in zip(header, cells) if v]
+            out.append(("[row] " + ", ".join(pairs)) if pairs else line)
+        else:
+            if line.strip() == "":
+                header = None
+            out.append(line)
+    return "\n".join(out)
+
+
+def _article_body(url, annotate_tables=False):
+    """본문 받기 (10초, html2text, 8,000자). annotate_tables 면 표 행에 머리글을 붙임. 실패하면 ''"""
     try:
         res = _get(url, timeout=10)
         if res.status_code != 200 or "html" not in (res.headers.get("content-type") or ""):
@@ -218,6 +239,8 @@ def _article_body(url):
         h.body_width = 0
         txt = h.handle(res.text)
         txt = re.sub(r"\n{3,}", "\n\n", txt).strip()
+        if annotate_tables:
+            txt = _annotate_tables(txt)
         return txt[:ARTICLE_MAX_CHARS]
     except Exception:
         return ""
@@ -294,7 +317,7 @@ def scan_pages(max_ai=None, seen=None, ev_store=None, st_store=None):
         for l in new:
             if max_ai is not None and budget_used >= max_ai:
                 break
-            body = _article_body(l["link"])
+            body = _article_body(l["link"], annotate_tables=True)
             if not body:
                 seen[f"page:{_sha(l['link'])}"] = date.today().isoformat()
                 res["errors"] += 1
@@ -596,9 +619,27 @@ def _process_fsr(code, name, link, max_ai=None):
     return {"status": "ok", "date": rep_date, "rows": len(rows), "drive": out["drive"]}
 
 
-def check_fsr(max_ai=None):
+def process_fsr_url(code, url, max_ai=None):
+    """특정 FSR PDF 1부를 index 와 무관하게 처리하고 index 에 기록 (F). 반환 _process_fsr 결과"""
+    cfg = DT.load_config()
+    name = cfg["names"].get(code, code)
+    idx = _fsr_index(code)
+    out = _process_fsr(code, name, {"url": url, "hint": url}, max_ai)
+    if out.get("status") == "ok":
+        idx["items"] = [it for it in idx["items"] if it.get("url") != url] + [{"url": url, "date": out["date"], "status": "ok", "at": _now(), "forced": True}]
+        idx["items"].sort(key=lambda x: x.get("date") or "")
+        _save(os.path.join(_fsr_dir(code), "index.json"), idx)
+    return out
+
+
+def check_fsr(max_ai=None, force_url=None):
+    """force_url = (code, url) 이면 그 1부만 처리"""
     cfg = DT.load_config()
     res = {}
+    if force_url:
+        code, url = force_url
+        res[code] = process_fsr_url(code, url, max_ai)
+        return res
     for code, fcfg in (cfg.get("fsr") or {}).items():
         name = cfg["names"].get(code, code)
         idx = _fsr_index(code)
@@ -661,8 +702,23 @@ def diff_fsr(code):
     reps = fsr_reports(code)
     if len(reps) < 2:
         return {"events": 0, "note": "FSR 2개 미만"}
-    old, new = reps[-2], reps[-1]
     name = DT.load_config()["names"].get(code, code)
+    total, compared = 0, []
+    for old, new in zip(reps[:-1], reps[1:]):   # 연속한 보고서 쌍마다 비교 (id = 새 보고서 url+rig+type+날짜 → 중복 생성 없음)
+        r = _diff_pair(code, name, old, new)
+        total += r["events"]
+        compared.append([old["report_date"], new["report_date"], r["events"]])
+    store = _events()
+    before = len(store["events"])
+    store["events"] = [e for e in store["events"] if not (e.get("type") == "dayrate_change" and e.get("prev_dayrate_usd_k") is not None and e.get("dayrate_usd_k") is not None
+                                                           and abs(e["dayrate_usd_k"] - e["prev_dayrate_usd_k"]) <= DAYRATE_CHANGE_MIN_K)]
+    removed = before - len(store["events"])
+    if removed:
+        _save(EVENTS_PATH, store)
+    return {"events": total, "removed_small_dayrate_changes": removed, "compared": compared}
+
+
+def _diff_pair(code, name, old, new):
     day, url = new["report_date"], new["url"]
 
     def by_pair(rep):
@@ -717,13 +773,9 @@ def diff_fsr(code):
         if row and "retired" in o_st[rig]:
             ev("retirement", row, f"{row['rig']}: 목록에서 제외(퇴역)")
     store = _events()
-    before = len(store["events"])
-    store["events"] = [e for e in store["events"] if not (e.get("type") == "dayrate_change" and e.get("prev_dayrate_usd_k") is not None and e.get("dayrate_usd_k") is not None
-                                                           and abs(e["dayrate_usd_k"] - e["prev_dayrate_usd_k"]) <= DAYRATE_CHANGE_MIN_K)]
-    removed = before - len(store["events"])
     n = _add_events(store, evs)
     _save(EVENTS_PATH, store)
-    return {"events": n, "removed_small_dayrate_changes": removed, "compared": [old["report_date"], new["report_date"]]}
+    return {"events": n}
 
 
 # ---------- 4) 파생 지표 ----------
@@ -775,8 +827,23 @@ def coverage_from_fsr(code, year):
             "stacked_rigs": len(rigs) - len(marketed), "gap_rigs": sorted(gaps, key=lambda g: g["last_end"]), "report_date": rep["report_date"]}
 
 
-def leading_dayrates(months=18):
-    """events(dayrate 있음) + 최신 FSR 의 최근 6개월 시작 firm 행 → 월별·세그먼트별 중앙값 {segment: [{month, median, n, points}]}"""
+def _start_month(e):
+    """이벤트의 점 월 = date(발표·보고서일). start(계약 시작월)는 툴팁·최근 체결 표·지역 매트릭스 건수에만 쓴다 (E)."""
+    return (e.get("date") or "")[:7]
+
+
+def _pct(vals, p):
+    vals = sorted(vals)
+    if not vals:
+        return None
+    k = (len(vals) - 1) * p
+    lo, hi = int(k), min(int(k) + 1, len(vals) - 1)
+    return vals[lo] + (vals[hi] - vals[lo]) * (k - lo)
+
+
+def leading_dayrates(months=24):
+    """events(dayrate 있음; 점의 월 = date 발표·보고서일) + 최신 FSR 의 최근 6개월 시작 firm 행(점의 월 = 보고서일) →
+    {segment: {"months": [{month, median, p25, p75, n, rolling3, rolling3_n, points}], "summary": {...}}}"""
     today = date.today()
     since = (today.replace(day=1) - timedelta(days=months * 31)).isoformat()[:7]
     pts = {"drillship": {}, "harsh": {}}
@@ -786,9 +853,11 @@ def leading_dayrates(months=18):
         if e.get("dayrate_usd_k") is None or e.get("rig_type") == "jackup":
             continue
         sg = seg_of(e.get("rig_type"))
-        mo = (e.get("date") or "")[:7]
+        mo = _start_month(e)
         if sg and mo >= since:
-            pts[sg].setdefault(mo, []).append({"rig": e.get("rig"), "customer": e.get("customer"), "value": e["dayrate_usd_k"], "source": e.get("source_name"), "url": e.get("url")})
+            pts[sg].setdefault(mo, []).append({"rig": e.get("rig"), "customer": e.get("customer"), "value": e["dayrate_usd_k"], "source": e.get("source_name"), "url": e.get("url"),
+                                                "date": e.get("date"), "start": e.get("start"), "region": e.get("region"), "code": e.get("code"), "company": e.get("company"),
+                                                "duration_days": e.get("duration_days"), "quote": e.get("quote"), "type": e.get("type"), "event_id": e.get("id")})
     six = (today - timedelta(days=183)).isoformat()[:7]
     cfg = DT.load_config()
     for code in cfg["tickers"]:
@@ -800,12 +869,13 @@ def leading_dayrates(months=18):
                 continue
             sg = seg_of(r.get("rig_type"))
             if sg:
-                pts[sg].setdefault(r["start"], []).append({"rig": r["rig"], "customer": r.get("customer"), "value": r["dayrate_usd_k"], "source": f"{cfg['names'].get(code, code)} FSR", "url": rep["url"]})
+                pts[sg].setdefault(rep["report_date"][:7], []).append({"rig": r["rig"], "customer": r.get("customer"), "value": r["dayrate_usd_k"], "source": f"{cfg['names'].get(code, code)} FSR", "url": rep["url"],
+                                                           "date": rep["report_date"], "start": r["start"], "region": r.get("region"), "code": code, "company": cfg["names"].get(code, code),
+                                                           "duration_days": None, "quote": f"FSR {rep['report_date']}: {r['rig']} {r.get('customer') or ''} {r['start']}~{r.get('end') or ''}", "type": "fsr_row", "event_id": None})
     out = {}
     for sg, by_m in pts.items():
         rows = []
-        months_sorted = sorted(by_m)
-        for m in months_sorted:
+        for m in sorted(by_m):
             ps = by_m[m]
             y, mo = int(m[:4]), int(m[5:7])
             win = []
@@ -815,9 +885,38 @@ def leading_dayrates(months=18):
                     mm += 12
                     yy -= 1
                 win += by_m.get(f"{yy}-{mm:02d}", [])
-            rows.append({"month": m, "median": statistics.median([p["value"] for p in ps]), "n": len(ps), "points": ps,
-                         "rolling3": statistics.median([p["value"] for p in win]) if win else None, "rolling3_n": len(win)})
-        out[sg] = rows
+            vals = [p["value"] for p in ps]
+            wv = [p["value"] for p in win]
+            rows.append({"month": m, "median": statistics.median(vals), "p25": _pct(vals, 0.25), "p75": _pct(vals, 0.75), "n": len(ps), "points": ps,
+                         "rolling3": statistics.median(wv) if wv else None, "rolling3_p25": _pct(wv, 0.25), "rolling3_p75": _pct(wv, 0.75), "rolling3_n": len(win)})
+        # 요약: 최근 3개월 중앙값 vs 직전 3개월(최근 월 기준 -3개월 창)
+        summ = {"recent": None, "prev": None, "chg_pct": None, "n": 0, "insufficient": True}
+        if rows:
+            last = rows[-1]
+            y, mo = int(last["month"][:4]), int(last["month"][5:7])
+            prev_win = []
+            for k in range(3, 6):
+                yy, mm = y, mo - k
+                while mm <= 0:
+                    mm += 12
+                    yy -= 1
+                prev_win += by_m.get(f"{yy}-{mm:02d}", [])
+            pv = [p["value"] for p in prev_win]
+            summ = {"recent": last["rolling3"], "recent_month": last["month"], "n": last["rolling3_n"], "prev": statistics.median(pv) if pv else None, "prev_n": len(pv),
+                    "chg_pct": round((last["rolling3"] / statistics.median(pv) - 1) * 100, 1) if pv and last["rolling3"] else None,
+                    "insufficient": last["rolling3_n"] < 5 or len(pv) < 5}      # 신호와 같은 기준(양쪽 창 n>=5) (G)
+        out[sg] = {"months": rows, "summary": summ}
+    # 최근 체결 10건 (세그먼트 무관, start 내림차순)
+    allp = [p for sg in pts.values() for ps in sg.values() for p in ps]
+    allp.sort(key=lambda p: ((p.get("start") or p.get("date") or ""), p.get("date") or ""), reverse=True)
+    seen_k, recent = set(), []
+    for p in allp:
+        k = ((p.get("rig") or "").lower(), (p.get("start") or "")[:7], p.get("value"))
+        if k in seen_k:
+            continue
+        seen_k.add(k)
+        recent.append(p)
+    out["recent"] = recent[:10]
     return out
 
 
@@ -842,6 +941,256 @@ def recent_events(days=60, type_=None, code=None):
         evs = [e for e in evs if e.get("code") == code.upper()]
     evs.sort(key=lambda e: (e.get("date") or "", e.get("id")), reverse=True)
     return evs
+
+
+# ---------- 5) 주가 기준선 (C1) ----------
+PRICES_PATH = os.path.join(CACHE_DIR, "prices.json")
+PRICES_MIN_INTERVAL_SEC = 3600
+
+
+def _yahoo_backoff_active():
+    try:
+        import batch_top_gainers as B
+        until = B._yahoo_backoff_until()
+        from datetime import timezone
+        return until is not None and datetime.now(timezone.utc) < until
+    except Exception:
+        return False
+
+
+def _set_backoff(reason):
+    try:
+        import batch_top_gainers as B
+        B._set_yahoo_backoff("drilling", reason)
+    except Exception:
+        pass
+
+
+def fetch_prices(force=False):
+    """RIG·SDRL·NE·OIH·브렌트(BZ=F, 실패 시 BNO)·XOM 일간 종가 3년 → cache/drilling/prices.json {"as_of", "series": {ticker: [[date, close], ...]}}.
+    1시간 안 재호출 금지(저장본 반환). Yahoo 백오프 중이면 건너뜀. 반환에 status 포함."""
+    cur = _load(PRICES_PATH, None)
+    if cur and not force:
+        try:
+            age = (datetime.now() - datetime.fromisoformat(cur.get("fetched_at"))).total_seconds()
+            if age < PRICES_MIN_INTERVAL_SEC:
+                return dict(cur, status="cached")
+        except (TypeError, ValueError):
+            pass
+    if _yahoo_backoff_active():
+        return dict(cur or {"as_of": None, "series": {}}, status="backoff")
+    cfg = DT.load_config()
+    bm = cfg.get("benchmark") or {}
+    tickers = list(cfg["tickers"]) + [bm.get("sector") or "OIH", bm.get("oil") or "BZ=F", "XOM"]
+    import yfinance as yf
+    series = {}
+    try:
+        df = yf.download(tickers, period="3y", interval="1d", progress=False, threads=False, auto_adjust=True)
+        closes = df["Close"] if "Close" in df else df
+        for t in tickers:
+            col = closes[t] if t in closes else None
+            if col is None:
+                continue
+            col = col.dropna()
+            series[t] = [[d.strftime("%Y-%m-%d"), round(float(v), 4)] for d, v in col.items()]
+    except Exception as e:
+        msg = str(e)
+        if "429" in msg or "Too Many" in msg or "rate" in msg.lower():
+            _set_backoff(msg)
+        return dict(cur or {"as_of": None, "series": {}}, status=f"error:{type(e).__name__}")
+    oil = bm.get("oil") or "BZ=F"
+    if not series.get(oil) and bm.get("oil_fallback"):
+        try:
+            col = yf.download(bm["oil_fallback"], period="3y", interval="1d", progress=False, threads=False, auto_adjust=True)["Close"].dropna()
+            if hasattr(col, "columns"):
+                col = col.iloc[:, 0]
+            series[oil] = [[d.strftime("%Y-%m-%d"), round(float(v), 4)] for d, v in col.items()]
+            series["_oil_source"] = bm["oil_fallback"]
+        except Exception:
+            pass
+    oil_src = series.pop("_oil_source", oil)
+    if not series:
+        return dict(cur or {"as_of": None, "series": {}}, status="empty")
+    as_of = max(v[-1][0] for v in series.values() if v)
+    out = {"as_of": as_of, "fetched_at": _now(), "tickers": tickers, "oil_ticker": oil, "oil_source": oil_src, "series": series}
+    _save(PRICES_PATH, out)
+    return dict(out, status="ok")
+
+
+def _series_map(rows):
+    return {d: v for d, v in rows}
+
+
+def _weekly(rows):
+    """일간 [[date, close]] → 주간(금요일 기준 마지막 거래일) 종가 [[week_end, close]]"""
+    out, cur_week, last = [], None, None
+    for d, v in rows:
+        y, w, _ = date.fromisoformat(d).isocalendar()
+        key = (y, w)
+        if cur_week is not None and key != cur_week:
+            out.append(last)
+        cur_week, last = key, [d, v]
+    if last:
+        out.append(last)
+    return out
+
+
+def _returns(rows):
+    return [(rows[i][0], rows[i][1] / rows[i - 1][1] - 1) for i in range(1, len(rows)) if rows[i - 1][1]]
+
+
+def _beta(y, x):
+    """최소제곱 베타 (y = a + b x). 반환 (beta, corr) — 표본 < 8 이면 (None, None)"""
+    n = min(len(y), len(x))
+    if n < 8:
+        return None, None
+    y, x = y[-n:], x[-n:]
+    mx, my = sum(x) / n, sum(y) / n
+    sxx = sum((a - mx) ** 2 for a in x)
+    syy = sum((b - my) ** 2 for b in y)
+    sxy = sum((a - mx) * (b - my) for a, b in zip(x, y))
+    if sxx <= 0 or syy <= 0:
+        return None, None
+    return sxy / sxx, sxy / (sxx * syy) ** 0.5
+
+
+def benchmark_stats():
+    """prices.json → rebased(1년=100), rs(종가/OIH, 60일선 대비 %), beta(52주 주간), decomposition(5일·20일 총/업종분/고유분), corr13w(13주 롤링)"""
+    pr = _load(PRICES_PATH, None)
+    if not pr or not pr.get("series"):
+        return None
+    cfg = DT.load_config()
+    bm = cfg.get("benchmark") or {}
+    sector, oil = bm.get("sector") or "OIH", pr.get("oil_ticker") or bm.get("oil") or "BZ=F"
+    S = pr["series"]
+    codes = [c for c in cfg["tickers"] if S.get(c)]
+    if not S.get(sector):
+        return {"as_of": pr.get("as_of"), "error": f"{sector} 시세 없음"}
+    today = date.fromisoformat(pr["as_of"])
+    one_y = (today - timedelta(days=365)).isoformat()
+    two_y = (today - timedelta(days=730)).isoformat()
+    out = {"as_of": pr.get("as_of"), "sector": sector, "oil": oil, "oil_source": pr.get("oil_source"), "codes": codes}
+    # (a) rebased 1년
+    reb = {}
+    for t in codes + [sector, oil, "XOM"]:
+        rows = [r for r in S.get(t) or [] if r[0] >= one_y]
+        if rows and rows[0][1]:
+            base = rows[0][1]
+            reb[t] = [[d, round(v / base * 100, 2)] for d, v in rows]
+    out["rebased"] = reb
+    # (b) 상대강도 X/OIH 1년 + 60일 이동평균, 현재 위치 %
+    sec_map = _series_map(S[sector])
+    rs = {}
+    for c in codes:
+        ratio = [[d, v / sec_map[d]] for d, v in S[c] if d in sec_map and sec_map[d] and d >= one_y]
+        if len(ratio) < 5:
+            continue
+        ma = []
+        for i in range(len(ratio)):
+            win = [r[1] for r in ratio[max(0, i - 59):i + 1]]
+            ma.append([ratio[i][0], sum(win) / len(win)])
+        pos = (ratio[-1][1] / ma[-1][1] - 1) * 100 if ma[-1][1] else None
+        rs[c] = {"ratio": [[d, round(v, 4)] for d, v in ratio], "ma60": [[d, round(v, 4)] for d, v in ma], "pos_vs_ma60_pct": round(pos, 1) if pos is not None else None}
+    out["rs"] = rs
+    # (c) 베타 (주간 52주)
+    wk = {t: _weekly([r for r in S.get(t) or [] if r[0] >= two_y]) for t in codes + [sector, oil]}
+    wret = {t: {d: r for d, r in _returns(v)} for t, v in wk.items()}
+    beta = {}
+    for c in codes:
+        common_s = sorted(set(wret[c]) & set(wret[sector]))[-52:]
+        common_o = sorted(set(wret[c]) & set(wret.get(oil) or {}))[-52:]
+        bs, cs = _beta([wret[c][d] for d in common_s], [wret[sector][d] for d in common_s])
+        bo, co = _beta([wret[c][d] for d in common_o], [wret[oil][d] for d in common_o]) if common_o else (None, None)
+        beta[c] = {"sector_beta": round(bs, 2) if bs is not None else None, "sector_corr": round(cs, 2) if cs is not None else None,
+                   "oil_beta": round(bo, 2) if bo is not None else None, "oil_corr": round(co, 2) if co is not None else None, "weeks": len(common_s)}
+    out["beta"] = beta
+    # (d) 분해: 5일·20일 수익률 = 업종분(베타×OIH) + 고유분
+    def ret_n(t, n):
+        rows = S.get(t) or []
+        if len(rows) <= n or not rows[-1 - n][1]:
+            return None
+        return rows[-1][1] / rows[-1 - n][1] - 1
+    dec = {}
+    for c in codes:
+        b = (beta.get(c) or {}).get("sector_beta")
+        dec[c] = {}
+        for n, thr in ((5, 5), (20, 10)):
+            tot, sec = ret_n(c, n), ret_n(sector, n)
+            if tot is None or sec is None or b is None:
+                dec[c][f"d{n}"] = None
+                continue
+            part = b * sec
+            resid = tot - part
+            dec[c][f"d{n}"] = {"total_pct": round(tot * 100, 1), "sector_part_pct": round(part * 100, 1), "residual_pct": round(resid * 100, 1), "sector_ret_pct": round(sec * 100, 1),
+                              "flag": "회사 고유 움직임" if abs(resid * 100) > thr else None, "window_end": S[c][-1][0], "window_start": S[c][-1 - n][0]}
+    out["decomposition"] = dec
+    # (e) 13주 롤링 상관: 3사 평균 주간 수익률 vs OIH / 브렌트 (최근 2년)
+    weeks = sorted(set.intersection(*[set(wret[c]) for c in codes]) & set(wret[sector])) if codes else []
+    avg = {d: sum(wret[c][d] for c in codes) / len(codes) for d in weeks}
+    corr = []
+    for i in range(12, len(weeks)):
+        win = weeks[i - 12:i + 1]
+        ya = [avg[d] for d in win]
+        _, cs = _beta(ya, [wret[sector][d] for d in win])
+        ow = [d for d in win if d in (wret.get(oil) or {})]
+        _, co = _beta([avg[d] for d in ow], [wret[oil][d] for d in ow]) if len(ow) >= 8 else (None, None)
+        corr.append([weeks[i], round(cs, 2) if cs is not None else None, round(co, 2) if co is not None else None])
+    out["corr13w"] = corr
+    return out
+
+
+# ---------- 6) 텔레그램 일간 요약 (C5) ----------
+NOTIFY_TYPES = ("award", "extension", "termination", "suspension", "reactivation", "stacking", "retirement", "ma", "guidance")
+NOTIFIED_PATH = os.path.join(CACHE_DIR, "notified.json")
+
+
+def _region_ko(key):
+    return dict(DT.REGIONS).get(key, key or "-")
+
+
+def notify_daily(dry_run=False):
+    """그날 새로 들어온 이벤트(주요 type 또는 단가 있음)·시장 수치를 텔레그램 1건으로. 없으면 발송 안 함. notified.json 으로 중복 방지."""
+    cfg = DT.load_config()
+    if not cfg.get("telegram_daily", True) and not dry_run:
+        return {"sent": False, "reason": "telegram_daily=false"}
+    sent_ids = set((_load(NOTIFIED_PATH, {}) or {}).get("ids") or [])
+    evs = [e for e in _events()["events"] if e["id"] not in sent_ids and (e.get("type") in NOTIFY_TYPES or e.get("dayrate_usd_k") is not None)]
+    sts = [s for s in _stats()["stats"] if s["id"] not in sent_ids]
+    if not evs and not sts:
+        return {"sent": False, "reason": "새 항목 없음"}
+    evs.sort(key=lambda e: (e.get("date") or "", e.get("type") == "dayrate_change"), reverse=True)
+    ov = _load(DT.OVERVIEW, {}) or {}
+    ck = ov.get("checklist") or {}
+    dr = ((ov.get("signals") or {}).get("dayrate_leading") or {}).get("drillship") or {}
+    dr_txt = f"{dr['latest']['value_text']}({dr.get('direction_ko') or '-'})" if dr.get("latest") else "-"
+    lines = [f"⛽ 시추 업황 {date.today().isoformat()}",
+             f"체크리스트 {ck.get('on', '-')}/{ck.get('of', 5)} · 단가 3개월 중앙값 {dr_txt}"]
+    for e in evs[:8]:
+        who = (e.get("code") or e.get("company") or "").strip()
+        bits = [x for x in (who, e.get("rig"), _region_ko(e.get("region")), e.get("customer"),
+                            f"{e['duration_days']:g}일" if e.get("duration_days") else (e.get("start") or None),
+                            f"${e['dayrate_usd_k']:g}K" if e.get("dayrate_usd_k") is not None else None) if x]
+        src = {"news": e.get("source_name") or "뉴스", "8-K": "8-K", "fsr_diff": "FSR"}.get(e.get("source"), e.get("source"))
+        lines.append(f"• [{e.get('type')}] " + " / ".join(bits) + f" ({src})")
+    if len(evs) > 8:
+        lines.append(f"  … {len(evs) - 8}건 더")
+    for s in sts[:4]:
+        m = {"contracted_rigs": "계약", "utilization": "가동률", "dayrate": "단가", "duration": "계약기간", "fleet_count": "선대", "retirements": "퇴역"}.get(s["metric"], s["metric"])
+        seg = {"drillship": "드릴십", "harsh": "한랭지", "floater_total": "부유식", "jackup": "잭업"}.get(s.get("segment"), s.get("segment"))
+        reg = f" {_region_ko(s['region'])}" if s.get("region") and s["region"] != "other" else ""
+        md = s["as_of"][5:].replace("-", "/") if s.get("as_of") else ""
+        lines.append(f"📊 {s.get('source_name') or '-'}: {m} {seg}{reg} {s['value']:g}{(' ' + s['unit']) if s.get('unit') and not s['unit'].startswith('rig') else '척' if s['metric'] in ('contracted_rigs', 'fleet_count') else ''}({md})")
+    if len(sts) > 4:
+        lines.append(f"  … 시장 수치 {len(sts) - 4}건 더")
+    text = "\n".join(lines)
+    if dry_run:
+        return {"sent": False, "dry_run": True, "events": len(evs), "stats": len(sts), "text": text}
+    import earnings_calls
+    ok = earnings_calls._tg_send_html(text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+    if ok:
+        _save(NOTIFIED_PATH, {"ids": sorted(sent_ids | {e["id"] for e in evs} | {s["id"] for s in sts})[-5000:], "last_sent": _now()})
+    _log(f"telegram sent={ok} events={len(evs)} stats={len(sts)}")
+    return {"sent": bool(ok), "events": len(evs), "stats": len(sts), "chars": len(text)}
 
 
 # ---------- 실행 ----------
@@ -870,10 +1219,19 @@ def run(news=True, eight_k=True, fsr=True, max_ai=None):
             except Exception as e:
                 out["fsr_diff"][code] = {"error": f"{type(e).__name__}: {str(e)[:80]}"}
     try:
+        pr = fetch_prices()
+        out["prices"] = {"as_of": pr.get("as_of"), "status": pr.get("status"), "n": {k: len(v) for k, v in (pr.get("series") or {}).items()}}
+    except Exception as e:
+        out["prices"] = {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+    try:
         ov = DT.overview()
         out["overview"] = {"headline": ov.get("headline"), "events_60d": len(ov.get("events") or [])}
     except Exception as e:
         out["overview"] = {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+    try:
+        out["telegram"] = notify_daily()
+    except Exception as e:
+        out["telegram"] = {"error": f"{type(e).__name__}: {str(e)[:120]}"}
     out["seconds"] = round(time.time() - t0, 1)
     nw, ek, fs = out.get("news") or {}, out.get("eight_k") or {}, out.get("fsr") or {}
     summary = (f"news ai={nw.get('ai', '-')} rel={nw.get('relevant', '-')} ev={nw.get('events', '-')} st={nw.get('stats', '-')}"
@@ -892,8 +1250,14 @@ if __name__ == "__main__":
     ap.add_argument("--news-only", action="store_true")
     ap.add_argument("--fsr-only", action="store_true")
     ap.add_argument("--max-ai", type=int, default=None, help="이번 실행의 AI 호출 상한(ai_budget limit override)")
+    ap.add_argument("--fsr-url", nargs=2, metavar=("CODE", "URL"), help="특정 FSR PDF 1부 처리 + diff + overview")
     a = ap.parse_args()
-    if a.news_only:
+    if a.fsr_url:
+        code, url = a.fsr_url[0].upper(), a.fsr_url[1]
+        print(json.dumps({"fsr": check_fsr(a.max_ai, force_url=(code, url)), "diff": diff_fsr(code)}, ensure_ascii=False, indent=1))
+        ov = DT.overview()
+        print("[drilling] overview:", ov.get("headline"))
+    elif a.news_only:
         run(news=True, eight_k=True, fsr=False, max_ai=a.max_ai)
     elif a.fsr_only:
         run(news=False, eight_k=False, fsr=True, max_ai=a.max_ai)

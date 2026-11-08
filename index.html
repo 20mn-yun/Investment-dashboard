@@ -1531,6 +1531,37 @@
         #tab-drilling table.dr-ev a { color: var(--accent); }
         #tab-drilling .dr-more { display: inline-block; margin: 6px 0 12px; cursor: pointer; color: var(--accent); font-size: var(--fs-sm); }
         @media (max-width: 768px) { #tab-drilling .dr-charts2 { grid-template-columns: 1fr; } }
+        #tab-drilling .dr-cycle { display: inline-block; font-size: var(--fs-xl); margin-right: 10px; }
+        #tab-drilling .dr-checklist { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+        #tab-drilling .dr-ck { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: var(--fs-sm); min-width: 0; }
+        #tab-drilling .dr-ck .nm { font-weight: bold; font-size: var(--fs-md); }
+        #tab-drilling .dr-ck .dot { font-size: var(--fs-md); margin-right: 4px; }
+        #tab-drilling .dr-ck .vt { display: block; font-variant-numeric: tabular-nums; }
+        #tab-drilling .dr-ck .bs { display: block; color: var(--text-dim); font-size: var(--fs-xs); white-space: normal; }
+        #tab-drilling .dr-bm-note { color: var(--text-muted); font-size: var(--fs-sm); margin: -4px 0 8px; }
+        #tab-drilling .dr-charts3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+        #tab-drilling .dr-charts3 .dr-chart { height: 200px; }
+        #tab-drilling .dr-chart-corr { height: 220px; }
+        #tab-drilling .dr-flagbadge { display: inline-block; font-size: var(--fs-xs); border-radius: 4px; padding: 0 5px; color: #fff; background: var(--up); margin-left: 4px; }
+        @media (max-width: 1024px) { #tab-drilling .dr-checklist { grid-template-columns: repeat(3, minmax(0, 1fr)); } #tab-drilling .dr-charts3 { grid-template-columns: 1fr; } }
+        @media (max-width: 600px) { #tab-drilling .dr-checklist { grid-template-columns: 1fr; } }
+        #tab-drilling .dr-cards2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+        #tab-drilling .dr-cards4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        #tab-drilling .dr-kcard { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; min-width: 0; font-size: var(--fs-md); }
+        #tab-drilling .dr-kcard .label { color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: 4px; }
+        #tab-drilling .dr-kcard b { font-size: var(--fs-lg); }
+        #tab-drilling .dr-kcard small { color: var(--text-dim); font-size: var(--fs-xs); }
+        #tab-drilling table.dr-recent td { white-space: nowrap; }
+        #tab-drilling table.dr-recent tr.row { cursor: pointer; }
+        #tab-drilling table.dr-recent tr.row:hover { background: var(--bg-hover); }
+        #tab-drilling .dr-ev-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+        #tab-drilling .dr-ev-tabs .period-btn { font-size: var(--fs-sm); }
+        #tab-drilling table.dr-ev td.sum { white-space: normal; }
+        #tab-drilling table.dr-ev td.sum small { display: block; color: var(--text-dim); font-size: var(--fs-xs); }
+        #tab-drilling table.dr-ev td.sum small a { color: var(--accent); }
+        #tab-drilling table.dr-ev tr.grp td { background: var(--bg-panel); cursor: pointer; font-weight: bold; color: var(--text-muted); }
+        #tab-drilling table.dr-ev tr.grp td .arrow { display: inline-block; width: 1.2em; }
+        @media (max-width: 600px) { #tab-drilling .dr-cards2, #tab-drilling .dr-cards4 { grid-template-columns: 1fr; } }
         #tab-drilling .dr-fold { margin-bottom: 14px; }
         #tab-drilling .dr-fold summary { cursor: pointer; color: var(--text-muted); font-size: var(--fs-sm); padding: 4px 0; }
         #tab-drilling .dr-trend-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
@@ -2695,33 +2726,48 @@
     <div class="loading" id="dr-loading">시추 업황 자료를 불러오는 중...</div>
     <div id="dr-content" style="display:none;">
         <div class="dr-header">
-            <div class="dr-headline" id="dr-headline"></div>
+            <div class="dr-headline"><span class="dr-cycle" id="dr-cycle"></span><span id="dr-headline"></span></div>
             <span class="dr-asof" id="dr-asof"></span>
             <button class="dr-btn" id="dr-refresh" onclick="loadDrilling(true)">새로고침</button>
         </div>
+        <div class="dr-checklist" id="dr-checklist"></div>
+        <div class="section-title">체결 단가 추이 <span class="dr-rm-summary">발표·보고서일 기준 · 3개월 이동 중앙값(계단) · p25~p75 밴드 · 최근 24개월</span>
+            <span class="dr-seg-toggle" id="dr-dr-seg"><span class="period-btn active" data-seg="drillship" onclick="drDrSeg('drillship')">드릴십</span><span class="period-btn" data-seg="harsh" onclick="drDrSeg('harsh')">한랭지</span></span></div>
+        <div class="dr-cards2" id="dr-dr-summary"></div>
+        <div class="dr-chart-wide"><canvas id="dr-chart-dayrate"></canvas></div>
+        <div class="dr-table-wrap"><table class="dr-table dr-recent" id="dr-recent"></table></div>
+        <div class="dr-cell-detail" id="dr-recent-detail" style="display:none;"></div>
+        <div class="section-title">시장 수치 <span class="dr-rm-summary" id="dr-ms-note"></span>
+            <span class="dr-seg-toggle" id="dr-ms-seg"><span class="period-btn active" data-seg="floater_total" onclick="drMsSeg('floater_total')">가동 부유식</span><span class="period-btn" data-seg="drillship" onclick="drMsSeg('drillship')">드릴십</span><span class="period-btn" data-seg="harsh" onclick="drMsSeg('harsh')">한랭지</span><span class="period-btn" data-seg="jackup" onclick="drMsSeg('jackup')">가동 잭업</span></span></div>
+        <div class="dr-bm-note">Westwood RigLogix 주간 집계 · 가동 = 계약돼 실제 작업 중인 리그</div>
+        <div class="dr-cards2" id="dr-ms-cards"></div>
+        <div class="dr-chart-wide"><canvas id="dr-chart-ms"></canvas></div>
+        <div class="section-title">신호판</div>
         <div class="dr-signals" id="dr-signals"></div>
         <div class="dr-signal-detail" id="dr-signal-detail" style="display:none;"></div>
         <div class="dr-outlook" id="dr-outlook"></div>
-        <div class="section-title">체결 단가 추이 <span class="dr-rm-summary">월별 중앙값 · 개별 체결 점 · 최근 18개월</span></div>
-        <div class="dr-chart-wide"><canvas id="dr-chart-dayrate"></canvas></div>
-        <div class="section-title">시장 수치 <span class="dr-rm-summary" id="dr-ms-note"></span>
-            <span class="dr-seg-toggle" id="dr-ms-seg"><span class="period-btn active" data-seg="drillship" onclick="drMsSeg('drillship')">드릴십</span><span class="period-btn" data-seg="harsh" onclick="drMsSeg('harsh')">한랭지</span></span></div>
-        <div class="dr-charts2"><div class="dr-chart"><canvas id="dr-chart-ms-rigs"></canvas></div><div class="dr-chart"><canvas id="dr-chart-ms-util"></canvas></div></div>
-        <details class="dr-fold" id="dr-trend-fold" ontoggle="drOnTrendToggle()"><summary>지표 추이 (8분기)</summary>
-            <div class="dr-trend-grid" id="dr-trend-grid"></div>
-        </details>
         <div class="section-title">지역 수요 매트릭스 <span class="dr-rm-summary" id="dr-rm-summary"></span></div>
         <div class="dr-table-wrap"><table class="dr-table dr-rm" id="dr-rm"></table></div>
         <div class="dr-cell-detail" id="dr-rm-detail" style="display:none;"></div>
         <div class="section-title">회사 실적 변수</div>
         <div class="dr-table-wrap"><table class="dr-table" id="dr-table"></table></div>
         <div class="section-title">이벤트 타임라인 <span class="dr-rm-summary">최근 60일 · 뉴스·8-K·FSR 비교</span></div>
+        <div class="dr-ev-tabs" id="dr-ev-tabs"></div>
         <div class="dr-ev-filters" id="dr-ev-filters"></div>
         <div class="dr-table-wrap"><table class="dr-table dr-ev" id="dr-ev"></table></div>
         <div id="dr-ev-more"></div>
-        <div class="section-title">다가오는 일정 (180일)</div>
+        <div class="section-title">현재 유휴 · 다가오는 일정 (180일)</div>
         <div class="dr-upcoming" id="dr-upcoming"></div>
-        <div class="dr-foot">출처: 각사 실적 컨콜 녹취록·8-K 보도자료에서 AI 추출 · ⓘ = 원문 문장 · S/R/N = Seadrill/Transocean/Noble</div>
+        <details class="dr-fold" id="dr-trend-fold" ontoggle="drOnTrendToggle()"><summary>지표 추이 (8분기)</summary>
+            <div class="dr-trend-grid" id="dr-trend-grid"></div>
+        </details>
+        <div class="section-title">주가 기준선 <span class="dr-rm-summary" id="dr-bm-asof"></span></div>
+        <div class="dr-bm-note">고유분 = 종목 수익률 − 베타×OIH. 고유분이 크면 회사 뉴스를 보고, 작으면 업종·유가 이슈</div>
+        <div class="dr-chart-wide"><canvas id="dr-chart-rebased"></canvas></div>
+        <div class="dr-charts3" id="dr-rs-grid"></div>
+        <div class="dr-table-wrap"><table class="dr-table" id="dr-decomp"></table></div>
+        <div class="dr-chart-wide dr-chart-corr"><canvas id="dr-chart-corr"></canvas></div>
+        <div class="dr-foot">출처: 각사 실적 컨콜 녹취록·8-K 보도자료·Fleet Status Report·업계 뉴스(Westwood 등)에서 AI 추출 · ⓘ = 원문 문장 · S/R/N = Seadrill/Transocean/Noble</div>
     </div>
 </div>
 <div class="tab-content" id="tab-dart">
@@ -3192,7 +3238,7 @@
 
     // ===== 시추 업황 탭 (A2: 변화·방향 중심) =====
     let drLoaded = false;
-    const dr = { data: null, charts: [], openSig: null, openCell: null, trendDrawn: false, dayrateChart: null, msCharts: [], msSeg: 'drillship', evFilter: { type: null, code: null }, evShown: 20 };
+    const dr = { data: null, charts: [], openSig: null, openCell: null, trendDrawn: false, dayrateChart: null, msCharts: [], msSeg: 'drillship', evFilter: { type: null, code: null, src: 'all' }, evShown: 20, bmCharts: [], drSeg: 'drillship', msSeg: 'floater_total', evOpenGroups: {}, recentOpen: null };
     const DR_TAG = { SDRL: 'S', RIG: 'R', NE: 'N' };
     const DR_SIG_ORDER = ['contracted_rigs', 'utilization', 'dayrate_leading', 'contract_duration', 'supply'];
     function drEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -3223,17 +3269,21 @@
     }
     function drRender() {
         const d = dr.data;
-        document.getElementById('dr-headline').textContent = d.headline || '';
+        const ck = d.checklist || null;
+        document.getElementById('dr-cycle').textContent = ck ? `상승 사이클 조건 ${ck.on}/${ck.of}` : '';
+        document.getElementById('dr-headline').textContent = (d.headline || '').replace(/^상승 사이클 조건 \d+\/\d+ · /, '');
+        drRenderChecklist();
         document.getElementById('dr-asof').textContent = (d.latest_quarter ? `기준 분기 ${d.latest_quarter}` : '수집된 분기 없음') + (d.generated_at ? ` · ${d.generated_at.slice(0, 16).replace('T', ' ')}` : '');
+        drRenderDayrate();
+        drRenderMarket();
         drRenderSignals();
         drRenderOutlook();
-        drRenderDayrateChart();
-        drRenderMarketSeries();
         drRenderRegionMatrix();
         drRenderCompanyTable();
-        dr.evFilter = { type: null, code: null }; dr.evShown = 20;
+        dr.evFilter = { type: null, code: null, src: 'all' }; dr.evShown = 20; dr.evOpenGroups = {};
         drRenderEvents();
         drRenderUpcoming();
+        drRenderBenchmark();
         if (document.getElementById('dr-trend-fold').open) drRenderTrends();
     }
     // 2) 신호판
@@ -3251,7 +3301,7 @@
         if (b.direction === 'stale') tail = `<span class="dr-stale">오래됨 · ${drEsc(b.stale_as_of ? String(b.stale_as_of).slice(0, 10) : b.stale_quarter)}</span>`;
         else if (b.direction === 'insufficient') tail = `<span class="dr-stale">${drEsc(b.direction_ko || '표본 부족')}</span>`;
         else {
-            const dirTxt = k === 'supply' ? (b.direction_ko || '-') : (b.delta != null ? `${b.delta > 0 ? '+' : ''}${drNum(b.delta, 1)}${b.unit}` : (b.direction_ko || '-'));
+            const dirTxt = k === 'supply' ? (b.direction_ko || '-') : (b.chg_pct != null ? `${b.chg_pct > 0 ? '+' : ''}${drNum(b.chg_pct, 1)}%` : b.delta != null ? `${b.delta > 0 ? '+' : ''}${drNum(b.delta, 1)}${b.unit}` : (b.direction_ko || '-'));
             tail = `<span class="delta ${drCls(b.direction)}">${drArrow(b.direction)} ${drEsc(dirTxt)}</span>`;
         }
         return `<div class="dr-sig-line">${b.segment_ko ? `<span class="seg">${drEsc(b.segment_ko)}</span>` : ''}<span class="vals">${vals}</span>${tail}</div>`;
@@ -3277,6 +3327,78 @@
         box.innerHTML = blocks.map(b => `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin:4px 0;">${drEsc(b.label)}${b.segment_ko ? ' · ' + drEsc(b.segment_ko) : ''} — 회사별 값·인용${b.direction === 'stale' ? ` <span class="dr-stale">오래됨 · ${drEsc(b.stale_quarter)}</span>` : ''}</div>` + block('최근', b.latest) + block('직전', b.prev)).join('');
         box.style.display = '';
     }
+    // 1b) 사이클 체크리스트
+    function drRenderChecklist() {
+        const ck = dr.data.checklist;
+        const box = document.getElementById('dr-checklist');
+        if (!ck) { box.innerHTML = ''; return; }
+        box.innerHTML = ck.items.map(it => {
+            const cls = it.on === true ? 'dr-up' : it.on === false ? 'dr-down' : 'dr-flat';
+            const dot = it.on === true ? '●' : it.on === false ? '○' : '–';
+            return `<div class="dr-ck"><span class="nm"><span class="dot ${cls}">${dot}</span>${drEsc(it.name)}</span><span class="vt ${cls}">${drEsc(it.on == null ? '판단 불가 · ' + it.value_text : it.value_text)}</span><span class="bs">${drEsc(it.basis || '')}</span></div>`;
+        }).join('');
+    }
+    // 1c) 주가 기준선: 리베이스·상대강도·분해·13주 상관
+    function drRenderBenchmark() {
+        const d = dr.data, bm = d.benchmark, C = drColors();
+        (dr.bmCharts || []).forEach(c => c.destroy()); dr.bmCharts = [];
+        const asof = document.getElementById('dr-bm-asof');
+        if (!bm || bm.error) { asof.textContent = bm && bm.error ? bm.error : '시세 수집 전'; return; }
+        asof.textContent = `종가 ${bm.as_of} · 업종 ${bm.sector} · 유가 ${bm.oil}${bm.oil_source && bm.oil_source !== bm.oil ? '(' + bm.oil_source + ')' : ''}`;
+        const codes = bm.codes || [], marks = Object.entries(d.merger_marks || {}).map(([code, m]) => ({ code, ...m }));
+        // (a) 1년 리베이스
+        const reb = bm.rebased || {}; const dates = [...new Set(Object.values(reb).flatMap(s => s.map(r => r[0])))].sort();
+        const idx = Object.fromEntries(dates.map((x, i) => [x, i]));
+        const ser = (t, label, color, extra) => { const m = Object.fromEntries((reb[t] || []).map(r => [r[0], r[1]])); return Object.assign({ label, data: dates.map(x => m[x] ?? null), borderColor: color, backgroundColor: color, pointRadius: 0, borderWidth: 1.5, spanGaps: true }, extra || {}); };
+        const datasets = codes.map(c => ser(c, c, C.series[c] || C.muted)).concat([ser(bm.sector, bm.sector, C.muted, { borderWidth: 3 }), ser(bm.oil, '브렌트', C.text, { borderDash: [4, 3] }), ser('XOM', 'XOM', '#8250df', { borderDash: [2, 2], borderWidth: 1 })]);
+        const qEnd = { Q1: '-03-31', Q2: '-06-30', Q3: '-09-30', Q4: '-12-31' };
+        const markPlugin = { id: 'drBmMarks', afterDraw(chart) {
+            const x = chart.scales.x, ctx = chart.ctx;
+            marks.forEach(m => { const q = /(20\d\d)Q([1-4])/.exec(m.quarter || ''); if (!q) return;
+                const mdate = (m.label.match(/\d{4}-\d{2}-\d{2}/) || [`${q[1]}${qEnd['Q' + q[2]]}`])[0];
+                const pos = dates.findIndex(dd => dd >= mdate); if (pos < 0) return;
+                const px = x.getPixelForValue(pos); ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = C.muted; ctx.beginPath(); ctx.moveTo(px, chart.chartArea.top); ctx.lineTo(px, chart.chartArea.bottom); ctx.stroke();
+                ctx.fillStyle = C.muted; ctx.font = `${fz(9, 'tab-drilling')}px sans-serif`; ctx.fillText(`${m.code} ${m.label}`, px + 3, chart.chartArea.top + 9); ctx.restore(); }); } };
+        dr.bmCharts.push(new Chart(document.getElementById('dr-chart-rebased'), { type: 'line', plugins: [markPlugin], data: { labels: dates, datasets },
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                plugins: { title: { display: true, text: '1년 리베이스 (시작 = 100)', font: fzf(12, 'tab-drilling', { weight: 'bold' }), color: C.text }, legend: { labels: { color: C.text, font: fzf(10, 'tab-drilling'), boxWidth: 10 } },
+                           tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw == null ? '-' : drNum(c.raw, 1)}` } } },
+                scales: { x: { ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } }, y: { ticks: { color: C.muted, font: fzf(9, 'tab-drilling') }, grid: { color: C.grid } } } } }));
+        // (b) 상대강도 미니차트 3개
+        const grid = document.getElementById('dr-rs-grid');
+        grid.innerHTML = codes.map(c => `<div class="dr-chart"><canvas id="dr-rs-${c}"></canvas></div>`).join('');
+        codes.forEach(c => {
+            const r = (bm.rs || {})[c]; if (!r) return;
+            const lab = r.ratio.map(x => x[0]);
+            dr.bmCharts.push(new Chart(document.getElementById(`dr-rs-${c}`), { type: 'line', data: { labels: lab, datasets: [
+                { label: `${c}/OIH`, data: r.ratio.map(x => x[1]), borderColor: C.series[c] || C.muted, pointRadius: 0, borderWidth: 1.5 },
+                { label: '60일선', data: r.ma60.map(x => x[1]), borderColor: C.muted, borderDash: [4, 3], pointRadius: 0, borderWidth: 1 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: `${c} 상대강도 (X/OIH) · 60일선 대비 ${r.pos_vs_ma60_pct == null ? '-' : (r.pos_vs_ma60_pct > 0 ? '+' : '') + drNum(r.pos_vs_ma60_pct, 1) + '%'}`, font: fzf(11, 'tab-drilling', { weight: 'bold' }), color: r.pos_vs_ma60_pct > 0 ? C.up : r.pos_vs_ma60_pct < 0 ? C.down : C.text } },
+                    scales: { x: { ticks: { color: C.muted, font: fzf(8, 'tab-drilling'), maxTicksLimit: 5, maxRotation: 0 }, grid: { display: false } }, y: { ticks: { color: C.muted, font: fzf(8, 'tab-drilling') }, grid: { color: C.grid } } } } }));
+        });
+        // (c) 분해 표
+        const dec = bm.decomposition || {}, beta = bm.beta || {};
+        const pct = v => v == null ? '-' : `<span class="${v > 0 ? 'dr-up' : v < 0 ? 'dr-down' : ''}">${v > 0 ? '+' : ''}${drNum(v, 1)}%</span>`;
+        let h = '<thead><tr><th>회사</th><th>OIH 베타<small>52주 주간</small></th><th>브렌트 베타</th><th>5일 총</th><th>업종분</th><th>고유분</th><th>20일 총</th><th>업종분</th><th>고유분</th></tr></thead><tbody>';
+        codes.forEach(c => {
+            const b = beta[c] || {}, d5 = (dec[c] || {}).d5, d20 = (dec[c] || {}).d20;
+            const cell = (x, k) => x ? pct(x[k]) + (k === 'residual_pct' && x.flag ? `<span class="dr-flagbadge">${drEsc(x.flag)}</span>` : '') : '-';
+            h += `<tr><td><b>${c}</b><small>${drEsc((d.names || {})[c] || '')}</small></td><td>${b.sector_beta == null ? '-' : drNum(b.sector_beta, 2)}<small>r ${b.sector_corr == null ? '-' : drNum(b.sector_corr, 2)}</small></td><td>${b.oil_beta == null ? '-' : drNum(b.oil_beta, 2)}<small>r ${b.oil_corr == null ? '-' : drNum(b.oil_corr, 2)}</small></td>` +
+                 `<td>${cell(d5, 'total_pct')}</td><td>${cell(d5, 'sector_part_pct')}</td><td>${cell(d5, 'residual_pct')}</td><td>${cell(d20, 'total_pct')}</td><td>${cell(d20, 'sector_part_pct')}</td><td>${cell(d20, 'residual_pct')}</td></tr>`;
+        });
+        const sec5 = codes.length && dec[codes[0]] && dec[codes[0]].d5 ? dec[codes[0]].d5.sector_ret_pct : null, sec20 = codes.length && dec[codes[0]] && dec[codes[0]].d20 ? dec[codes[0]].d20.sector_ret_pct : null;
+        h += `<tr><td><b>${bm.sector}</b><small>업종 ETF</small></td><td>1.00</td><td>-</td><td>${pct(sec5)}</td><td></td><td></td><td>${pct(sec20)}</td><td></td><td></td></tr>`;
+        document.getElementById('dr-decomp').innerHTML = h + '</tbody>';
+        // (d) 13주 상관
+        const corr = bm.corr13w || [];
+        const zero3 = { id: 'drCorr03', afterDraw(chart) { const y = chart.scales.y, ctx = chart.ctx; const py = y.getPixelForValue(0.3); ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = C.muted; ctx.beginPath(); ctx.moveTo(chart.chartArea.left, py); ctx.lineTo(chart.chartArea.right, py); ctx.stroke(); ctx.restore(); } };
+        dr.bmCharts.push(new Chart(document.getElementById('dr-chart-corr'), { type: 'line', plugins: [zero3], data: { labels: corr.map(x => x[0]), datasets: [
+            { label: '3사 평균 vs OIH', data: corr.map(x => x[1]), borderColor: C.up, pointRadius: 0, borderWidth: 1.5, spanGaps: true },
+            { label: '3사 평균 vs 브렌트', data: corr.map(x => x[2]), borderColor: C.down, pointRadius: 0, borderWidth: 1.5, borderDash: [4, 3], spanGaps: true }] },
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                plugins: { title: { display: true, text: '13주 롤링 상관 (주간 수익률, 최근 2년) · 점선 0.3', font: fzf(12, 'tab-drilling', { weight: 'bold' }), color: C.text }, legend: { labels: { color: C.text, font: fzf(10, 'tab-drilling'), boxWidth: 10 } } },
+                scales: { x: { ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } }, y: { min: -1, max: 1, ticks: { color: C.muted, font: fzf(9, 'tab-drilling') }, grid: { color: C.grid } } } } }));
+    }
     // 2b) 경영진 전망 한 줄 블록 (최대 6건, 더 있으면 펼침)
     function drRenderOutlook() {
         const box = document.getElementById('dr-outlook');
@@ -3288,76 +3410,143 @@
         box.innerHTML = `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin-bottom:4px;">경영진 전망 (시장, 최신 분기)</div>` + head +
             (rest.length ? `<details class="dr-fold"><summary>더 보기 ${rest.length}건</summary>${rest.map(line).join('')}</details>` : '');
     }
-    // 2c) 체결 단가 추이: 월별 중앙값(드릴십 실선·한랭지 점선) + 개별 체결 점 + RIG FSR 분기 평균 단가(회색 점선)
-    function drRenderDayrateChart() {
-        const d = dr.data, C = drColors(), ld = d.dayrates || {};
+    // 2c) 체결 단가 추이 (D2): 세그먼트 토글, 요약 2칸, 계단형 rolling3 + p25~p75 밴드 + 개별 점 + 월별 건수 막대, 최근 체결 10건 표
+    function drDrSeg(seg) { dr.drSeg = seg; document.querySelectorAll('#dr-dr-seg .period-btn').forEach(b => b.classList.toggle('active', b.dataset.seg === seg)); drRenderDayrate(); }
+    function drRegionLabel(key) { const r = (dr.data.regions || []).find(x => x.key === key); return r ? r.label : (key || '-'); }
+    function drRenderDayrate() {
+        const d = dr.data, C = drColors(), ld = d.dayrates || {}, seg = dr.drSeg || 'drillship';
         if (dr.dayrateChart) { dr.dayrateChart.destroy(); dr.dayrateChart = null; }
-        const months = [...new Set([...(ld.drillship || []), ...(ld.harsh || [])].map(m => m.month))].sort();
+        // 요약 2칸 (드릴십 / 한랭지)
+        document.getElementById('dr-dr-summary').innerHTML = DR_SEGS.map(([sg, ko]) => {
+            const sm = (ld[sg] || {}).summary || {};
+            if (sm.recent == null) return `<div class="dr-kcard"><div class="label">${ko}</div><span class="dr-flat">수집 전</span></div>`;
+            const chg = sm.chg_pct == null ? '-' : `<span class="${sm.chg_pct > 0 ? 'dr-up' : sm.chg_pct < 0 ? 'dr-down' : ''}">${sm.chg_pct > 0 ? '+' : ''}${drNum(sm.chg_pct, 0)}%</span>`;
+            return `<div class="dr-kcard"><div class="label">${ko}</div>최근 3개월 중앙값 <b>$${drNum(sm.recent, 0)}K</b><small> ~${drEsc(sm.recent_month || '')}</small> · 직전 3개월 ${sm.prev == null ? '-' : '$' + drNum(sm.prev, 0) + 'K'} · ${chg} · ${sm.insufficient ? `<span class="dr-stale">표본 부족 ${sm.n}건</span>` : `표본 ${sm.n}건`}</div>`;
+        }).join('');
+        const months = ((ld[seg] || {}).months || []);
         const el = document.getElementById('dr-chart-dayrate');
-        if (!months.length) { el.parentNode.innerHTML = '<div class="dr-empty">체결 단가 데이터 수집 중 (뉴스·FSR 에서 단가가 있는 계약이 쌓이면 표시)</div>'; return; }
-        const idx = Object.fromEntries(months.map((m, i) => [m, i]));
-        const line = (seg, label, dash) => ({ type: 'line', label, data: months.map(m => { const x = (ld[seg] || []).find(y => y.month === m); return x ? (x.rolling3 != null ? x.rolling3 : x.median) : null; }), borderColor: C.muted, borderDash: dash, pointRadius: 0, spanGaps: true, tension: 0.2, yAxisID: 'y' });
-        const monthPts = seg => ({ type: 'scatter', label: `${seg === 'harsh' ? '한랭지' : '드릴십'} 월별 중앙값`, data: (ld[seg] || []).map(m => ({ x: idx[m.month], y: m.median, n: m.n })), backgroundColor: C.muted, pointRadius: 5, pointStyle: 'rectRot', yAxisID: 'y', xAxisID: 'x2' });
-        const pts = seg => ({ type: 'scatter', label: `${seg === 'harsh' ? '한랭지' : '드릴십'} 체결`, data: (ld[seg] || []).flatMap(m => m.points.map(p => ({ x: idx[m.month] + (Math.random() - 0.5) * 0.3, y: p.value, rig: p.rig, customer: p.customer, source: p.source }))), backgroundColor: seg === 'harsh' ? C.down : C.up, pointRadius: 4, pointStyle: seg === 'harsh' ? 'triangle' : 'circle', yAxisID: 'y', xAxisID: 'x2' });
-        const datasets = [line('drillship', '드릴십 3개월 이동 중앙값', []), line('harsh', '한랭지 3개월 이동 중앙값', [4, 3]), monthPts('drillship'), monthPts('harsh'), pts('drillship'), pts('harsh')];
+        if (!months.length) { el.parentNode.innerHTML = '<div class="dr-empty">체결 단가 데이터 수집 중</div>'; drRenderRecent(); return; }
+        // 월 축: 첫 달 ~ 마지막 달 연속
+        const lab = []; { let [y, m] = months[0].month.split('-').map(Number); const [ey, em] = months[months.length - 1].month.split('-').map(Number); while (y < ey || (y === ey && m <= em)) { lab.push(`${y}-${String(m).padStart(2, '0')}`); m++; if (m > 12) { m = 1; y++; } } }
+        const idx = Object.fromEntries(lab.map((x, i) => [x, i]));
+        const byM = Object.fromEntries(months.map(m => [m.month, m]));
+        let lastR = null, lastLo = null, lastHi = null;
+        const r3 = [], lo = [], hi = [], cnt = [];
+        lab.forEach(x => { const m = byM[x]; if (m) { lastR = m.rolling3; lastLo = m.rolling3_p25 ?? m.rolling3; lastHi = m.rolling3_p75 ?? m.rolling3; } r3.push(lastR); lo.push(lastLo); hi.push(lastHi); cnt.push(m ? m.n : 0); });
+        const col = seg === 'harsh' ? C.down : C.up;
+        const datasets = [
+            { type: 'line', label: '3개월 이동 중앙값', data: r3, borderColor: col, stepped: 'before', pointRadius: 0, borderWidth: 2, yAxisID: 'y', order: 2 },
+            { type: 'line', label: 'p75', data: hi, borderColor: 'transparent', backgroundColor: col + '22', fill: '+1', pointRadius: 0, stepped: 'before', yAxisID: 'y', order: 3 },
+            { type: 'line', label: 'p25', data: lo, borderColor: 'transparent', pointRadius: 0, stepped: 'before', yAxisID: 'y', order: 3 },
+            { type: 'scatter', label: '개별 체결', data: months.flatMap(m => m.points.map(p => ({ x: idx[m.month] + (Math.random() - 0.5) * 0.3, y: p.value, p }))), backgroundColor: col, pointRadius: 4, yAxisID: 'y', xAxisID: 'x2', order: 1 },
+            { type: 'bar', label: '월별 건수', data: cnt, backgroundColor: C.muted + '33', yAxisID: 'y2', order: 4 },
+        ];
         const rigFsr = ((d.fsr || {}).RIG || {}).avg_dayrate_table || [];
-        if (rigFsr.length) {   // 분기 라벨 'Q4 2026' → 분기 중간 월에 점
-            const qm = { 'Q1': '02', 'Q2': '05', 'Q3': '08', 'Q4': '11' };
-            const rows = rigFsr.filter(r => /drillship|floater/i.test(r.segment || '') && r.value_usd_k != null).map(r => { const m = /(Q[1-4])\D*(20\d\d)/.exec(r.period || ''); return m ? { month: `${m[2]}-${qm[m[1]]}`, v: r.value_usd_k } : null; }).filter(Boolean);
-            rows.forEach(r => { if (!(r.month in idx)) { months.push(r.month); } });
-            months.sort(); months.forEach((m, i) => { idx[m] = i; });
-            datasets.forEach(ds => { if (ds.type === 'line') ds.data = months.map(m => { const x = (ld[ds.label.startsWith('한랭') ? 'harsh' : 'drillship'] || []).find(y => y.month === m); return x ? (x.rolling3 != null ? x.rolling3 : x.median) : null; }); });
-            datasets.forEach(ds => { if (ds.type === 'scatter') ds.data.forEach(p => { if (p.n != null) p.x = idx[(ld[ds.label.startsWith('한랭') ? 'harsh' : 'drillship'] || []).find(y => y.median === p.y && idx[y.month] != null && true) ? (ld[ds.label.startsWith('한랭') ? 'harsh' : 'drillship'] || []).find(y => y.median === p.y).month : months[0]]; }); });
-            datasets.push({ type: 'line', label: 'RIG FSR 평균 계약단가(드릴십)', data: months.map(m => { const r = rows.find(x => x.month === m); return r ? r.v : null; }), borderColor: C.muted, borderDash: [2, 3], pointRadius: 2, spanGaps: true, yAxisID: 'y' });
-        }
-        dr.dayrateChart = new Chart(el, { data: { labels: months, datasets }, options: { responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: C.text, font: fzf(10, 'tab-drilling'), boxWidth: 10 } },
-                       tooltip: { callbacks: { label: c => c.raw && c.raw.rig != null ? `${c.raw.rig} / ${c.raw.customer || '-'} $${drNum(c.raw.y, 0)}K (${c.raw.source || ''})` : c.raw && c.raw.n != null ? `${c.dataset.label}: $${drNum(c.raw.y, 0)}K (${c.raw.n}건)` : `${c.dataset.label}: ${c.raw == null ? '-' : '$' + drNum(c.raw, 0) + 'K'}` } } },
-            scales: { x: { ticks: { color: C.muted, font: fzf(10, 'tab-drilling') }, grid: { display: false } }, x2: { type: 'linear', display: false, min: -0.5, max: months.length - 0.5 },
-                      y: { ticks: { color: C.muted, font: fzf(10, 'tab-drilling'), callback: v => '$' + v + 'K' }, grid: { color: C.grid } } } } });
+        const qm = { Q1: '02', Q2: '05', Q3: '08', Q4: '11' };
+        const fsrPts = rigFsr.filter(r => (seg === 'harsh' ? /harsh/i : /drillship|floater/i).test(r.segment || '') && r.value_usd_k != null).map(r => { const m = /(Q[1-4])\D*(20\d\d)/.exec(r.period || ''); return m ? [`${m[2]}-${qm[m[1]]}`, r.value_usd_k] : null; }).filter(Boolean);
+        if (fsrPts.length) datasets.push({ type: 'line', label: 'RIG 선단 평균(계약 기준)', data: lab.map(x => { const f = fsrPts.find(p => p[0] === x); return f ? f[1] : null; }), borderColor: C.muted, borderDash: [2, 3], pointRadius: 3, spanGaps: true, yAxisID: 'y', order: 2 });
+        dr.dayrateChart = new Chart(el, { data: { labels: lab, datasets }, options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: C.text, font: fzf(10, 'tab-drilling'), boxWidth: 10, filter: it => !['p25', 'p75'].includes(it.text) } },
+                       tooltip: { callbacks: { label: c => { const p = c.raw && c.raw.p; if (p) return `${p.start || p.date} ${p.rig} / ${p.customer || '-'} / ${drRegionLabel(p.region)} $${drNum(p.value, 0)}K (${p.source || ''})`; return `${c.dataset.label}: ${c.raw == null ? '-' : (c.dataset.type === 'bar' ? c.raw + '건' : '$' + drNum(c.raw, 0) + 'K')}`; } } } },
+            scales: { x: { ticks: { color: C.muted, font: fzf(10, 'tab-drilling'), maxRotation: 0, autoSkip: true }, grid: { display: false } }, x2: { type: 'linear', display: false, min: -0.5, max: lab.length - 0.5 },
+                      y: { position: 'left', ticks: { color: C.muted, font: fzf(10, 'tab-drilling'), callback: v => '$' + v + 'K' }, grid: { color: C.grid } },
+                      y2: { position: 'right', beginAtZero: true, suggestedMax: Math.max(...cnt, 1) * 4, ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), stepSize: 1 }, grid: { display: false } } } } });
+        drRenderRecent();
     }
-    // 2d) 시장 수치: 계약 리그 수·가동률 시계열 (출처별 점 색, 세그먼트 토글)
-    function drMsSeg(seg) { dr.msSeg = seg; document.querySelectorAll('#dr-ms-seg .period-btn').forEach(b => b.classList.toggle('active', b.dataset.seg === seg)); drRenderMarketSeries(); }
-    function drRenderMarketSeries() {
-        const d = dr.data, C = drColors(), ms = d.market_series || {}, seg = dr.msSeg || 'drillship';
+    function drRenderRecent() {
+        const rec = (dr.data.dayrates || {}).recent || [];   // 표의 '시작' 열은 계약 시작월(start), 차트 점은 발표일 기준
+        const tbl = document.getElementById('dr-recent');
+        if (!rec.length) { tbl.innerHTML = ''; return; }
+        tbl.innerHTML = '<thead><tr><th>시작</th><th>시추사</th><th>리그</th><th>고객</th><th>지역</th><th>기간</th><th>단가</th><th>중앙값 대비</th><th>출처</th></tr></thead><tbody>' + rec.map((p, i) => {
+            const vs = p.vs_median_pct == null ? '-' : `<span class="${p.vs_median_pct > 0 ? 'dr-up' : p.vs_median_pct < 0 ? 'dr-down' : ''}">${p.vs_median_pct > 0 ? '+' : ''}${drNum(p.vs_median_pct, 0)}%</span>`;
+            const src = /FSR/.test(p.source || '') ? `FSR ${drEsc(p.date || '')}` : (p.url ? `<a href="${drEsc(p.url)}" target="_blank" rel="noopener">${drEsc(p.source || '뉴스')}</a>` : drEsc(p.source || ''));
+            return `<tr class="row" onclick="drRecentDetail(${i})"><td>${drEsc(p.start || p.date || '')}</td><td>${p.code ? drTag(p.code) + ' ' : ''}${drEsc(p.company || '-')}</td><td><b>${drEsc(p.rig || '-')}</b></td><td>${drEsc(p.customer || '-')}</td><td>${drEsc(drRegionLabel(p.region))}</td><td>${p.duration_days ? drNum(p.duration_days, 0) + '일' : '-'}</td><td style="text-align:right;">$${drNum(p.value, 0)}K</td><td style="text-align:right;">${vs}</td><td>${src}</td></tr>`;
+        }).join('') + '</tbody>';
+    }
+    function drRecentDetail(i) {
+        const p = ((dr.data.dayrates || {}).recent || [])[i]; const box = document.getElementById('dr-recent-detail');
+        if (!p || (dr.recentOpen === i)) { dr.recentOpen = null; box.style.display = 'none'; box.innerHTML = ''; return; }
+        dr.recentOpen = i; box.style.display = ''; box.innerHTML = `<div class="dr-row"><span class="co">${drEsc(p.rig)}</span><span class="q">${drEsc(p.quote || '(인용 없음)')}</span></div>`;
+    }
+    // 2d) 시장 수치 (D3): 카드(세그먼트별 최신 · 지난주/4주 전/전 분기 ±) + 시계열(선 + 가동률 보조축, 출처별 점 모양)
+    function drMsSeg(seg) { dr.msSeg = seg; document.querySelectorAll('#dr-ms-seg .period-btn').forEach(b => b.classList.toggle('active', b.dataset.seg === seg)); drRenderMarket(); }
+    const DR_SEG_KO = { floater_total: '가동 부유식 리그(Westwood 주간)', drillship: '드릴십', harsh: '한랭지', jackup: '가동 잭업' };
+    function drRenderMarket() {
+        const d = dr.data, C = drColors(), ms = d.market_series || {}, cards = d.market_cards || {}, seg = dr.msSeg || 'floater_total';
         (dr.msCharts || []).forEach(c => c.destroy()); dr.msCharts = [];
-        const segs = seg === 'harsh' ? ['harsh'] : ['drillship', 'floater_total'];
-        const palette = [C.up, C.down, '#2da44e', '#8250df', '#bf8700'];
-        let note = [];
-        [['dr-chart-ms-rigs', 'contracted_rigs', '계약 리그 수', v => drNum(v, 0) + '척'], ['dr-chart-ms-util', 'utilization', '가동률', v => drNum(v, 0) + '%']].forEach(([id, metric, title, fmt]) => {
-            const pts = segs.flatMap(sg => (ms[metric] || {})[sg] || []);
-            const el = document.getElementById(id); const wrap = el.parentNode;
-            if (pts.length < 2) { note.push(`${title} 수집 중(${pts.length}건)`); wrap.style.opacity = 0.5; }
-            else wrap.style.opacity = 1;
-            const srcs = [...new Set(pts.map(p => p.source_name || '?'))];
-            dr.msCharts.push(new Chart(el, { type: 'scatter', data: { datasets: srcs.map((sname, i) => ({ label: sname, data: pts.filter(p => (p.source_name || '?') === sname).map(p => ({ x: p.as_of, y: p.value, q: p.quote, u: p.url })), backgroundColor: palette[i % palette.length], pointRadius: 4, showLine: srcs.length === 1 })) },
-                options: { responsive: true, maintainAspectRatio: false, parsing: false,
-                    plugins: { title: { display: true, text: `${title} (${seg === 'harsh' ? '한랭지' : '드릴십·부유식 전체'})`, font: fzf(11, 'tab-drilling', { weight: 'bold' }), color: C.text }, legend: { labels: { color: C.muted, font: fzf(9, 'tab-drilling'), boxWidth: 10 } },
-                               tooltip: { callbacks: { label: c => `${c.dataset.label} ${c.raw.x}: ${fmt(c.raw.y)}`, afterLabel: c => (c.raw.q || '').slice(0, 120) } } },
-                    scales: { x: { type: 'category', labels: [...new Set(pts.map(p => p.as_of))].sort(), ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), maxRotation: 0, autoSkip: true }, grid: { display: false } }, y: { ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), callback: fmt }, grid: { color: C.grid } } } } }));
+        const dl = x => !x ? '-' : `<span class="${x.delta > 0 ? 'dr-up' : x.delta < 0 ? 'dr-down' : ''}" title="기준 ${drEsc(x.ref_as_of)}">${x.delta > 0 ? '+' : ''}${drNum(x.delta, 1)}</span>`;
+        const card = (metric, title, fmt) => {
+            const rows = Object.entries(cards[metric] || {}).filter(([, v]) => v);
+            if (!rows.length) return `<div class="dr-kcard"><div class="label">${title}</div><span class="dr-flat">수집 중 — Westwood 주간 글이 쌓이면 표시</span></div>`;
+            return `<div class="dr-kcard"><div class="label">${title}</div>` + rows.map(([sg, v]) => `<div class="dr-row"><span class="co">${DR_SEG_KO[sg] || sg}</span><b>${fmt(v.value)}</b><small>(${drEsc(String(v.as_of).slice(5).replace('-', '/'))})</small><span class="sub">지난주 ${dl(v.week)} · 4주 전 ${dl(v.w4)} · 전 분기 ${dl(v.quarter)}</span><span class="dr-src" title="${drEsc(v.as_of)}">${drEsc(drSrcShort(v.source_name))}</span></div>`).join('') + '</div>';
+        };
+        document.getElementById('dr-ms-cards').innerHTML = card('contracted_rigs', '계약(가동) 리그 수', v => drNum(v, 0) + '척') + card('utilization', '가동률', v => drNum(v, 0) + '%');
+        const segs = seg === 'floater_total' ? ['floater_total'] : [seg];
+        const el = document.getElementById('dr-chart-ms');
+        const rigs = segs.flatMap(sg => ((ms.contracted_rigs || {})[sg] || [])).filter(p => p.value != null && (p.region == null || p.region === '' || p.region === 'other'));
+        const util = segs.flatMap(sg => ((ms.utilization || {})[sg] || [])).filter(p => p.value != null && (p.region == null || p.region === '' || p.region === 'other'));
+        const note = [];
+        if (rigs.length < 2) note.push(`계약 리그 수(${DR_SEG_KO[seg]}) ${rigs.length}건`);
+        if (util.length < 2) note.push(`가동률(${DR_SEG_KO[seg]}) ${util.length}건`);
+        document.getElementById('dr-ms-note').textContent = note.length ? '수집 중 — Westwood 주간 글이 쌓이면 표시: ' + note.join(' · ') : '';
+        if (rigs.length < 2 && util.length < 2) { el.parentNode.style.display = 'none'; return; }
+        el.parentNode.style.display = '';
+        const styles = ['circle', 'triangle', 'rect', 'rectRot', 'cross'];
+        const srcList = [...new Set([...rigs, ...util].map(p => p.source_name || '?'))];
+        const ds = [];
+        srcList.forEach((sname, i) => {
+            const r = rigs.filter(p => (p.source_name || '?') === sname).sort((a, b) => a.as_of < b.as_of ? -1 : 1);
+            if (r.length) ds.push({ type: 'line', label: `계약 리그 수 · ${sname}`, data: r.map(p => ({ x: p.as_of, y: p.value, q: p.quote })), borderColor: C.up, backgroundColor: C.up, pointStyle: styles[i % styles.length], pointRadius: 4, borderWidth: 1.5, yAxisID: 'y', showLine: true });
+            const u = util.filter(p => (p.source_name || '?') === sname).sort((a, b) => a.as_of < b.as_of ? -1 : 1);
+            if (u.length) ds.push({ type: 'line', label: `가동률 · ${sname}`, data: u.map(p => ({ x: p.as_of, y: p.value, q: p.quote })), borderColor: C.down, backgroundColor: C.down, borderDash: [4, 3], pointStyle: styles[i % styles.length], pointRadius: 4, borderWidth: 1.5, yAxisID: 'y2', showLine: true });
         });
-        document.getElementById('dr-ms-note').textContent = note.join(' · ');
+        const labels = [...new Set([...rigs, ...util].map(p => p.as_of))].sort();
+        dr.msCharts.push(new Chart(el, { data: { datasets: ds }, options: { responsive: true, maintainAspectRatio: false, parsing: false,
+            plugins: { title: { display: true, text: `${DR_SEG_KO[seg]} — 계약 리그 수(좌) · 가동률(우)`, font: fzf(12, 'tab-drilling', { weight: 'bold' }), color: C.text }, legend: { labels: { color: C.muted, font: fzf(9, 'tab-drilling'), boxWidth: 10, usePointStyle: true } },
+                       tooltip: { callbacks: { label: c => `${c.dataset.label} ${c.raw.x}: ${drNum(c.raw.y, 0)}${c.dataset.yAxisID === 'y2' ? '%' : '척'}`, afterLabel: c => (c.raw.q || '').slice(0, 120) } } },
+            scales: { x: { type: 'category', labels, ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), maxRotation: 0, autoSkip: true }, grid: { display: false } },
+                      y: { position: 'left', ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), callback: v => drNum(v, 0) + '척' }, grid: { color: C.grid } },
+                      y2: { position: 'right', min: 0, max: 100, display: util.length >= 2, ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), callback: v => v + '%' }, grid: { display: false } } } } }));
     }
-    // 5b) 이벤트 타임라인
-    const DR_EV_KO = { award: '계약', extension: '연장', option: '옵션', termination: '해지', suspension: '중단', reactivation: '재가동', stacking: '스택', retirement: '퇴역', newbuild: '신조', tender: '입찰', ma: 'M&A', guidance: '가이던스', dayrate_change: '단가변경', other: '기타' };
+    // 5b) 이벤트 타임라인 (D4): 한글 배지·한 줄 요약·출처 탭·FSR 묶음
+    const DR_EV_KO = { award: '신규계약', extension: '연장', option: '옵션행사', termination: '해지', suspension: '중단', reactivation: '재가동', stacking: '스택', retirement: '퇴역', dayrate_change: '단가변경', tender: '입찰', ma: 'M&A', guidance: '가이던스', newbuild: '신조', other: '기타' };
     function drEvCls(t) { return ['award', 'extension', 'option', 'reactivation'].includes(t) ? 'pos' : ['termination', 'suspension', 'stacking', 'retirement'].includes(t) ? 'neg' : ''; }
     function drEvFilter(kind, val) { dr.evFilter[kind] = dr.evFilter[kind] === val ? null : val; dr.evShown = 20; drRenderEvents(); }
+    function drEvSrc(v) { dr.evFilter.src = v; dr.evShown = 20; drRenderEvents(); }
     function drEvMore() { dr.evShown += 20; drRenderEvents(); }
+    function drEvGroup(k) { dr.evOpenGroups[k] = !dr.evOpenGroups[k]; drRenderEvents(); }
+    function drEvLine(e) {
+        const bits = [e.company || e.code || '-', e.rig || null, e.region ? drRegionLabel(e.region) : null, DR_EV_KO[e.type] || e.type,
+                      e.duration_days ? `${drNum(e.duration_days, 0)}일` : (e.start ? `시작 ${e.start}` : null), e.dayrate_usd_k != null ? `$${drNum(e.dayrate_usd_k, 0)}K` : null].filter(Boolean);
+        const src = e.source === 'fsr_diff' ? `FSR ${e.date}` : `${e.source_name || e.source} ${e.date}`;
+        return `${bits.map(drEsc).join(' · ')} · (${drEsc(src)})`;
+    }
     function drRenderEvents() {
-        const all = dr.data.events || [], f = dr.evFilter || {};
-        const types = [...new Set(all.map(e => e.type))], codes = [...new Set(all.map(e => e.code).filter(Boolean))];
-        document.getElementById('dr-ev-filters').innerHTML = types.map(t => `<span class="dr-chip ${f.type === t ? 'active' : ''}" onclick="drEvFilter('type', '${t}')">${DR_EV_KO[t] || t} ${all.filter(e => e.type === t).length}</span>`).join('') +
+        const all = dr.data.events || [], f = dr.evFilter || { src: 'all' };
+        document.getElementById('dr-ev-tabs').innerHTML = [['all', '전체'], ['news', '뉴스·공시'], ['fsr', 'FSR 변경']].map(([k, ko]) => `<span class="period-btn ${f.src === k ? 'active' : ''}" onclick="drEvSrc('${k}')">${ko} ${k === 'all' ? all.length : all.filter(e => (k === 'fsr') === (e.source === 'fsr_diff')).length}</span>`).join('');
+        const bySrc = all.filter(e => f.src === 'all' || (f.src === 'fsr') === (e.source === 'fsr_diff'));
+        const types = [...new Set(bySrc.map(e => e.type))], codes = [...new Set(bySrc.map(e => e.code).filter(Boolean))];
+        document.getElementById('dr-ev-filters').innerHTML = types.map(t => `<span class="dr-chip ${f.type === t ? 'active' : ''}" onclick="drEvFilter('type', '${t}')">${DR_EV_KO[t] || t} ${bySrc.filter(e => e.type === t).length}</span>`).join('') +
             codes.map(c => `<span class="dr-chip ${f.code === c ? 'active' : ''}" onclick="drEvFilter('code', '${c}')">${c}</span>`).join('');
-        const evs = all.filter(e => (!f.type || e.type === f.type) && (!f.code || e.code === f.code));
+        const evs = bySrc.filter(e => (!f.type || e.type === f.type) && (!f.code || e.code === f.code));
         const tbl = document.getElementById('dr-ev');
-        if (!evs.length) { tbl.innerHTML = '<tbody><tr><td class="dr-empty">최근 60일 이벤트 없음 (06:00 수집기가 쌓습니다)</td></tr></tbody>'; document.getElementById('dr-ev-more').innerHTML = ''; return; }
-        const rows = evs.slice(0, dr.evShown).map(e => `<tr><td class="num">${drEsc(e.date)}</td><td><span class="dr-badge ${drEvCls(e.type)}">${DR_EV_KO[e.type] || e.type}</span></td>` +
-            `<td>${e.code ? drTag(e.code) + ' ' : ''}${drEsc(e.company || '-')}</td><td><b>${drEsc(e.rig || '-')}</b>${e.rig_type && e.rig_type !== 'unknown' ? `<small>${drEsc(e.rig_type)}</small>` : ''}</td>` +
-            `<td>${drEsc((dr.data.regions || []).find(r => r.key === e.region) ? dr.data.regions.find(r => r.key === e.region).label : e.region || '-')}</td><td>${drEsc(e.customer || '-')}</td>` +
-            `<td class="num">${e.start ? drEsc(e.start) : ''}${e.duration_days ? `<small>${drNum(e.duration_days, 0)}일</small>` : ''}</td><td class="num">${e.dayrate_usd_k != null ? '$' + drNum(e.dayrate_usd_k, 0) + 'K' : '-'}${e.tcv_usd_m != null ? `<small>TCV $${drNum(e.tcv_usd_m, 0)}M</small>` : ''}</td>` +
-            `<td>${e.url ? `<a href="${drEsc(e.url)}" target="_blank" rel="noopener">${drEsc(e.source_name || e.source)}</a>` : drEsc(e.source_name || e.source)}${drI(e.quote)}</td></tr>`).join('');
-        tbl.innerHTML = '<thead><tr><th>날짜</th><th>종류</th><th>회사</th><th>리그</th><th>지역</th><th>고객</th><th>시작·기간</th><th>단가</th><th>출처</th></tr></thead><tbody>' + rows + '</tbody>';
-        document.getElementById('dr-ev-more').innerHTML = evs.length > dr.evShown ? `<span class="dr-more" onclick="drEvMore()">더 보기 (${evs.length - dr.evShown}건 남음)</span>` : '';
+        if (!evs.length) { tbl.innerHTML = '<tbody><tr><td class="dr-empty">이벤트 없음 (06:00 수집기가 쌓습니다)</td></tr></tbody>'; document.getElementById('dr-ev-more').innerHTML = ''; return; }
+        // FSR 변경은 보고서 날짜·회사별 묶음, 뉴스는 개별 행. 표시 단위(묶음 또는 행) 20개씩
+        const units = []; const seenG = {};
+        evs.forEach(e => {
+            if (e.source === 'fsr_diff') { const k = `${e.date}|${e.code}`; if (!seenG[k]) { seenG[k] = { key: k, group: true, date: e.date, code: e.code, name: e.company, items: [] }; units.push(seenG[k]); } seenG[k].items.push(e); }
+            else units.push({ group: false, e });
+        });
+        const row = e => `<tr><td class="num">${drEsc(e.date)}</td><td><span class="dr-badge ${drEvCls(e.type)}">${DR_EV_KO[e.type] || e.type}</span></td><td class="sum">${drEvLine(e)}${e.source !== 'fsr_diff' && e.headline ? `<small>${e.url ? `<a href="${drEsc(e.url)}" target="_blank" rel="noopener">${drEsc(e.headline)}</a>` : drEsc(e.headline)}</small>` : ''}</td><td>${drI(e.quote)}</td></tr>`;
+        let h = '<thead><tr><th>날짜</th><th>종류</th><th style="text-align:left;">요약</th><th></th></tr></thead><tbody>';
+        units.slice(0, dr.evShown).forEach(u => {
+            if (!u.group) { h += row(u.e); return; }
+            const open = !!dr.evOpenGroups[u.key];
+            h += `<tr class="grp" onclick="drEvGroup('${u.key}')"><td class="num">${drEsc(u.date)}</td><td colspan="3"><span class="arrow">${open ? '▾' : '▸'}</span>FSR ${drEsc(u.date.slice(5).replace('-', '/'))} (${drEsc(u.code || u.name || '')}) — 변경 ${u.items.length}건</td></tr>`;
+            if (open) u.items.forEach(e => { h += row(e); });
+        });
+        tbl.innerHTML = h + '</tbody>';
+        document.getElementById('dr-ev-more').innerHTML = units.length > dr.evShown ? `<span class="dr-more" onclick="drEvMore()">더 보기 (${units.length - dr.evShown}건 남음)</span>` : '';
     }
     // 3) 지표 추이 (접이식)
     function drOnTrendToggle() { if (document.getElementById('dr-trend-fold').open && dr.data && !dr.trendDrawn) drRenderTrends(); }
@@ -3462,8 +3651,10 @@
     function drRenderUpcoming() {
         const u = dr.data.upcoming || { gap_rigs: [], earnings_dates: [] };
         const gaps = (u.gap_rigs || []).map(g => `<div class="dr-row"><span class="co">${drEsc(g.code)}</span><span class="v">${drEsc(g.rig)}</span><span class="sub">${drEsc(g.when || '?')}${g.when_date ? ' (' + g.when_date.slice(0, 7) + ')' : ''} · ${drEsc(g.quarter)} 발언</span>${drI(g.quote)}</div>`).join('');
-        const dates = (u.earnings_dates || []).map(e => `<div class="dr-row"><span class="co">${drEsc(e.code)}</span><span class="v">${drEsc(e.date)}</span><span class="sub">다음 실적 발표 (${drEsc(e.name)})</span></div>`).join('');
+        const dates = (u.earnings_dates || []).map(e => `<div class="dr-row"><span class="co">${drEsc(e.code)}</span><span class="v">${drEsc(e.date)}${e.estimated ? ' <span class="dr-stale" title="' + drEsc(e.basis || '') + '">추정</span>' : ''}</span><span class="sub">다음 실적 발표 (${drEsc(e.name)})</span></div>`).join('');
+        const idle = (u.idle_rigs || []).map(g => `<div class="dr-row"><span class="co">${drEsc(g.code)}</span><span class="v">${drEsc(g.rig)}</span><span class="sub">${drEsc(g.when || '')} · ${drEsc(g.quarter)} 발언</span>${drI(g.quote)}</div>`).join('');
         document.getElementById('dr-upcoming').innerHTML =
+            (idle ? `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin-bottom:4px;">현재 유휴/가용 리그 (${(u.idle_rigs || []).length})</div>` + idle + '<div style="height:6px"></div>' : '') +
             `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin-bottom:4px;">공백 예정 리그</div>` + (gaps || '<div class="dr-empty">180일 안 공백 예정 리그 없음</div>') +
             `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin:8px 0 4px;">다음 실적 발표</div>` + (dates || '<div class="dr-empty">180일 안 발표 예정일 정보 없음</div>');
     }

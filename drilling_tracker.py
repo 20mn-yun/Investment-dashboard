@@ -443,6 +443,14 @@ def signals(series_by_code, latest_quarter=None):
     return out
 
 
+def _months_back(month, k):
+    y, m = int(month[:4]), int(month[5:7]) - k
+    while m <= 0:
+        m += 12
+        y -= 1
+    return f"{y}-{m:02d}"
+
+
 def _quarter_end_iso(q):
     """'2026Q3' → 달력 분기 말 ISO 날짜 (결산 12월 가정: 시추 3사 모두 12월)"""
     m = re.match(r"^(20\d\d)Q([1-4])$", str(q or ""))
@@ -494,7 +502,7 @@ def _apply_daily(out):
             pts = []
             for sg in segs:
                 pts += (ms.get(metric) or {}).get(sg) or []
-            pts = [p for p in pts if p.get("value") is not None]
+            pts = [p for p in pts if p.get("value") is not None and (p.get("region") in (None, "", "other"))]   # 업계 전체(global)만 — 지역 수치는 섞지 않음
             if not pts:
                 continue
             pts.sort(key=lambda p: p["as_of"])
@@ -524,25 +532,58 @@ def _apply_daily(out):
     except Exception as e:
         ld, out["daily_error"] = {}, f"leading_dayrates:{type(e).__name__}"
     for seg in ("drillship", "harsh"):
-        months = [m for m in (ld.get(seg) or []) if m.get("rolling3") is not None]
-        if not months:
+        months = [m for m in ((ld.get(seg) or {}).get("months") or []) if m.get("rolling3") is not None]
+        sm = (ld.get(seg) or {}).get("summary") or {}
+        if not months or sm.get("recent") is None:
             continue
-        def packm(m):   # 값 = 3개월 이동 중앙값(rolling3), 표본 n = 3개월 창의 점 수
-            return {"quarter": m["month"], "as_of": m["month"] + "-01", "value": m["rolling3"], "value_text": f"${m['rolling3']:g}K", "n": m.get("rolling3_n") or 0,
-                    "month_median": m["median"], "month_n": m["n"], "source_name": f"체결 {m.get('rolling3_n') or 0}건/3개월(뉴스·FSR)",
-                    "sources": [{"code": None, "value": f"${p['value']:g}K", "quote": f"{p.get('rig') or ''} / {p.get('customer') or ''} ({p.get('source') or ''})", "detail": {"url": p.get("url")}} for p in m["points"]], "dirs": []}
-        latest, prev = packm(months[-1]), (packm(months[-2]) if len(months) >= 2 else None)
+        # 신호 = summary(최근 3개월 창 vs 직전 3개월 창), 임계 ±5%, 양쪽 n>=5 (G). 월 rolling3 는 차트(history)용으로만
+        last = months[-1]
+        pts_recent = [p for m in months if m["month"] >= _months_back(last["month"], 2) for p in m["points"]]
+        latest = {"quarter": sm.get("recent_month") or last["month"], "as_of": (sm.get("recent_month") or last["month"]) + "-01", "value": sm["recent"], "value_text": f"${sm['recent']:g}K",
+                  "n": sm.get("n") or 0, "window": "최근 3개월", "source_name": f"체결 {sm.get('n') or 0}건/최근 3개월(뉴스·FSR)",
+                  "sources": [{"code": None, "value": f"${p['value']:g}K", "quote": f"{p.get('rig') or ''} / {p.get('customer') or ''} ({p.get('source') or ''})", "detail": {"url": p.get("url"), "date": p.get("date")}} for p in pts_recent], "dirs": []}
+        prev = None
+        if sm.get("prev") is not None:
+            prev = {"quarter": _months_back(last["month"], 3), "as_of": _months_back(last["month"], 3) + "-01", "value": sm["prev"], "value_text": f"${sm['prev']:g}K", "n": sm.get("prev_n") or 0,
+                    "window": "직전 3개월", "source_name": f"체결 {sm.get('prev_n') or 0}건/직전 3개월", "sources": [], "dirs": []}
+        chg = sm.get("chg_pct")
         delta = (latest["value"] - prev["value"]) if prev else None
-        enough = latest["n"] >= 3 and prev is not None and prev["n"] >= 3
+        enough = latest["n"] >= 5 and prev is not None and prev["n"] >= 5
         direction = ("stale" if stale_by_date(latest["as_of"]) else "insufficient" if not enough
-                     else ("up" if delta > 15 else "down" if delta < -15 else "flat"))
+                     else ("up" if chg > 5 else "down" if chg < -5 else "flat"))
         old = (sig.get("dayrate_leading") or {}).get(seg)
-        sig.setdefault("dayrate_leading", {})[seg] = {"label": "체결 단가", "unit": "$K/일", "segment": seg, "segment_ko": dict(SEGMENTS)[seg], "latest": latest, "prev": prev, "delta": delta,
-                                                     "direction": direction, "direction_ko": "오래됨" if direction == "stale" else f"표본 부족 {latest['n']}건" if direction == "insufficient" else DIRECTION_KO.get(direction, "-"),
+        sig.setdefault("dayrate_leading", {})[seg] = {"label": "체결 단가", "unit": "$K/일", "segment": seg, "segment_ko": dict(SEGMENTS)[seg], "latest": latest, "prev": prev, "delta": delta, "chg_pct": chg,
+                                                     "direction": direction,
+                                                     "direction_ko": "오래됨" if direction == "stale" else (f"표본 부족(최근 {latest['n']}건, 직전 {(prev or {}).get('n', 0)}건)" if direction == "insufficient" else DIRECTION_KO.get(direction, "-")),
                                                      "stale_quarter": latest["quarter"] if direction == "stale" else None, "n_sources": latest["n"], "statement_quarter": latest["quarter"],
                                                      "primary": "dayrates", "history": [{"quarter": m["month"], "as_of": m["month"] + "-01", "value": m["rolling3"], "month_median": m["median"], "n": m.get("rolling3_n"), "by_code": {}} for m in months], "call_fallback": old}
+    for p in (ld.get("recent") or []):
+        sg = "harsh" if p.get("rig_type") == "harsh" else "drillship"
+        mon = (p.get("date") or "")[:7]
+        row = next((m for m in ((ld.get(sg) or {}).get("months") or []) if m["month"] == mon), None)
+        ref = (row or {}).get("rolling3")
+        p["vs_median_pct"] = round((p["value"] / ref - 1) * 100, 1) if ref else None
     out["dayrates"] = ld
     out["market_series"] = ms
+    # (b2) 시장 수치 카드: 세그먼트별 최신값과 지난주·4주 전·전 분기 대비 (global 시계열에서 가장 가까운 과거 값)
+    def nearest_before(pts, target):
+        cand = [p for p in pts if p["as_of"] <= target]
+        return cand[-1] if cand else None
+    cards = {}
+    for metric in ("contracted_rigs", "utilization"):
+        cards[metric] = {}
+        for seg in ("floater_total", "drillship", "harsh", "jackup"):
+            pts = sorted([p for p in ((ms.get(metric) or {}).get(seg) or []) if p.get("value") is not None and (p.get("region") in (None, "", "other"))], key=lambda p: p["as_of"])
+            if not pts:
+                continue
+            last = pts[-1]
+            ld_ = date.fromisoformat(last["as_of"][:10])
+            def delta(days):
+                ref = nearest_before(pts[:-1], (ld_ - timedelta(days=days)).isoformat())
+                return {"delta": round(last["value"] - ref["value"], 1), "ref_as_of": ref["as_of"]} if ref else None
+            cards[metric][seg] = {"value": last["value"], "as_of": last["as_of"], "unit": last.get("unit"), "source_name": last.get("source_name"), "url": last.get("url"),
+                                  "week": delta(7), "w4": delta(28), "quarter": delta(91), "n": len(pts)}
+    out["market_cards"] = cards
     # (d) FSR 커버리지·공백 리그 → company
     yrs = (today.year + 1, today.year + 2)
     out["fsr"] = {}
@@ -587,7 +628,9 @@ def _apply_daily(out):
             for e in all_evs:
                 if e.get("region") != rkey or e.get("type") not in ("award", "extension", "option"):
                     continue
-                d = e.get("date") or ""
+                d = str(e.get("start") or "")
+                if not re.match(r"^20\d\d-\d\d", d):
+                    d = e.get("date") or ""
                 m = re.match(r"^(20\d\d)-(\d\d)", d)
                 if m and (int(m.group(1)) * 4 + (int(m.group(2)) - 1) // 3 + 1) == qi:
                     n += 1
@@ -597,7 +640,6 @@ def _apply_daily(out):
     recent = [e for e in all_evs if (e.get("date") or "") >= since30 and e.get("type") in ("award", "extension", "option")]
     rates = [e["dayrate_usd_k"] for e in recent if e.get("dayrate_usd_k") is not None]
     out["recent30"] = {"contracts": len(recent), "dayrate_median_k": _median(rates)}
-    out["headline"] = (out.get("headline") or "") + f" · 최근 30일 계약 {len(recent)}건 · 단가 중앙값 " + (f"${_median(rates):g}K" if rates else "-")
     return out
 
 
@@ -714,13 +756,20 @@ def _parse_when(text, ref):
     t = str(text or "").lower()
     months = {m.lower(): i + 1 for i, m in enumerate(calendar.month_name) if m}
     months.update({m.lower(): i + 1 for i, m in enumerate(calendar.month_abbr) if m})
+    ordinal = {"first": 1, "second": 2, "third": 3, "fourth": 4, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4}
+    # '1q27' / 'q1 27' / 'q1-27' 처럼 두 자리 연도가 붙은 분기 표기
+    m = re.search(r"\b(?:q([1-4])|([1-4])q)[\s'\-]?(\d{2})\b", t)
     y = re.search(r"(20\d\d)", t)
+    if m and not y:
+        q = int(m.group(1) or m.group(2))
+        return date(2000 + int(m.group(3)), q * 3, 1)
     if not y:
         return None
     yr = int(y.group(1))
-    m = re.search(r"\b(q[1-4]|[1-4]q)\b", t)
+    m = re.search(r"\b(q[1-4]|[1-4]q)\b", t) or re.search(r"\b(first|second|third|fourth|1st|2nd|3rd|4th)\s+quarter\b", t)
     if m:
-        q = int(re.sub(r"\D", "", m.group(1)))
+        g = m.group(1)
+        q = ordinal.get(g) or int(re.sub(r"\D", "", g))
         return date(yr, q * 3, 1)
     for name, num in months.items():
         if re.search(r"\b" + re.escape(name) + r"\b", t):
@@ -738,32 +787,93 @@ def upcoming(series_by_code, names, window_days=180):
     """180일 창: 회사별 gap_rigs(when 이 최근 분기 이후 또는 해석 불가) + earnings_calls.earnings_dates 의 다음 발표일"""
     today = date.today()
     horizon = today + timedelta(days=window_days)
-    gaps, dates = [], []
+    gaps, idle, dates = [], [], []
+    idle_rx = re.compile(r"currently idle|\bidle\b|available|warm.?stack|cold.?stack", re.I)
     for code, s in series_by_code.items():
         if not s["items"]:
             continue
         cur = s["items"][-1]
         qend = _quarter_end_date(cur["label"]) if cur.get("label") else today
         for g in cur["company"].get("gap_rigs") or []:
-            d = _parse_when(g.get("when"), qend)
+            when = g.get("when") or ""
+            d = _parse_when(when, qend)
+            row = {"code": code, "rig": g.get("rig") or "?", "when": when, "when_date": d.isoformat() if d else None, "quote": g.get("quote") or "", "quarter": cur["quarter"]}
+            if idle_rx.search(when) and (d is None or d <= today):
+                idle.append(row)                       # 현재 유휴/가용 리그 (시점이 과거이거나 없음)
+                continue
             if d is not None and (d < max(qend, today) or d > horizon):
                 continue
-            gaps.append({"code": code, "rig": g.get("rig") or "?", "when": g.get("when") or "", "when_date": d.isoformat() if d else None, "quote": g.get("quote") or "", "quarter": cur["quarter"]})
+            gaps.append(row)
         try:
-            nxt = [d for d in earnings_calls.earnings_dates(code) if today <= d <= horizon]
+            all_d = sorted(earnings_calls.earnings_dates(code))
+            nxt = [d for d in all_d if today <= d <= horizon]
             if nxt:
-                dates.append({"code": code, "name": names.get(code, code), "date": nxt[0].isoformat()})
+                dates.append({"code": code, "name": names.get(code, code), "date": nxt[0].isoformat(), "estimated": False})
+            else:
+                past = [d for d in all_d if d < today]
+                if past:
+                    est = past[-1] + timedelta(days=91)
+                    if est <= horizon:
+                        dates.append({"code": code, "name": names.get(code, code), "date": est.isoformat(), "estimated": True, "basis": f"마지막 발표 {past[-1].isoformat()} + 91일"})
         except Exception:
             pass
     gaps.sort(key=lambda g: (g["when_date"] or "9999", g["code"]))
+    idle.sort(key=lambda g: (g["code"], g["rig"]))
     dates.sort(key=lambda d: d["date"])
-    return {"window_days": window_days, "gap_rigs": gaps, "earnings_dates": dates[:3]}
+    return {"window_days": window_days, "gap_rigs": gaps, "idle_rigs": idle, "earnings_dates": dates[:3]}
+
+
+def cycle_checklist(sig, cds, rm, benchmark=None):
+    """상승 사이클 조건 5개. 각 {name, on: True|False|None, value_text, basis}. stale·insufficient 는 None(판단 불가)."""
+    def blk(key, seg="drillship"):
+        v = sig.get(key)
+        return v if key == "supply" else (v or {}).get(seg)
+    items = []
+    # ① 계약 리그 수 증가
+    b = blk("contracted_rigs")
+    if not b or b["direction"] in ("stale", "insufficient", "none"):
+        items.append({"name": "계약 리그 수 증가", "on": None, "value_text": (b or {}).get("direction_ko") or "자료 없음", "basis": "드릴십, 최신 vs 직전"})
+    else:
+        items.append({"name": "계약 리그 수 증가", "on": b["direction"] == "up", "value_text": f"{(b['prev'] or {}).get('value_text') or '-'} → {b['latest']['value_text']}", "basis": f"{b['latest'].get('source_name') or ''} {b['latest'].get('as_of') or ''}".strip()})
+    # ② 체결 단가 상승
+    b = blk("dayrate_leading")
+    if not b or b["direction"] in ("stale", "insufficient", "none"):
+        items.append({"name": "체결 단가 상승", "on": None, "value_text": (b or {}).get("direction_ko") or "자료 없음", "basis": "최근 3개월 창 vs 직전 3개월 창 · 임계 ±5%"})
+    else:
+        items.append({"name": "체결 단가 상승", "on": b["direction"] == "up", "value_text": f"{(b['prev'] or {}).get('value_text') or '-'} → {b['latest']['value_text']}" + (f" ({b['chg_pct']:+.1f}%)" if b.get("chg_pct") is not None else ""), "basis": f"최근 3개월 {b['latest'].get('n')}건 vs 직전 3개월 {(b['prev'] or {}).get('n')}건 · 임계 ±5%"})
+    # ③ 공급 긴축
+    b = blk("supply")
+    if not b or b["direction"] in ("stale", "none"):
+        items.append({"name": "공급 긴축", "on": None, "value_text": (b or {}).get("direction_ko") or "자료 없음", "basis": "재가동 none·conditional 또는 퇴역>0"})
+    else:
+        src = (b["latest"]["sources"] or [{}])[0].get("detail") or {}
+        items.append({"name": "공급 긴축", "on": b["direction"] == "up", "value_text": b["direction_ko"], "basis": f"재가동 {src.get('stance') or '-'} · 퇴역 {src.get('retirements') if src.get('retirements') is not None else '-'} ({b['latest']['quarter']})"})
+    # ④ 수요 확산
+    sm = (rm or {}).get("summary") or {}
+    if not rm:
+        items.append({"name": "수요 확산", "on": None, "value_text": "자료 없음", "basis": "up 지역 ≥ down 지역 + 2"})
+    else:
+        items.append({"name": "수요 확산", "on": sm.get("up", 0) >= sm.get("down", 0) + 2, "value_text": f"확대 {sm.get('up', 0)} · 약세 {sm.get('down', 0)} · 혼재 {sm.get('mixed', 0)}", "basis": "지역 매트릭스 최근 2분기 추세"})
+    # ⑤ 회사 커버리지 개선 (3사 중 2사 이상: 내년 커버리지 Δ ≥ 0 또는 FSR 내년 커버리지 ≥ 80%)
+    good, known, bits = 0, 0, []
+    for code, cd in (cds or {}).items():
+        m = (cd or {}).get("metrics") or {}
+        d = (m.get("coverage_next") or {}).get("delta")
+        f = (m.get("coverage_fsr_next") or {}).get("latest")
+        ok = (d is not None and d >= 0) or (f is not None and f >= 80)
+        if d is None and f is None:
+            continue
+        known += 1
+        good += ok
+        bits.append(f"{code} {'Δ' + format(d, '+.0f') + 'pp' if d is not None else ''}{' FSR ' + format(f, '.0f') + '%' if f is not None else ''}".strip())
+    items.append({"name": "회사 커버리지 개선", "on": (good >= 2) if known else None, "value_text": f"{good}/{known}사" if known else "자료 없음", "basis": " · ".join(bits) or "내년 커버리지 Δ≥0 또는 FSR ≥80%"})
+    return {"items": items, "on": sum(1 for i in items if i["on"] is True), "off": sum(1 for i in items if i["on"] is False), "unknown": sum(1 for i in items if i["on"] is None), "of": len(items)}
 
 
 def headline(sig, rm):
     """템플릿 한 문장: '상승 n · 보합 n · 하락 n — <상승 지표>, <상승 지역 수>개 지역 수요 확대, <하락 지역명> 약세 (한랭지: …) (오래된 값 n개 제외)'.
     세그먼트가 둘인 지표는 드릴십 기준으로 집계, 한랭지는 괄호로 덧붙임. stale 은 집계에서 제외."""
-    up, down, flat, stale_n, harsh_notes = [], [], [], 0, []
+    up, down, flat, stale_n, insuff_n, harsh_notes = [], [], [], 0, 0, []
     for key, label, _u, _t in SIGNAL_DEFS:
         v = sig.get(key)
         if key == "supply":
@@ -780,6 +890,8 @@ def headline(sig, rm):
         d = blk["direction"]
         if d == "stale":
             stale_n += 1
+        elif d == "insufficient":
+            insuff_n += 1
         elif d == "up":
             up.append(label + ("(긴축)" if key == "supply" else ""))
         elif d == "down":
@@ -801,8 +913,8 @@ def headline(sig, rm):
     text = head + (" — " + ", ".join(parts) if parts else " — 방향 신호 없음")
     if harsh_notes:
         text += f" (한랭지: {', '.join(harsh_notes)})"
-    if stale_n:
-        text += f" (오래된 값 {stale_n}개 제외)"
+    if stale_n or insuff_n:
+        text += " (" + " · ".join(x for x in (f"오래된 값 {stale_n}개 제외" if stale_n else "", f"표본 부족 {insuff_n}개 제외" if insuff_n else "") if x) + ")"
     return text
 
 
@@ -831,8 +943,17 @@ def overview():
     out["region_matrix"] = region_matrix(out["series"])
     out["company_deltas"] = {code: company_deltas(s) for code, s in out["series"].items()}
     out["upcoming"] = upcoming(out["series"], cfg["names"])
+    _apply_daily(out)                      # 일간 수집물 반영 뒤에 문장·체크리스트 (신호판 최종 direction 기준)
     out["headline"] = headline(out["signals"], out["region_matrix"])
-    _apply_daily(out)
+    try:   # C1 주가 기준선
+        import drilling_daily as DD
+        out["benchmark"] = DD.benchmark_stats()
+    except Exception as e:
+        out["benchmark"] = {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+    out["checklist"] = cycle_checklist(out["signals"], out.get("company_deltas"), out.get("region_matrix"), out.get("benchmark"))
+    r30 = out.get("recent30") or {}
+    out["headline"] = (f"상승 사이클 조건 {out['checklist']['on']}/{out['checklist']['of']} · " + out["headline"]
+                       + f" · 최근 30일 계약 {r30.get('contracts', 0)}건 · 단가 중앙값 " + (f"${r30['dayrate_median_k']:g}K" if r30.get("dayrate_median_k") is not None else "-"))
     _save(OVERVIEW, out)
     return out
 
