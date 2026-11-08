@@ -859,12 +859,12 @@ Rules:
 - If only a growth rate is given (e.g. "revenue up 7% to 10% year over year"), fill revenue_growth_pct (and low/high) and leave revenue null.
 - growth_basis: "sequential", "quarter-over-quarter", "from Q3 levels", "versus the prior quarter" -> "qoq"; "year-over-year", "compared to last year", "versus the prior-year quarter" -> "yoy". If the basis is not stated, null.
 - period: the fiscal quarter/year as the company names it, normalized to "YYYYQn" (fiscal year and quarter number, e.g. "2027Q3", "Q4 of fiscal 2026" -> "2026Q4") or "FYYYYY" (e.g. "FY2028"). If the company does not name it, use the natural next quarter / current fiscal year given in the header.
-- adj_ebitda: Adjusted EBITDA (or EBITDA) guidance only.
+- adj_ebitda: Adjusted EBITDA (or EBITDA) guidance only. If op_income or adj_ebitda is stated in a different unit than revenue (e.g. revenue in billions, EBITDA in millions), give that unit in op_income_unit / adj_ebitda_unit ("USD M" or "USD B"); otherwise null.
 - quotes: up to 4 verbatim sentences that contain the numbers you used.
 - Missing values -> null. Never invent numbers.
 Output JSON only, no prose:
 {"next_quarter": {"period": "YYYYQn" or null, "revenue": n, "revenue_low": n, "revenue_high": n, "revenue_growth_pct": n, "revenue_growth_low": n, "revenue_growth_high": n, "growth_basis": "yoy"|"qoq"|null,
-                  "gross_margin_pct": n, "gross_margin_low": n, "gross_margin_high": n, "op_income": n, "eps": n, "adj_ebitda": n, "unit": "USD M"|"USD B"|null},
+                  "gross_margin_pct": n, "gross_margin_low": n, "gross_margin_high": n, "op_income": n, "op_income_unit": null, "eps": n, "adj_ebitda": n, "adj_ebitda_unit": null, "unit": "USD M"|"USD B"|null},
  "fiscal_year": {"period": "FYYYYY" or null, same fields},
  "quotes": ["..."]}"""
 GUIDANCE_RE = re.compile(r"\b(outlook|guidance|guide[sd]?\b|we (?:expect|anticipate|project|forecast)|expected to be|forecast|next quarter|coming quarter|"
@@ -920,6 +920,8 @@ def _clean_guidance_block(j, kind, fiscal_month, fallback_period):
         j = {}
     out = {k: _num_or_none(j.get(k)) for k in _GUIDANCE_NUM_KEYS}
     out["unit"] = (str(j.get("unit")).strip() if j.get("unit") else None)
+    for k in ("op_income_unit", "adj_ebitda_unit"):
+        out[k] = str(j.get(k)).strip() if j.get(k) else None
     out["growth_basis"] = j.get("growth_basis") if j.get("growth_basis") in ("yoy", "qoq") else None
     out["period"] = str(j.get("period") or "").strip()[:12] or None
     out["period_end"] = _guidance_period_end(out["period"], kind, fiscal_month, fallback_period)

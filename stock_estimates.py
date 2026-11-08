@@ -172,9 +172,14 @@ def _call_candidates(code, fin, fm, labels, pending):
                 pending.append({"col": col, "ref_col": "this_year", "gpct": gpct, "detail": base + rng_txt, "quotes": quotes[:2],
                                 "gm": blk.get("gross_margin_pct")})
         for src_key, item in (("op_income", "operating_income"), ("adj_ebitda", "ebitda")):
-            v = earnings_calls._adj_amount(blk.get(src_key), unit)
-            if v is not None:
-                items[item] = {"value": v, "source": "call", "detail": base + (" · 조정 EBITDA" if item == "ebitda" else "")}
+            v = earnings_calls._adj_amount(blk.get(src_key), blk.get(src_key + "_unit") or unit)
+            if v is None:
+                continue
+            note = " · 조정 EBITDA 가이던스" if item == "ebitda" else ""
+            if rev is not None and v > rev * 1.5 and v / 1000 <= rev * 1.5:   # 블록 단위(USD B)를 M 값에 잘못 적용한 경우 보정 (예: EBITDA 450 → $450M)
+                v = v / 1000
+                note += " · 단위 보정(USD B→M, 매출 대비 크기로 판단)"
+            items[item] = {"value": v, "source": "call", "detail": base + note}
         if blk.get("eps") is not None:
             items["eps"] = {"value": float(blk["eps"]), "source": "call", "detail": base}
         if items:
@@ -191,21 +196,25 @@ def _call_candidates(code, fin, fm, labels, pending):
 
 # ---------- ② 리포트 추정 ----------
 def _report_period_end(period, market, fm, today):
-    """리포트 추정 기간 라벨 → 달력 종료월 'YYYY.MM'. 추정(E/F/P 또는 미래 연도)만, 실적(A)·해석 불가는 None"""
+    """리포트 추정 기간 라벨 → (달력 종료월 'YYYY.MM', 종류 'annual'|'quarter'). 추정(E/F/P 또는 미래 연도)만, 실적(A)·해석 불가는 None.
+    연간 라벨은 올해/다음해 열에만, 분기 라벨은 다음분기 열에만 맞춘다(결산 12월 회사는 연말 라벨이 다음 분기 라벨과 같을 수 있음)."""
     s = str(period or "").strip().upper().replace(" ", "").replace("(", "").replace(")", "")
     m = re.match(r"^FY([A-Z]{3})-?(\d\d)[EFP]?$", s)          # FYJAN-27E
     if m and m.group(1) in _MONTHS:
-        return f"20{m.group(2)}.{_MONTHS[m.group(1)]:02d}"
+        return f"20{m.group(2)}.{_MONTHS[m.group(1)]:02d}", "annual"
     m = re.match(r"^(?:FY)?(20\d\d|\d\d)([EFPA])?$", s)        # 2026E, FY27E, 2026
     if m:
         y = int(m.group(1)) if len(m.group(1)) == 4 else 2000 + int(m.group(1))
         k = m.group(2)
         if k == "A" or (k is None and y < today.year):
             return None
-        return f"{y}.{fm:02d}"
+        return f"{y}.{fm:02d}", "annual"
     m = re.match(r"^(20\d\d)\.(\d\d)([EFP])?$", s)              # 2026.12E
     if m:
-        return f"{m.group(1)}.{m.group(2)}"
+        return f"{m.group(1)}.{m.group(2)}", "annual"
+    m = re.match(r"^(\d\d)/(\d\d)([EFP])?$", s)                  # 26/12E (연/월, 회계연도 말)
+    if m:
+        return f"20{m.group(1)}.{m.group(2)}", "annual"
     m = re.match(r"^(20\d\d)Q([1-4])([EFP])?$", s)                 # 2026Q3E
     m2 = None if m else re.match(r"^([1-4])Q(20\d\d|\d\d)([EFP])?$", s)   # 3Q26E
     if m or m2:
@@ -215,8 +224,8 @@ def _report_period_end(period, market, fm, today):
             q = int(m2.group(1))
             y = int(m2.group(2)) if len(m2.group(2)) == 4 else 2000 + int(m2.group(2))
         if market == "KR" or fm == 12:
-            return f"{y}.{q * 3:02d}"
-        return earnings_calls._fq_end(y, q, fm)
+            return f"{y}.{q * 3:02d}", "quarter"
+        return earnings_calls._fq_end(y, q, fm), "quarter"
     return None
 
 
@@ -233,15 +242,19 @@ def _report_candidates(market, code, fm, labels, today):
             continue
         broker = s.get("broker") or f"#{s.get('message_id')}"
         for e in s.get("estimates") or []:
-            end = _report_period_end(e.get("period_raw") or e.get("period"), market, fm, today)
-            if not end:
+            pe = _report_period_end(e.get("period_raw") or e.get("period"), market, fm, today)
+            if not pe:
                 continue
-            col = next((c for c in ("next_quarter", "this_year", "next_year") if labels[c] == end), None)
+            end, kind = pe
+            cols = ("next_quarter",) if kind == "quarter" else ("this_year", "next_year")
+            col = next((c for c in cols if labels[c] == end), None)
             if not col:
                 continue
             mult = _UNIT_MULT.get(e.get("unit") or "", 1e8 if market == "KR" else 1e6)
-            for key in ("revenue", "operating_income", "net_income", "eps"):
+            for key in ("revenue", "operating_income", "net_income", "eps", "ebitda"):
                 v = e.get(key)
+                if key == "ebitda" and v in (None, 0, 0.0):
+                    v = e.get("adj_ebitda")                   # EBITDA 행이 없고 조정 EBITDA 만 있으면 그것
                 if v in (None, 0, 0.0):
                     continue
                 val = float(v) * (1 if key == "eps" else mult)

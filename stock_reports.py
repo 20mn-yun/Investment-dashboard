@@ -326,6 +326,7 @@ AI_SYSTEM = """당신은 한국 증권사 리포트를 구조화하는 분석 �
 - 숫자는 쉼표 없는 숫자(단위는 별도 필드). 금액 단위는 표에 적힌 그대로 적는다(예: "십억원", "억원", "조원", "백만달러").
 - 연도 라벨은 표 머리글 그대로 쓴다(예: 2026F, 2026E, 2027(E), 3Q26P). 분기 추정도 허용.
 - 추정 실적의 순이익은 지배주주(지배지분) 순이익이 있으면 그것, 없으면 당기순이익을 쓰고 어느 쪽인지 "순이익기준"에 적는다.
+- 추정 표에 EBITDA 행이 있으면 "EBITDA"에, 조정(Adjusted) EBITDA 행이 있으면 "조정EBITDA"에 적는다(같은 단위). 없으면 null.
 - 목표주가 이력은 Compliance 표(제시일자·투자의견·목표주가)에서 날짜순으로 적는다. 없으면 빈 배열.
 - 이전 목표주가 = 이력에서 직전 제시 값, 또는 본문의 "상향/하향/유지" 문구로 알 수 있으면 그 값. 변경 방향은 상향|하향|유지|신규|null.
 - 리포트 유형: 기업분석 | 실적리뷰 | 코멘트 | 산업 | 전략시황 | 기타.
@@ -334,7 +335,7 @@ AI_SYSTEM = """당신은 한국 증권사 리포트를 구조화하는 분석 �
 - 출력은 JSON 하나만. 설명·마크다운·코드펜스 금지. 형식:
 {"증권사": "", "애널리스트": "", "발행일": "YYYY-MM-DD 또는 null", "리포트유형": "", "투자의견": "", "목표주가": 0, "이전목표주가": 0,
  "목표주가변경": "", "요약": ["", ""], "순이익기준": "지배주주|당기",
- "추정실적": [{"기간": "2026F", "매출액": null, "영업이익": null, "순이익": null, "EPS": null, "단위": "십억원"}],
+ "추정실적": [{"기간": "2026F", "매출액": null, "영업이익": null, "순이익": null, "EBITDA": null, "조정EBITDA": null, "EPS": null, "단위": "십억원"}],
  "목표주가이력": [{"날짜": "YYYY-MM-DD", "목표주가": 0, "투자의견": ""}]}"""
 
 
@@ -495,7 +496,9 @@ def normalize_summary(raw, item, price=None, market="KR"):
         unit = e.get("단위") or ""
         out["estimates"].append({"period": _norm_period(e.get("기간")), "period_raw": e.get("기간"),
                                  "revenue": _to_unit(_num(e.get("매출액")), unit, market), "operating_income": _to_unit(_num(e.get("영업이익")), unit, market),
-                                 "net_income": _to_unit(_num(e.get("순이익")), unit, market), "eps": _num(e.get("EPS")), "unit_raw": unit, "unit": unit_out})
+                                 "net_income": _to_unit(_num(e.get("순이익")), unit, market), "eps": _num(e.get("EPS")),
+                                 "ebitda": _to_unit(_num(e.get("EBITDA")), unit, market), "adj_ebitda": _to_unit(_num(e.get("조정EBITDA")), unit, market),
+                                 "unit_raw": unit, "unit": unit_out})
     for h in raw.get("목표주가이력") or []:
         if isinstance(h, dict) and _num(h.get("목표주가")):
             d = str(h.get("날짜") or "")
@@ -959,6 +962,32 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
     except Exception as e:
         job.update(stage="failed", error=f"{type(e).__name__}: {e}", finished_at=_now())
         print(f"[stock_reports] {market} {code} 작업 실패: {type(e).__name__}: {e}", flush=True)
+
+
+def resummarize(market, code, name="", limit=3):
+    """이미 정리된 최근 리포트 limit 건을 다시 AI 정리 (5-F: 스키마에 EBITDA 추가 뒤 소급용). 검색·받기 없음, 05:30 루프에서 부르지 않음.
+    ai_budget reports/reports_us 한도는 summarize_one 안에서 확인. 반환 [{message_id, broker, status, ebitda_n}]"""
+    st = _load_json(_state_path(market, code), None)
+    if not st:
+        return []
+    summaries = _load_json(_sum_path(market, code), {})
+    items = [it for it in st["items"].values() if it.get("pdf") and os.path.exists(os.path.join(_BD, it["pdf"]))
+             and (summaries.get(str(it["message_id"])) or {}).get("status") == "ok"]
+    items.sort(key=lambda x: x.get("date") or "", reverse=True)
+    price = _current_price(market, code)
+    annual_rev = annual_revenue(market, code, name)
+    out = []
+    for it in items[:max(0, int(limit or 0))]:
+        k = str(it["message_id"])
+        res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price, annual_rev, summaries.get(k))
+        if res.get("status") == "ok":
+            summaries[k] = res
+            _save_json(_sum_path(market, code), summaries)
+        out.append({"message_id": k, "broker": res.get("broker") or it.get("broker"), "status": res.get("status"),
+                    "ebitda_n": sum(1 for e in (res.get("estimates") or []) if e.get("ebitda") is not None or e.get("adj_ebitda") is not None)})
+        if res.get("status") == "ai_limit":
+            break
+    return out
 
 
 def start_job(market, code, name, ai_limit=None, refresh_search=True):

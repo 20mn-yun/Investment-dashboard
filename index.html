@@ -9145,7 +9145,8 @@
     function svEstCols(keys) {
         const e = sv.est;
         if (!e || !e.ok || !e.columns) return [];
-        const names = sv.view === 'quarter' ? [['next_quarter', '다음분기E']] : sv.view === 'ttm' ? [['this_year', '올해E']] : [['this_year', '올해E'], ['next_year', '다음해E']];
+        // 연도 보기는 먼 미래가 왼쪽(다음해E → 올해E → 최신 실적 → 과거) 으로 한 방향
+        const names = sv.view === 'quarter' ? [['next_quarter', '다음분기E']] : sv.view === 'ttm' ? [['this_year', '올해E']] : [['next_year', '다음해E'], ['this_year', '올해E']];
         return names.map(([k, title]) => ({ key: k, title, col: e.columns[k] }))
             .filter(c => c.col && c.col.items && keys.some(([k]) => c.col.items[k] && c.col.items[k].value != null));
     }
