@@ -703,6 +703,9 @@ def status_us(code, name=""):
             # 5-A 조정 EBITDA (달러 원값·단위·인용). 추출 전이면 None
             "adjusted": ({k: d["adjusted"].get(k) for k in ("status", "adj_ebitda", "value", "unit", "label", "quote", "reason")}
                          if st == "ok" and d.get("adjusted") else None),
+            # 5-C 가이던스 숫자(다음 분기·회계연도, 회사 단위 그대로). 추출 전이면 None
+            "guidance": ({k: d["guidance"].get(k) for k in ("status", "next_quarter", "fiscal_year", "quotes", "reason", "at")}
+                         if st == "ok" and d.get("guidance") else None),
         })
     return {"market": "US", "code": code, "name": name, "quarters": rows, "av": av_counters(),
             "ai": {"summary_used": ai_budget.used("call_summary"), "summary_limit": ai_budget.DEFAULT_LIMITS["call_summary"],
@@ -724,8 +727,13 @@ _ADJ_RE = re.compile(r"ebitda", re.I)
 
 
 def _adj_excerpts(transcript):
-    """EBITDA 가 들어간 문단 ±2문단만 모아 텍스트로. 문단 = 세그먼트 content 를 빈 줄로 나눈 뒤, 긴 것은 문장 단위로 600자 안팎씩 묶은 것.
-    길이 상한(ADJ_MAX_CHARS)을 넘으면 앞뒤 문단을 먼저 줄이고, 그래도 넘으면 EBITDA 문단만 남긴다 (언급 문단은 잘리지 않게)."""
+    """EBITDA 가 들어간 문단 ±2문단만 모아 텍스트로 (5-A). _excerpts 의 EBITDA 특화 호출."""
+    return _excerpts(transcript, _ADJ_RE, ADJ_CONTEXT_PARAS, ADJ_MAX_CHARS)
+
+
+def _excerpts(transcript, rx, ctx_paras=2, max_chars=12000):
+    """rx 에 걸리는 문단 ±ctx_paras 문단만 모아 텍스트로. 문단 = 세그먼트 content 를 빈 줄로 나눈 뒤, 긴 것은 문장 단위로 600자 안팎씩 묶은 것.
+    길이 상한을 넘으면 앞뒤 문단을 먼저 줄이고, 그래도 넘으면 걸린 문단만 남긴다 (언급 문단은 잘리지 않게). 반환 (텍스트, 걸린 문단 수)."""
     paras = []
     for s in transcript:
         who = f"{s.get('speaker') or ''} ({s.get('title') or ''})"
@@ -744,7 +752,7 @@ def _adj_excerpts(transcript):
                 buf += sent + " "
             if buf.strip():
                 paras.append((who, buf.strip()))
-    hits = [i for i, (_, p) in enumerate(paras) if _ADJ_RE.search(p)]
+    hits = [i for i, (_, p) in enumerate(paras) if rx.search(p)]
     if not hits:
         return "", 0
 
@@ -759,11 +767,11 @@ def _adj_excerpts(transcript):
             last = who
         return "\n\n".join(out)
 
-    for ctx in (ADJ_CONTEXT_PARAS, 1, 0):
+    for ctx in sorted({ctx_paras, 1, 0}, reverse=True):
         text = build(ctx)
-        if len(text) <= ADJ_MAX_CHARS:
+        if len(text) <= max_chars:
             return text, len(hits)
-    return text[:ADJ_MAX_CHARS], len(hits)
+    return text[:max_chars], len(hits)
 
 
 def _adj_amount(v, unit):
@@ -839,6 +847,166 @@ def extract_adjusted_missing(code, name="", limit=None, max_n=None):
         if max_n and len(out) >= max_n:
             break
     return out
+
+
+
+# ---------- 가이던스 숫자 추출 (5-C): 원문의 outlook/guidance 문단만 보내 다음 분기·회계연도 전망치를 JSON 으로. 분기 파일 "guidance" 키에 저장 ----------
+GUIDANCE_SYSTEM = """You extract forward-looking GUIDANCE numbers from excerpts of a US earnings call transcript (management's outlook for the NEXT quarter and the CURRENT/NEXT fiscal year).
+Rules:
+- Use only numbers management explicitly states as outlook/guidance/expectation for FUTURE periods. Ignore results for the quarter just reported, prior periods and analyst questions.
+- Keep each number in the unit management used (unit: "USD M" or "USD B"; EPS in USD per share; margins and growth in percent). Do not convert, sum or annualize.
+- A range ("$1.42B to $1.47B", "7% to 10%") -> fill *_low and *_high and set the main field to the midpoint. "plus or minus 2%" around X -> low = X*(1-0.02), high = X*(1+0.02).
+- If only a growth rate is given (e.g. "revenue up 7% to 10% year over year"), fill revenue_growth_pct (and low/high) and leave revenue null.
+- growth_basis: "sequential", "quarter-over-quarter", "from Q3 levels", "versus the prior quarter" -> "qoq"; "year-over-year", "compared to last year", "versus the prior-year quarter" -> "yoy". If the basis is not stated, null.
+- period: the fiscal quarter/year as the company names it, normalized to "YYYYQn" (fiscal year and quarter number, e.g. "2027Q3", "Q4 of fiscal 2026" -> "2026Q4") or "FYYYYY" (e.g. "FY2028"). If the company does not name it, use the natural next quarter / current fiscal year given in the header.
+- adj_ebitda: Adjusted EBITDA (or EBITDA) guidance only.
+- quotes: up to 4 verbatim sentences that contain the numbers you used.
+- Missing values -> null. Never invent numbers.
+Output JSON only, no prose:
+{"next_quarter": {"period": "YYYYQn" or null, "revenue": n, "revenue_low": n, "revenue_high": n, "revenue_growth_pct": n, "revenue_growth_low": n, "revenue_growth_high": n, "growth_basis": "yoy"|"qoq"|null,
+                  "gross_margin_pct": n, "gross_margin_low": n, "gross_margin_high": n, "op_income": n, "eps": n, "adj_ebitda": n, "unit": "USD M"|"USD B"|null},
+ "fiscal_year": {"period": "FYYYYY" or null, same fields},
+ "quotes": ["..."]}"""
+GUIDANCE_RE = re.compile(r"\b(outlook|guidance|guide[sd]?\b|we (?:expect|anticipate|project|forecast)|expected to be|forecast|next quarter|coming quarter|"
+                         r"full[- ]year|fiscal (?:year|20\d\d|'?\d\d)|for (?:the )?(?:first|second|third|fourth) quarter|for (?:fiscal )?q[1-4]\b|"
+                         r"for (?:fiscal )?20\d\d|remainder of the year|second half)", re.I)
+GUIDANCE_CONTEXT_PARAS = 1
+GUIDANCE_MAX_CHARS = 16000
+_GUIDANCE_NUM_KEYS = ("revenue", "revenue_low", "revenue_high", "revenue_growth_pct", "revenue_growth_low", "revenue_growth_high",
+                      "gross_margin_pct", "gross_margin_low", "gross_margin_high", "op_income", "eps", "adj_ebitda")
+
+
+def _fq_end(fy, q, fiscal_month):
+    """회계연도·분기 번호·결산월 → 달력 분기 말 라벨 'YYYY.MM' (av_quarter 의 역변환)"""
+    fm = int(fiscal_month or 12)
+    m, y = fm - 3 * (4 - int(q)), int(fy)
+    while m <= 0:
+        m += 12
+        y -= 1
+    return f"{y}.{m:02d}"
+
+
+def _next_label(label):
+    y, m = int(label[:4]), int(label[5:7])
+    m += 3
+    if m > 12:
+        m -= 12
+        y += 1
+    return f"{y}.{m:02d}"
+
+
+def _guidance_period_end(period, kind, fiscal_month, fallback):
+    """AI 가 준 period('2027Q3' / 'FY2028') → 달력 종료월 라벨. 해석 못 하면 fallback(헤더에 알려준 자연스러운 기간)."""
+    s = str(period or "").strip().upper().replace(" ", "")
+    m = re.match(r"^(?:FY)?(20\d\d)Q([1-4])$", s) or re.match(r"^Q([1-4])(?:FY)?(20\d\d)$", s)
+    if m and kind == "next_quarter":
+        fy, q = (m.group(1), m.group(2)) if s[0] != "Q" else (m.group(2), m.group(1))
+        return _fq_end(fy, q, fiscal_month)
+    m = re.match(r"^(?:FY)?(20\d\d)$", s)
+    if m and kind == "fiscal_year":
+        return f"{m.group(1)}.{int(fiscal_month or 12):02d}"
+    return fallback
+
+
+def _num_or_none(v):
+    try:
+        return None if v is None or isinstance(v, bool) else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _clean_guidance_block(j, kind, fiscal_month, fallback_period):
+    if not isinstance(j, dict):
+        j = {}
+    out = {k: _num_or_none(j.get(k)) for k in _GUIDANCE_NUM_KEYS}
+    out["unit"] = (str(j.get("unit")).strip() if j.get("unit") else None)
+    out["growth_basis"] = j.get("growth_basis") if j.get("growth_basis") in ("yoy", "qoq") else None
+    out["period"] = str(j.get("period") or "").strip()[:12] or None
+    out["period_end"] = _guidance_period_end(out["period"], kind, fiscal_month, fallback_period)
+    out["has_any"] = any(out[k] is not None for k in _GUIDANCE_NUM_KEYS)
+    return out
+
+
+def extract_guidance(code, quarter, name="", limit=None, force=False):
+    """가이던스 숫자 1건 (한도 kind='call_guidance', Haiku). 원문에서 outlook/guidance 문단 ±1 만 보내 다음 분기·회계연도 전망치를 JSON 으로 받는다.
+    반환 {status: ok|none|cached|no_transcript|ai_limit|ai_error, guidance}. 결과는 분기 파일 "guidance" 키에 저장하고, 한 번 뽑으면(ok·none) 다시 부르지 않는다.
+    금액은 회사가 말한 단위(USD M/B) 그대로 저장하고 환산하지 않는다(환산은 stock_estimates 가)."""
+    import us_financials
+    st, d = transcript_state(code, quarter)
+    if st != "ok":
+        return {"status": "no_transcript"}
+    cur = d.get("guidance")
+    if cur and not force and cur.get("status") in ("ok", "none"):
+        return {"status": "cached", "guidance": cur}
+    text, n_hits = _excerpts(d["transcript"], GUIDANCE_RE, GUIDANCE_CONTEXT_PARAS, GUIDANCE_MAX_CHARS)
+    if not text:
+        res = {"status": "none", "reason": "원문에 전망 문단 없음", "at": _now(), "mentions": 0}
+        d["guidance"] = res
+        _save_json(_p(code, quarter), d)
+        return {"status": "none", "guidance": res}
+    allowed, n = ai_budget.take("call_guidance", limit=limit)
+    if not allowed:
+        return {"status": "ai_limit", "used": n}
+    # 헤더: 이 분기 라벨(달력 분기 말)·결산월·자연스러운 다음 분기/회계연도 라벨
+    cache = us_financials._load_cache(code)
+    fm = us_financials.fiscal_month(cache) if cache else 12
+    qinfo = next((q for q in quarters(code) if q["quarter"] == quarter), None)
+    this_end = qinfo["label"] if qinfo else None
+    nq_end = _next_label(this_end) if this_end else None
+    m = re.match(r"^(20\d\d)Q([1-4])$", quarter)
+    fy, q = (int(m.group(1)), int(m.group(2))) if m else (None, None)
+    nq_name = (f"{fy}Q{q + 1}" if q and q < 4 else f"{fy + 1}Q1") if fy else "next quarter"
+    fy_name = f"FY{fy}" if fy else "current fiscal year"
+    fy_end = f"{fy}.{fm:02d}" if fy else None
+    user = (f"Company: {name or code} ({code})\nQuarter just reported: {quarter} (fiscal; calendar quarter ended {this_end or '?'}). Fiscal year ends in month {fm}.\n"
+            f"Natural next quarter: {nq_name} (calendar quarter ending {nq_end or '?'}). Current fiscal year: {fy_name} (ending {fy_end or '?'}).\n\n"
+            f"Excerpts ({n_hits} outlook mentions):\n\n{text}")
+    t0 = time.time()
+    try:
+        out, tin, tout, model = us_financials._call_ai_full(GUIDANCE_SYSTEM, user, max_tokens=900, task="call_guidance")
+        j = _parse_json(out)
+    except Exception as e:
+        print(f"[earnings_calls] {code} {quarter} 가이던스 추출 실패: {type(e).__name__}: {str(e)[:120]}", flush=True)
+        return {"status": f"ai_error:{type(e).__name__}", "error": str(e)[:300]}
+    nq = _clean_guidance_block(j.get("next_quarter"), "next_quarter", fm, nq_end)
+    fyb = _clean_guidance_block(j.get("fiscal_year"), "fiscal_year", fm, fy_end)
+    quotes = [str(x)[:400] for x in (j.get("quotes") or []) if x][:4]
+    ok = nq["has_any"] or fyb["has_any"]
+    res = {"status": "ok" if ok else "none", "next_quarter": nq, "fiscal_year": fyb, "quotes": quotes, "mentions": n_hits,
+           "fiscal_month": fm, "tokens": {"input": tin, "output": tout}, "seconds": round(time.time() - t0, 1), "at": _now(), "model": model}
+    if not ok:
+        res["reason"] = "전망 문단은 있으나 숫자 가이던스를 찾지 못함"
+    d["guidance"] = res
+    _save_json(_p(code, quarter), d)
+    print(f"[earnings_calls] {code} {quarter} 가이던스: {res['status']} nq_rev={nq.get('revenue')} {nq.get('unit')} fy={fyb.get('period')} "
+          f"(오늘 {n}/{ai_budget.resolve_limit('call_guidance', limit)})", flush=True)
+    return {"status": res["status"], "guidance": res}
+
+
+def extract_guidance_missing(code, name="", limit=None):
+    """원문이 있는 가장 최근 분기 1건만, guidance 가 아직 없으면 추출 (05:30 루프). 반환 [{quarter, status}]"""
+    for q in reversed(quarters(code)):
+        st, d = transcript_state(code, q["quarter"])
+        if st != "ok":
+            continue
+        if (d.get("guidance") or {}).get("status") in ("ok", "none"):
+            return []
+        r = extract_guidance(code, q["quarter"], name, limit=limit)
+        return [{"quarter": q["quarter"], "status": r.get("status")}]
+    return []
+
+
+def latest_guidance(code):
+    """원문이 있는 가장 최근 분기의 guidance(status ok) 와 그 분기 정보. 없으면 None. (stock_estimates 용, AI 호출 없음)"""
+    for q in reversed(quarters(code)):
+        st, d = transcript_state(code, q["quarter"])
+        if st != "ok":
+            continue
+        g = d.get("guidance")
+        if g and g.get("status") == "ok":
+            return {"quarter": q["quarter"], "label": q["label"], "guidance": g}
+        return None
+    return None
 
 
 def ensure_recent(code, name="", n=2, summarize_too=True, summary_limit=None):

@@ -27,6 +27,7 @@ DEFAULT_LIMITS = {
     "ir_release": 20,        # 8-K 실적 보도자료 요약 (sec_filings)
     "ocr": 20,               # 이미지 PDF 리포트 OCR (stock_reports, qlmanage → codex tg_ocr)
     "adj_ebitda": 50,        # 5-A 컨콜 원문에서 조정 EBITDA 추출 (earnings_calls.extract_adjusted, Haiku)
+    "call_guidance": 50,     # 5-C 컨콜 원문에서 다음분기·연간 가이던스 숫자 추출 (earnings_calls.extract_guidance, Haiku)
 }
 
 _lock = threading.Lock()

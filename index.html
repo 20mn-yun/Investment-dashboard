@@ -1672,6 +1672,10 @@
         .sv-sum td small, .sv-sum td:first-child small { display: block; font-size: var(--fs-xs); color: var(--text-dim); font-weight: normal; }
         .sv-sum td small.sv-up { color: var(--up); }
         .sv-sum td small.sv-down { color: var(--accent); }
+        /* 5-C 추정 열: 기울임체 · 왼쪽 점선 · 연한 배경 · 출처 배지 */
+        .sv-sum th.sv-est, .sv-sum td.sv-est { font-style: italic; cursor: default; background: rgba(127, 127, 127, 0.08); border-left: 1px dashed var(--text-muted); border-right: 1px dashed var(--text-muted); }
+        .sv-sum td.sv-est small.sv-est-src { font-style: normal; font-size: var(--fs-xs); color: var(--text-dim); display: block; }
+        .sv-top-left .sv-sum.sv-has-est th:first-child, .sv-top-left .sv-sum.sv-has-est td:first-child { width: 16%; }
         /* 차트 카드 */
         .sv-top { display: grid; grid-template-columns: 55fr 45fr; gap: 14px; align-items: stretch; margin-bottom: 8px; }
         .sv-top-left { min-width: 0; }
@@ -8570,7 +8574,7 @@
     const sv = { market: null, code: null, name: '', table: 'IS', view: 'ttm', years: '5', mode: 'chart', fin: null, flat: {},
                  prices: null, selLb: null, charts: [], summary: null, token: 0, pollTimer: null, disc: [], discShown: 0,
                  searchTimer: null, results: [],
-                 unit: 'eok', unitMax: 0,
+                 unit: 'eok', unitMax: 0, est: null, rszTimer: null, guidAt: undefined, guidTries: 0,
                  rp: null, rpTimer: null, rpOpen: {},
                  peers: null, peersTimer: null, prSort: { col: null, asc: true }, prOpen: {}, prAddTimer: null,
                  calls: null, callsTimer: null, callQ: null, callLang: 'ko', callFull: { en: null, ko: null }, callShow: false, callOpen: {},
@@ -8721,6 +8725,7 @@
         clearTimeout(sv.peersTimer);
         sv.peers = null; sv.prOpen = {}; sv.prSort = { col: null, asc: true };
         sv.rp = null; sv.rpOpen = {};
+        sv.est = null; sv.guidAt = undefined; sv.guidTries = 0;
         sv.calls = null; sv.callQ = null; sv.callLang = 'ko'; sv.callFull = { en: null, ko: null }; sv.callShow = false; sv.callOpen = {};
         (sv.charts || []).forEach(c => c.destroy());
         Object.assign(sv, { market, code, name, fin: null, flat: {}, prices: null, selLb: null, charts: [], summary: null, disc: [], discShown: 0 });
@@ -8844,6 +8849,7 @@
         sv.fin = d;
         sv.flat = {};
         Object.values(d.statements).forEach(st => Object.entries(st.items).forEach(([k, it]) => { sv.flat[k] = it; }));
+        svLoadEstimates(t);   // 5-C 추정 열 (저장본 조합, 빠름)
         if (d.updating) {
             const p = d.updating;
             status.innerHTML = `<div class="sv-note">최신 보고서 확인 중... ${p.total ? `${p.done} / ${p.total}` : ''}</div>`;
@@ -9135,14 +9141,49 @@
         return n / ((e0 + e1) / 2) * 100;
     }
 
-    // 요약 표: 행 = 핵심 3개, 열 = 최근 5개 기간(최신이 왼쪽), 칸 = 값 + 전년 대비
+    // 5-C 추정 열: 보기별로 쓸 열 (분기: 다음분기E, 4분기누적: 올해E, 연도: 올해E·다음해E). 값이 하나도 없는 열은 숨김
+    function svEstCols(keys) {
+        const e = sv.est;
+        if (!e || !e.ok || !e.columns) return [];
+        const names = sv.view === 'quarter' ? [['next_quarter', '다음분기E']] : sv.view === 'ttm' ? [['this_year', '올해E']] : [['this_year', '올해E'], ['next_year', '다음해E']];
+        return names.map(([k, title]) => ({ key: k, title, col: e.columns[k] }))
+            .filter(c => c.col && c.col.items && keys.some(([k]) => c.col.items[k] && c.col.items[k].value != null));
+    }
+    async function svLoadEstimates(t) {
+        try {
+            const res = await fetch(API_BASE + `/api/stock/estimates?market=${sv.market}&code=${encodeURIComponent(sv.code)}`);
+            const d = await res.json();
+            if (t !== sv.token) return;
+            sv.est = res.ok ? d : null;
+        } catch (e) {
+            if (t !== sv.token) return;
+            sv.est = null;
+        }
+        if (sv.fin && sv.fin.status === 'ready') svRenderSumTable();
+    }
+    function svEstCell(k, c) {
+        const it = c.col.items[k];
+        if (!it || it.value == null) return '<td class="sv-est">-</td>';
+        const g = svGrowth(it.value, it.prev_actual);          // 전년 같은 기간 "실적" 대비
+        const gs = g == null ? '<small>-</small>'
+            : `<small class="${g > 0 ? 'sv-up' : g < 0 ? 'sv-down' : ''}">${g > 0 ? '▲' : g < 0 ? '▼' : ''} ${Math.abs(g).toFixed(1)}%</small>`;
+        const src = it.source === 'call' ? (it.converted ? '컨콜·환산' : '컨콜') : it.source === 'reports' ? `리포트 ${it.n || 1}` : '컨센';
+        return `<td class="sv-est" title="${svEsc(it.detail || '')}">${svAmt(it.value)}${gs}<small class="sv-est-src">${src}</small></td>`;
+    }
+
+    // 요약 표: 행 = 핵심 3개, 열 = [추정 열] + 최근 5개 기간(최신이 왼쪽), 칸 = 값 + 전년 대비. 820px 이하에서 추정 열이 있으면 실적 열은 4개
     function svRenderSumTable() {
-        const periods = svPeriods().slice(-5).reverse();
-        const keys = SV_KEYS[sv.table].filter(([k, , optional]) => (k !== 'ebitda' || svEbitdaOn()) && (!optional || periods.some(lb => svV(k, lb) != null)));
-        let h = `<thead><tr><th><small>단위 ${svUnitName()}</small></th>` + periods.map(lb =>
-            `<th data-lb="${lb}" class="${lb === sv.selLb ? 'sv-sel' : ''}">${lb}</th>`).join('') + '</tr></thead><tbody>';
+        const estAll = svEstCols(SV_KEYS[sv.table].filter(([k]) => k !== 'ebitda' || svEbitdaOn()));
+        const narrow = estAll.length && window.innerWidth <= 820;
+        const periods = svPeriods().slice(narrow ? -4 : -5).reverse();
+        const keys = SV_KEYS[sv.table].filter(([k, , optional]) => (k !== 'ebitda' || svEbitdaOn())
+            && (!optional || periods.some(lb => svV(k, lb) != null) || estAll.some(c => c.col.items[k] && c.col.items[k].value != null)));
+        const est = svEstCols(keys);
+        let h = `<thead><tr><th><small>단위 ${svUnitName()}</small></th>` + est.map(c =>
+            `<th class="sv-est" title="${svEsc(c.col.sources.map(s => s === 'call' ? '컨콜 가이던스' : s === 'reports' ? '리포트 추정 평균' : '컨센서스').join(' · '))}">${c.title}<small>${c.col.label}</small></th>`).join('')
+            + periods.map(lb => `<th data-lb="${lb}" class="${lb === sv.selLb ? 'sv-sel' : ''}">${lb}</th>`).join('') + '</tr></thead><tbody>';
         keys.forEach(([k, label]) => {
-            h += `<tr><td><b>${label}</b><small>YOY</small></td>` + periods.map(lb => {
+            h += `<tr><td><b>${label}</b><small>YOY</small></td>` + est.map(c => svEstCell(k, c)).join('') + periods.map(lb => {
                 const v = svV(k, lb);
                 const g = svGrowth(v, svV(k, svPrevLabel(lb)));
                 const gs = g == null ? '<small>-</small>'
@@ -9151,6 +9192,7 @@
             }).join('') + '</tr>';
         });
         const tbl = document.getElementById('sv-sum');
+        tbl.classList.toggle('sv-has-est', est.length > 0);
         tbl.innerHTML = h + '</tbody>';
         tbl.onclick = e => {
             const c = e.target.closest('[data-lb]');
@@ -9160,6 +9202,11 @@
             svRenderWaterfall();
         };
     }
+
+    window.addEventListener('resize', () => {
+        clearTimeout(sv.rszTimer);
+        sv.rszTimer = setTimeout(() => { if (sv.fin && sv.fin.status === 'ready' && sv.est) svRenderSumTable(); }, 200);
+    });
 
     // 폭포 차트: 합계는 바닥부터, 차감·증감은 앞 합계에서 떠 있는 막대
     function svRenderWaterfall() {
@@ -9923,6 +9970,14 @@
         const busy = qs.some(q => q.translate_job && !['done', 'failed'].includes(q.translate_job.stage)) ||
                      (start !== false && qs.slice(0, 2).some(q => q.transcript === 'missing'));
         if (busy) sv.callsTimer = setTimeout(() => svLoadCalls(busy && !qs.some(q => q.translate_job && !['done', 'failed'].includes(q.translate_job.stage)) ? undefined : false), 3000);
+        // 5-D: 열기 때 뒤에서 뽑는 최신 분기 가이던스 — 생기면 요약 표(추정 열)만 다시. 없는 동안 8초 간격 최대 6번 확인
+        if (d.market === 'US') {
+            const lq = qs.find(q => q.transcript === 'ok');
+            const gAt = lq && lq.guidance ? (lq.guidance.at || 'ok') : null;
+            if (gAt && sv.guidAt !== undefined && sv.guidAt !== gAt) svLoadEstimates(t);
+            sv.guidAt = gAt;
+            if (lq && !lq.guidance && !busy && sv.guidTries < 6) { sv.guidTries++; sv.callsTimer = setTimeout(() => svLoadCalls(false), 8000); }
+        }
     }
     function svCallQ() { return (sv.calls.quarters || []).find(q => q.quarter === sv.callQ); }
     function svCallRender() {

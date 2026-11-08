@@ -25,6 +25,7 @@ import stock_notes
 import stock_reports
 import ai_budget
 import earnings_calls
+import stock_estimates
 import stock_peers
 import stock_brief
 import sec_filings
@@ -2384,10 +2385,22 @@ def _calls_open_bg(code, name):
     """종목종합정보 열 때 뒤에서: 최근 2개 분기 녹취록 받기(요약 X) → 워치리스트 종목이면 새 컨콜 텔레그램 알림(비교 자동 실행 X)"""
     try:
         earnings_calls.ensure_recent(code, name, 2, False)
+        earnings_calls.extract_guidance_missing(code, name)     # 5-D 최신 분기 가이던스 숫자 (없을 때만, call_guidance 한도는 ai_budget.take 가 확인)
         if watchlist_store.is_in_watchlist("US", code):
             earnings_calls.notify_new_calls(code, name, run_compare=False)
     except Exception as e:
         print(f"[calls] {code} 열기 작업 실패: {type(e).__name__}: {e}", flush=True)
+
+
+@app.route("/api/stock/estimates", methods=["GET"])
+def stock_estimates_api():
+    """5-C 추정 열: 다음 분기·올해·다음해 전망치 (항목별 컨콜 가이던스 > 리포트 추정 평균 > 컨센서스). 저장본만 조합, AI 호출 없음.
+    refresh=1 이면 다시 계산."""
+    r, err = _resolve_stock(request.args.get("market", "KR"), request.args.get("code", ""))
+    if err:
+        return err
+    market, code, name, _ = r
+    return jsonify(stock_estimates.get_estimates(market, code, name, refresh=request.args.get("refresh", "0") == "1"))
 
 
 @app.route("/api/stock/calls", methods=["GET"])
@@ -4112,6 +4125,12 @@ def _krfin_prefetch_run(reason):
                 results[key] += ", 조정EBITDA " + " ".join(f"{a['quarter']}:{a['status']}" for a in adj)
         except Exception as e:
             results[key] += f", 조정EBITDA 실패({type(e).__name__})"
+        try:   # 5-C 가이던스 숫자: 원문 있는 최신 분기 1건, 아직 안 뽑았을 때만 (call_guidance 한도 안에서)
+            gd = earnings_calls.extract_guidance_missing(code, items_name.get(code, ""))
+            if gd:
+                results[key] += ", 가이던스 " + " ".join(f"{a['quarter']}:{a['status']}" for a in gd)
+        except Exception as e:
+            results[key] += f", 가이던스 실패({type(e).__name__})"
         try:   # 새 컨콜·요약 완료 텔레그램 알림 (워치리스트 미국 종목, 직전분기 비교는 call_compare 한도 안에서)
             nt = earnings_calls.notify_new_calls(code, items_name.get(code, ""), run_compare=True)
             if nt.get("init") or nt.get("sent") or nt.get("skipped"):
