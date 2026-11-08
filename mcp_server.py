@@ -737,6 +737,8 @@ LOG_FILES = {
     "quarterly_eps": os.path.join(LOG_DIR, "quarterly_eps.log"),
     "indicators_tracker": os.path.join(_CACHE, "indicators_tracker.log"),
     "korea_export": os.path.join(BASE_DIR, "korea_export_update.log"),
+    "drilling_daily": os.path.join(LOG_DIR, "drilling_daily.log"),
+    "drilling_daily_launchd": os.path.join(LOG_DIR, "drilling_daily.launchd.log"),
 }
 for _m in ("us", "kr", "jp", "eu"):
     LOG_FILES[f"batch_{_m}"] = os.path.join(_CACHE, f"batch_top_gainers_{_m}.log")
@@ -1112,6 +1114,90 @@ def launchd_status() -> dict:
     return {"ok": True, "server_time": datetime.now(KST).isoformat(timespec="seconds"), "running": sum(1 for a in agents if isinstance(a["pid"], int)),
             "count": len(agents), "agents": agents, "plist_count": len(plist_labels), "not_loaded": not_loaded,
             "nonzero_exit": [a["label"] for a in agents if a["last_exit_status"] not in (0, None)]}
+
+
+@mcp.tool
+def get_drilling_kpis(code: str | None = None, quarter: str | None = None) -> dict:
+    """시추 업황(해양 시추사 SDRL·RIG·NE) KPI 읽기(읽기 전용, AI 호출 없음). code 없음 → 전체 overview(티커별 분기 시계열·최신 분기 시장 발언),
+    code 만 → 그 회사 분기 시계열, quarter(예 '2026Q3')까지 → 그 분기 KPI 원본(시장·회사 항목과 원문 인용)."""
+    require_allowed_email()
+    try:
+        if BASE_DIR not in sys.path:
+            sys.path.insert(0, BASE_DIR)
+        import drilling_tracker
+    except Exception as e:
+        return {"ok": False, "error": "import_failed", "message": f"{type(e).__name__}: {_mask(str(e))[:200]}"}
+    c = (code or "").strip().upper()
+    q = (quarter or "").strip().upper()
+    if c and c not in set(drilling_tracker.load_config().get("tickers") or []):
+        return {"ok": False, "error": "bad_code", "available": drilling_tracker.load_config().get("tickers")}
+    if c and q:
+        d = drilling_tracker._load(drilling_tracker._kpi_path(c, q))
+        if not d:
+            s = drilling_tracker.series(c)
+            return {"ok": False, "error": "not_found", "code": c, "quarter": q, "available": s["quarters"]}
+        out = {"ok": True, "code": c, "quarter": q, "kpi": d}
+        return _fit(out, lambda p: False)
+    if c:
+        out = {"ok": True, **drilling_tracker.series(c)}
+
+        def _shrink(p):
+            if len(p["items"]) <= 1:
+                return False
+            p["items"] = p["items"][1:]
+            p["quarters"] = p["quarters"][1:]
+            p["market"] = {k: v for k, v in p["market"].items() if k in p["quarters"]}
+            p["company"] = {k: v for k, v in p["company"].items() if k in p["quarters"]}
+            p["hint"] = "응답 상한으로 오래된 분기를 잘랐음. quarter 를 지정해 분기별로 볼 것"
+            return True
+        return _fit(out, _shrink)
+    try:
+        with open(drilling_tracker.OVERVIEW, "r", encoding="utf-8") as f:
+            ov = json.load(f)
+    except (OSError, ValueError):
+        ov = drilling_tracker.overview()
+    out = {"ok": True, **ov}
+
+    def _shrink_ov(p):
+        changed = False
+        for s in p["series"].values():
+            if len(s.get("items") or []) > 1:
+                s["items"] = s["items"][1:]
+                s["quarters"] = s["quarters"][1:]
+                s["market"] = {k: v for k, v in s["market"].items() if k in s["quarters"]}
+                s["company"] = {k: v for k, v in s["company"].items() if k in s["quarters"]}
+                changed = True
+        if changed:
+            p["hint"] = "응답 상한으로 오래된 분기를 잘랐음. code 를 지정해 회사별로 볼 것"
+        return changed
+    return _fit(out, _shrink_ov)
+
+
+@mcp.tool
+def get_drilling_events(days: int = 30, type: str | None = None, code: str | None = None) -> dict:
+    """시추 업황 이벤트 읽기(읽기 전용): 최근 days일(1~400)의 계약·연장·옵션·해지·스택·재가동·퇴역 등 이벤트(뉴스·8-K·FSR 비교에서 추출, 원문 인용 포함).
+    type(award|extension|option|termination|suspension|reactivation|stacking|retirement|newbuild|tender|ma|guidance|dayrate_change|other), code(SDRL|RIG|NE) 로 거른다."""
+    require_allowed_email()
+    try:
+        if BASE_DIR not in sys.path:
+            sys.path.insert(0, BASE_DIR)
+        import drilling_daily
+    except Exception as e:
+        return {"ok": False, "error": "import_failed", "message": f"{type(e).__name__}: {_mask(str(e))[:200]}"}
+    try:
+        d = max(1, min(400, int(days)))
+    except (TypeError, ValueError):
+        d = 30
+    evs = drilling_daily.recent_events(d, (type or "").strip() or None, (code or "").strip() or None)
+    out = {"ok": True, "days": d, "type": type or None, "code": (code or "").upper() or None, "count": len(evs), "events": evs}
+
+    def _shrink(p):
+        if len(p["events"]) <= 5:
+            return False
+        p["events"] = p["events"][:max(5, len(p["events"]) // 2)]
+        p["hint"] = "응답 상한으로 최근 것만 남김. days 를 줄이거나 type/code 로 거를 것"
+        return True
+    return _fit(out, _shrink)
 
 
 if __name__ == "__main__":

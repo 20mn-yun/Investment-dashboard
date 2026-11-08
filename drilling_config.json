@@ -1,0 +1,70 @@
+{
+ "tickers": [
+  "SDRL",
+  "RIG",
+  "NE"
+ ],
+ "names": {
+  "SDRL": "Seadrill",
+  "RIG": "Transocean",
+  "NE": "Noble"
+ },
+ "quarters_back": 8,
+ "merger_marks": {
+  "RIG": {
+   "quarter": "2026Q4",
+   "label": "Valaris 합병(2026-12-01)"
+  }
+ },
+ "fsr": {
+  "RIG": {
+   "page": "https://www.deepwater.com/investors/fleet-status-report",
+   "pattern": "FleetStatusReport.*\\.pdf"
+  },
+  "SDRL": {
+   "page": "https://www.seadrill.com/?s=fleet+status",
+   "pattern": "Fleet-Status-Report.*\\.pdf"
+  },
+  "NE": {
+   "page": "https://noblecorp.com/our-investors/reports-filings/fleet-status-report/",
+   "pattern": "download/noble-corporation-fleet-status-report[^\"'&]*\\?wpdmdl=\\d+"
+  }
+ },
+ "news": {
+  "google_queries": [
+   "drillship contract",
+   "offshore rig dayrate",
+   "Transocean contract",
+   "Seadrill contract",
+   "Noble drillship",
+   "Valaris contract",
+   "Petrobras drillship tender",
+   "harsh environment semisubmersible contract",
+   "Westwood RigLogix floater",
+   "Esgian rig"
+  ],
+  "rss": [
+   "https://www.rigzone.com/news/rss/rigzone_latest.aspx",
+   "https://www.offshore-energy.biz/feed/"
+  ],
+  "prefilter": "(?i)\\b(drillship|semi-?sub|semisubmersible|floater|rig|dayrate|day rate|day-rate|Transocean|Seadrill|Noble Corp|Valaris|Odfjell|Stena Drilling|Petrobras|Westwood|Esgian|RigLogix|Sonadrill|cold.?stack|reactivat)\\b",
+  "max_ai_per_run": 40,
+  "lookback_days": 3,
+  "pages": [
+   {
+    "name": "Westwood Insights",
+    "url": "https://www.westwoodenergy.com/news",
+    "link_pattern": "westwoodenergy\\.com/news/(?!infographics/global-land|category|westwood-energy-newsletter)(?!.*(wind|land-drilling|land-rig|onshore)).*"
+   },
+   {
+    "name": "Esgian",
+    "url": "https://esgian.com/insights/",
+    "link_pattern": "esgian\\.com/20\\d\\d/\\d\\d/\\d\\d/(?!.*wind).*(rig|drill).*"
+   }
+  ]
+ },
+ "eight_k_items": [
+  "7.01",
+  "8.01"
+ ]
+}

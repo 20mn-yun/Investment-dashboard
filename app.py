@@ -26,6 +26,7 @@ import stock_reports
 import ai_budget
 import earnings_calls
 import stock_estimates
+import drilling_tracker
 import stock_peers
 import stock_brief
 import sec_filings
@@ -2392,6 +2393,68 @@ def _calls_open_bg(code, name):
         print(f"[calls] {code} 열기 작업 실패: {type(e).__name__}: {e}", flush=True)
 
 
+def _drilling_tickers():
+    try:
+        return set(drilling_tracker.load_config().get("tickers") or [])
+    except Exception:
+        return set()
+
+
+@app.route("/api/drilling", methods=["GET"])
+def drilling_api():
+    """시추 업황 탭 데이터 (cache/drilling/overview.json). 없거나 refresh=1 이면 KPI 파일로 다시 만든다. AI 호출 없음."""
+    try:
+        if request.args.get("refresh", "0") == "1" or not os.path.exists(drilling_tracker.OVERVIEW):
+            return jsonify(drilling_tracker.overview())
+        with open(drilling_tracker.OVERVIEW, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({"error": "drilling_failed", "message": f"{type(e).__name__}: {str(e)[:200]}"}), 500
+
+
+@app.route("/api/drilling/events", methods=["GET"])
+def drilling_events_api():
+    """시추 이벤트(뉴스·8-K·FSR diff). ?days=60&type=award&code=RIG"""
+    try:
+        import drilling_daily
+        days = max(1, min(400, int(request.args.get("days", "60") or 60)))
+        typ = (request.args.get("type") or "").strip() or None
+        code = (request.args.get("code") or "").strip().upper() or None
+        evs = drilling_daily.recent_events(days, typ, code)
+        return jsonify({"ok": True, "days": days, "type": typ, "code": code, "count": len(evs), "events": evs})
+    except Exception as e:
+        return jsonify({"error": "drilling_failed", "message": f"{type(e).__name__}: {str(e)[:200]}"}), 500
+
+
+@app.route("/api/drilling/fsr", methods=["GET"])
+def drilling_fsr_api():
+    """최신 Fleet Status Report 추출본. ?code=RIG"""
+    code = (request.args.get("code") or "").strip().upper()
+    if not re.match(r"^[A-Z.]{1,6}$", code):
+        return jsonify({"error": "bad_request", "message": "code=티커"}), 400
+    try:
+        import drilling_daily
+        rep = drilling_daily.latest_fsr(code)
+    except Exception as e:
+        return jsonify({"error": "drilling_failed", "message": f"{type(e).__name__}: {str(e)[:200]}"}), 500
+    if not rep:
+        return jsonify({"error": "not_found", "code": code}), 404
+    return jsonify(rep)
+
+
+@app.route("/api/drilling/kpi", methods=["GET"])
+def drilling_kpi_api():
+    """분기 KPI 파일 원본. ?code=SDRL&quarter=2026Q3"""
+    code = (request.args.get("code") or "").strip().upper()
+    quarter = (request.args.get("quarter") or "").strip().upper()
+    if not re.match(r"^[A-Z.]{1,6}$", code) or not re.match(r"^20\d\dQ[1-4]$", quarter):
+        return jsonify({"error": "bad_request", "message": "code=티커, quarter=YYYYQn"}), 400
+    d = drilling_tracker._load(drilling_tracker._kpi_path(code, quarter))
+    if not d:
+        return jsonify({"error": "not_found", "code": code, "quarter": quarter}), 404
+    return jsonify(d)
+
+
 @app.route("/api/stock/estimates", methods=["GET"])
 def stock_estimates_api():
     """5-C 추정 열: 다음 분기·올해·다음해 전망치 (항목별 컨콜 가이던스 > 리포트 추정 평균 > 컨센서스). 저장본만 조합, AI 호출 없음.
@@ -4131,6 +4194,13 @@ def _krfin_prefetch_run(reason):
                 results[key] += ", 가이던스 " + " ".join(f"{a['quarter']}:{a['status']}" for a in gd)
         except Exception as e:
             results[key] += f", 가이던스 실패({type(e).__name__})"
+        if code in _drilling_tickers():
+            try:   # 시추 업황 탭: 녹취록 있는 분기 중 KPI 없는 것만 (drilling_kpi 한도 안에서)
+                dk = drilling_tracker.extract_missing(code)
+                if dk:
+                    results[key] += ", 시추KPI " + " ".join(f"{a['quarter']}:{a['status']}" for a in dk)
+            except Exception as e:
+                results[key] += f", 시추KPI 실패({type(e).__name__})"
         try:   # 새 컨콜·요약 완료 텔레그램 알림 (워치리스트 미국 종목, 직전분기 비교는 call_compare 한도 안에서)
             nt = earnings_calls.notify_new_calls(code, items_name.get(code, ""), run_compare=True)
             if nt.get("init") or nt.get("sent") or nt.get("skipped"):
@@ -4158,6 +4228,10 @@ def _krfin_prefetch_run(reason):
                 + (f", 섹션 실패 {len(b['failed_sections'])}" if b.get("failed_sections") else "")
         except Exception as e:
             results[f"brief:{it['market']}_{it['code']}"] = f"실패({type(e).__name__}: {str(e)[:80]})"
+    try:   # 시추 업황 overview 1회 (KPI 파일 → overview.json)
+        drilling_tracker.overview()
+    except Exception as e:
+        print(f"[drilling] overview 실패: {type(e).__name__}: {str(e)[:120]}", flush=True)
     st = _krfin_prefetch_state()
     st.update(last_run_date=date.today().isoformat(), last_run_at=datetime.now().isoformat(timespec="seconds"),
               last_results=results)

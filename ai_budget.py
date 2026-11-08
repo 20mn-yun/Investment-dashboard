@@ -28,6 +28,9 @@ DEFAULT_LIMITS = {
     "ocr": 20,               # 이미지 PDF 리포트 OCR (stock_reports, qlmanage → codex tg_ocr)
     "adj_ebitda": 50,        # 5-A 컨콜 원문에서 조정 EBITDA 추출 (earnings_calls.extract_adjusted, Haiku)
     "call_guidance": 50,     # 5-C 컨콜 원문에서 다음분기·연간 가이던스 숫자 추출 (earnings_calls.extract_guidance, Haiku)
+    "drilling_kpi": 20,      # 시추 업황 탭: 컨콜·8-K 에서 시장/회사 KPI 추출 (drilling_tracker.extract_kpis, Sonnet)
+    "drilling_news": 40,     # 시추 업황 탭 B: 뉴스·8-K(7.01/8.01) 기사 1건 → 이벤트·시장 수치 추출 (drilling_daily, Sonnet)
+    "drilling_fsr": 6,       # 시추 업황 탭 B: Fleet Status Report PDF 1건 → 리그 표 추출 (drilling_daily, Sonnet)
 }
 
 _lock = threading.Lock()

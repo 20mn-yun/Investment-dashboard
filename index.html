@@ -1481,6 +1481,80 @@
         }
 
         /* ===== 정유 탭 ===== */
+        /* ===== 시추 업황 탭 ===== */
+        #tab-drilling .dr-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+        #tab-drilling .dr-headline { font-size: var(--fs-lg); font-weight: bold; line-height: 1.35; flex: 1 1 60%; min-width: 0; }
+        #tab-drilling .dr-asof { color: var(--text-muted); font-size: var(--fs-sm); }
+        #tab-drilling .dr-btn { background: var(--bg-panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 12px; font-size: var(--fs-md); cursor: pointer; margin-left: auto; }
+        #tab-drilling .dr-btn:hover { border-color: var(--accent); color: var(--accent); }
+        #tab-drilling .dr-up { color: var(--up); } #tab-drilling .dr-down { color: var(--accent); } #tab-drilling .dr-flat { color: var(--text-muted); } #tab-drilling .dr-mixed { color: var(--text-dim); }
+        #tab-drilling .dr-signals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
+        #tab-drilling .dr-sig { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer; min-width: 0; }
+        #tab-drilling .dr-sig:hover, #tab-drilling .dr-sig.open { border-color: var(--accent); }
+        #tab-drilling .dr-sig .label { color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: 4px; }
+        #tab-drilling .dr-sig .vals { font-size: var(--fs-md); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #tab-drilling .dr-sig .vals b { font-size: var(--fs-lg); }
+        #tab-drilling .dr-sig .vals small { color: var(--text-dim); font-size: var(--fs-xs); }
+        #tab-drilling .dr-sig .delta { font-size: var(--fs-md); font-weight: bold; margin-top: 2px; }
+        #tab-drilling .dr-sig .n { color: var(--text-dim); font-size: var(--fs-xs); margin-top: 4px; }
+        #tab-drilling .dr-sig-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; padding: 2px 0; }
+        #tab-drilling .dr-sig-line .seg { color: var(--text-muted); font-size: var(--fs-xs); min-width: 3em; }
+        #tab-drilling .dr-sig-line .vals { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #tab-drilling .dr-sig-line .delta { margin-top: 0; }
+        #tab-drilling .dr-stale { display: inline-block; color: var(--text-muted); background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-size: var(--fs-xs); font-weight: normal; }
+        #tab-drilling .dr-signal-detail, #tab-drilling .dr-cell-detail { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: var(--fs-md); }
+        #tab-drilling .dr-row { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; border-top: 1px dashed var(--border); flex-wrap: wrap; }
+        #tab-drilling .dr-row:first-of-type { border-top: none; }
+        #tab-drilling .dr-row .co { color: var(--text-muted); font-size: var(--fs-sm); min-width: 3.4em; }
+        #tab-drilling .dr-row .v { font-weight: bold; font-variant-numeric: tabular-nums; }
+        #tab-drilling .dr-row .sub { color: var(--text-dim); font-size: var(--fs-xs); }
+        #tab-drilling .dr-row .q { color: var(--text-muted); font-size: var(--fs-sm); font-style: italic; width: 100%; }
+        #tab-drilling .dr-i { display: inline-block; cursor: pointer; color: var(--text-muted); font-size: var(--fs-xs); border: 1px solid var(--border); border-radius: 50%; width: 1.3em; height: 1.3em; line-height: 1.25em; text-align: center; margin-left: 2px; user-select: none; }
+        #tab-drilling .dr-i:hover { color: var(--accent); border-color: var(--accent); }
+        #tab-drilling .dr-quote { display: none; width: 100%; color: var(--text-muted); font-size: var(--fs-xs); font-style: italic; padding: 2px 0 4px; white-space: normal; }
+        #tab-drilling .dr-quote.open { display: block; }
+        #tab-drilling .dr-outlook { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: var(--fs-md); }
+        #tab-drilling .dr-outlook .dr-row .q { width: auto; flex: 1 1 100%; }
+        #tab-drilling .dr-chart-wide { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; height: 280px; position: relative; margin-bottom: 14px; }
+        #tab-drilling .dr-charts2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+        #tab-drilling .dr-chart { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; height: 240px; position: relative; }
+        #tab-drilling .dr-seg-toggle { margin-left: 10px; font-weight: normal; }
+        #tab-drilling .dr-seg-toggle .period-btn { font-size: var(--fs-xs); }
+        #tab-drilling .dr-src { display: inline-block; font-size: var(--fs-xs); color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-left: 4px; font-style: normal; }
+        #tab-drilling .dr-ev-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        #tab-drilling .dr-chip { font-size: var(--fs-xs); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; cursor: pointer; color: var(--text-muted); background: var(--bg-card); }
+        #tab-drilling .dr-chip.active { border-color: var(--accent); color: var(--accent); }
+        #tab-drilling .dr-badge { display: inline-block; font-size: var(--fs-xs); border-radius: 4px; padding: 1px 6px; color: #fff; background: var(--text-muted); }
+        #tab-drilling .dr-badge.pos { background: var(--up); } #tab-drilling .dr-badge.neg { background: var(--accent); }
+        #tab-drilling table.dr-ev td { text-align: left; white-space: normal; }
+        #tab-drilling table.dr-ev td.num { text-align: right; white-space: nowrap; }
+        #tab-drilling table.dr-ev a { color: var(--accent); }
+        #tab-drilling .dr-more { display: inline-block; margin: 6px 0 12px; cursor: pointer; color: var(--accent); font-size: var(--fs-sm); }
+        @media (max-width: 768px) { #tab-drilling .dr-charts2 { grid-template-columns: 1fr; } }
+        #tab-drilling .dr-fold { margin-bottom: 14px; }
+        #tab-drilling .dr-fold summary { cursor: pointer; color: var(--text-muted); font-size: var(--fs-sm); padding: 4px 0; }
+        #tab-drilling .dr-trend-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+        #tab-drilling .dr-trend { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 6px; height: 170px; position: relative; }
+        #tab-drilling .dr-rm-summary { font-weight: normal; color: var(--text-muted); font-size: var(--fs-sm); margin-left: 8px; }
+        #tab-drilling .dr-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: var(--bg-card); }
+        #tab-drilling table.dr-table { border-collapse: collapse; width: 100%; font-size: var(--fs-md); white-space: nowrap; }
+        #tab-drilling table.dr-table th, #tab-drilling table.dr-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+        #tab-drilling table.dr-table th { color: var(--text-muted); font-weight: normal; font-size: var(--fs-sm); background: var(--bg-panel); }
+        #tab-drilling table.dr-table th:first-child, #tab-drilling table.dr-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--bg-card); z-index: 1; }
+        #tab-drilling table.dr-table td:first-child a { color: var(--accent); cursor: pointer; font-weight: bold; }
+        #tab-drilling table.dr-table td small { display: block; color: var(--text-dim); font-size: var(--fs-xs); font-weight: normal; }
+        #tab-drilling table.dr-rm td.cell { text-align: center; cursor: pointer; }
+        #tab-drilling table.dr-rm td.cell:hover, #tab-drilling table.dr-rm td.cell.open { background: var(--bg-hover); }
+        #tab-drilling table.dr-rm td.trend { text-align: center; font-weight: bold; }
+        #tab-drilling .dr-dot { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; vertical-align: middle; margin-right: 4px; background: var(--text-muted); }
+        #tab-drilling .dr-dot.dr-up { background: var(--up); } #tab-drilling .dr-dot.dr-down { background: var(--accent); } #tab-drilling .dr-dot.dr-mixed { background: linear-gradient(90deg, var(--up) 50%, var(--accent) 50%); }
+        #tab-drilling .dr-tag { display: inline-block; font-size: var(--fs-xs); color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; margin-left: 2px; }
+        #tab-drilling .dr-upcoming { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: var(--fs-md); }
+        #tab-drilling .dr-upcoming .dr-row .co { min-width: 4em; }
+        #tab-drilling .dr-foot { color: var(--text-dim); font-size: var(--fs-xs); margin-top: 6px; }
+        #tab-drilling .dr-empty { color: var(--text-muted); font-size: var(--fs-md); padding: 6px 0; }
+        @media (max-width: 1024px) { #tab-drilling .dr-signals { grid-template-columns: repeat(3, minmax(0, 1fr)); } #tab-drilling .dr-trend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 600px) { #tab-drilling .dr-signals { grid-template-columns: repeat(2, minmax(0, 1fr)); } #tab-drilling .dr-trend-grid { grid-template-columns: 1fr; } #tab-drilling .dr-headline { font-size: var(--fs-md); } }
         #tab-refinery .refinery-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
         #tab-refinery .refinery-verdict { font-size: var(--fs-lg); font-weight: 700; }
         #tab-refinery .refinery-verdict.v-ok { color: var(--green); }
@@ -1844,6 +1918,7 @@
         <div class="tab-group-tabs">
             <div class="tab" data-tab="export" onclick="switchTab('export')">월별 수출실적</div>
             <div class="tab" data-tab="refinery" onclick="switchTab('refinery')">정유</div>
+            <div class="tab" data-tab="drilling" onclick="switchTab('drilling')">시추 업황</div>
         </div>
     </div>
     <div class="tab-group">
@@ -2616,6 +2691,39 @@
 </div>
 
 <!-- DART 공시 탭 -->
+<div class="tab-content" id="tab-drilling">
+    <div class="loading" id="dr-loading">시추 업황 자료를 불러오는 중...</div>
+    <div id="dr-content" style="display:none;">
+        <div class="dr-header">
+            <div class="dr-headline" id="dr-headline"></div>
+            <span class="dr-asof" id="dr-asof"></span>
+            <button class="dr-btn" id="dr-refresh" onclick="loadDrilling(true)">새로고침</button>
+        </div>
+        <div class="dr-signals" id="dr-signals"></div>
+        <div class="dr-signal-detail" id="dr-signal-detail" style="display:none;"></div>
+        <div class="dr-outlook" id="dr-outlook"></div>
+        <div class="section-title">체결 단가 추이 <span class="dr-rm-summary">월별 중앙값 · 개별 체결 점 · 최근 18개월</span></div>
+        <div class="dr-chart-wide"><canvas id="dr-chart-dayrate"></canvas></div>
+        <div class="section-title">시장 수치 <span class="dr-rm-summary" id="dr-ms-note"></span>
+            <span class="dr-seg-toggle" id="dr-ms-seg"><span class="period-btn active" data-seg="drillship" onclick="drMsSeg('drillship')">드릴십</span><span class="period-btn" data-seg="harsh" onclick="drMsSeg('harsh')">한랭지</span></span></div>
+        <div class="dr-charts2"><div class="dr-chart"><canvas id="dr-chart-ms-rigs"></canvas></div><div class="dr-chart"><canvas id="dr-chart-ms-util"></canvas></div></div>
+        <details class="dr-fold" id="dr-trend-fold" ontoggle="drOnTrendToggle()"><summary>지표 추이 (8분기)</summary>
+            <div class="dr-trend-grid" id="dr-trend-grid"></div>
+        </details>
+        <div class="section-title">지역 수요 매트릭스 <span class="dr-rm-summary" id="dr-rm-summary"></span></div>
+        <div class="dr-table-wrap"><table class="dr-table dr-rm" id="dr-rm"></table></div>
+        <div class="dr-cell-detail" id="dr-rm-detail" style="display:none;"></div>
+        <div class="section-title">회사 실적 변수</div>
+        <div class="dr-table-wrap"><table class="dr-table" id="dr-table"></table></div>
+        <div class="section-title">이벤트 타임라인 <span class="dr-rm-summary">최근 60일 · 뉴스·8-K·FSR 비교</span></div>
+        <div class="dr-ev-filters" id="dr-ev-filters"></div>
+        <div class="dr-table-wrap"><table class="dr-table dr-ev" id="dr-ev"></table></div>
+        <div id="dr-ev-more"></div>
+        <div class="section-title">다가오는 일정 (180일)</div>
+        <div class="dr-upcoming" id="dr-upcoming"></div>
+        <div class="dr-foot">출처: 각사 실적 컨콜 녹취록·8-K 보도자료에서 AI 추출 · ⓘ = 원문 문장 · S/R/N = Seadrill/Transocean/Noble</div>
+    </div>
+</div>
 <div class="tab-content" id="tab-dart">
     <!-- 상태 바 -->
     <div class="dart-status-bar">
@@ -3069,6 +3177,10 @@
             refineryLoaded = true;
             loadRefinery();
         }
+        if (tabName === 'drilling' && !drLoaded) {
+            drLoaded = true;
+            loadDrilling();
+        }
         if (tabName === 'indicators' && !indicatorsLoaded) {
             indicatorsLoaded = true;
             loadIndicators();
@@ -3077,6 +3189,284 @@
 
     // 다른 탭에서 종목종합정보 열기 (공용). stockview 미초기화면 switchTab 이 initStockView 를 동기 실행하므로 바로 svOpen 가능.
     // 노트 미저장 가드는 svOpen 안에서 작동 (force 넘기지 않음)
+
+    // ===== 시추 업황 탭 (A2: 변화·방향 중심) =====
+    let drLoaded = false;
+    const dr = { data: null, charts: [], openSig: null, openCell: null, trendDrawn: false, dayrateChart: null, msCharts: [], msSeg: 'drillship', evFilter: { type: null, code: null }, evShown: 20 };
+    const DR_TAG = { SDRL: 'S', RIG: 'R', NE: 'N' };
+    const DR_SIG_ORDER = ['contracted_rigs', 'utilization', 'dayrate_leading', 'contract_duration', 'supply'];
+    function drEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function drI(quote) { return quote ? `<span class="dr-i" onclick="drToggleQuote(this)" title="원문 문장">i</span><span class="dr-quote">${drEsc(quote)}</span>` : ''; }
+    function drToggleQuote(el) { const q = el.nextElementSibling; if (q) q.classList.toggle('open'); }
+    function drCls(d) { return d === 'up' || d === 'raised' ? 'dr-up' : d === 'down' || d === 'lowered' ? 'dr-down' : d === 'mixed' ? 'dr-mixed' : 'dr-flat'; }
+    function drArrow(d) { return d === 'up' ? '▲' : d === 'down' ? '▼' : d === 'mixed' ? '◆' : d === 'flat' ? '─' : ''; }
+    function drNum(v, digits) { return v == null || isNaN(v) ? '-' : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits == null ? 1 : digits }); }
+    function drUsd(v, unit) { if (v == null) return '-'; return unit === 'B' ? '$' + (v / 1e9).toFixed(2) + 'B' : '$' + Math.round(v / 1e6).toLocaleString() + 'M'; }
+    function drTag(code) { return `<span class="dr-tag" title="${drEsc(code)}">${DR_TAG[code] || code}</span>`; }
+    function drLatest(code) { const s = dr.data && dr.data.series[code]; return s && s.items.length ? s.items[s.items.length - 1] : null; }
+    function drColors() {
+        const g = n => getComputedStyle(document.getElementById('tab-drilling')).getPropertyValue(n).trim();
+        return { text: g('--text'), muted: g('--text-muted'), grid: g('--border'), up: g('--up'), down: g('--accent'), series: { SDRL: g('--accent'), RIG: g('--up'), NE: '#2da44e' } };
+    }
+    async function loadDrilling(force) {
+        const loading = document.getElementById('dr-loading'), content = document.getElementById('dr-content');
+        if (!dr.data) { loading.style.display = ''; content.style.display = 'none'; }
+        try {
+            const res = await fetch(API_BASE + '/api/drilling' + (force ? '?refresh=1' : ''));
+            const d = await res.json();
+            if (!res.ok) throw new Error(d.message || d.error || ('HTTP ' + res.status));
+            dr.data = d;
+        } catch (e) { loading.textContent = '시추 업황 자료를 불러오지 못했습니다: ' + (e.message || e); return; }
+        loading.style.display = 'none'; content.style.display = '';
+        dr.trendDrawn = false;
+        drRender();
+    }
+    function drRender() {
+        const d = dr.data;
+        document.getElementById('dr-headline').textContent = d.headline || '';
+        document.getElementById('dr-asof').textContent = (d.latest_quarter ? `기준 분기 ${d.latest_quarter}` : '수집된 분기 없음') + (d.generated_at ? ` · ${d.generated_at.slice(0, 16).replace('T', ' ')}` : '');
+        drRenderSignals();
+        drRenderOutlook();
+        drRenderDayrateChart();
+        drRenderMarketSeries();
+        drRenderRegionMatrix();
+        drRenderCompanyTable();
+        dr.evFilter = { type: null, code: null }; dr.evShown = 20;
+        drRenderEvents();
+        drRenderUpcoming();
+        if (document.getElementById('dr-trend-fold').open) drRenderTrends();
+    }
+    // 2) 신호판
+    const DR_SEGS = [['drillship', '드릴십'], ['harsh', '한랭지']];
+    function drSrcShort(s) { s = String(s || ''); if (/westwood/i.test(s)) return 'Westwood'; if (/esgian/i.test(s)) return 'Esgian'; if (/clarkson/i.test(s)) return 'Clarksons'; if (/FSR/.test(s)) return 'FSR'; if (/체결/.test(s)) return s; if (/컨콜/.test(s)) return '회사'; return s.length > 14 ? s.slice(0, 14) + '…' : s; }
+    function drSigBlocks(k) {   // 지표 → [세그먼트 블록...] (supply 는 1개)
+        const s = (dr.data.signals || {})[k]; if (!s) return [];
+        return k === 'supply' ? [s] : DR_SEGS.map(([seg]) => s[seg]).filter(Boolean);
+    }
+    function drSigLine(k, b) {   // 한 줄: "세그 직전 → 최근 (Δ 화살표)" / stale 이면 회색 배지
+        const l = b.latest, p = b.prev;
+        const vals = `${p && p.value_text ? `${drEsc(p.value_text)}<small> ${drEsc(p.quarter)}</small> → ` : ''}<b>${drEsc(l.value_text || (k === 'supply' ? b.direction_ko : '-'))}</b><small> ${drEsc(l.quarter)}</small>` +
+                     (l.source_name ? `<span class="dr-src" title="${drEsc(l.as_of || '')}">${drEsc(drSrcShort(l.source_name))}${l.as_of ? ' ' + drEsc(String(l.as_of).slice(0, 10)) : ''}</span>` : '');
+        let tail;
+        if (b.direction === 'stale') tail = `<span class="dr-stale">오래됨 · ${drEsc(b.stale_as_of ? String(b.stale_as_of).slice(0, 10) : b.stale_quarter)}</span>`;
+        else if (b.direction === 'insufficient') tail = `<span class="dr-stale">${drEsc(b.direction_ko || '표본 부족')}</span>`;
+        else {
+            const dirTxt = k === 'supply' ? (b.direction_ko || '-') : (b.delta != null ? `${b.delta > 0 ? '+' : ''}${drNum(b.delta, 1)}${b.unit}` : (b.direction_ko || '-'));
+            tail = `<span class="delta ${drCls(b.direction)}">${drArrow(b.direction)} ${drEsc(dirTxt)}</span>`;
+        }
+        return `<div class="dr-sig-line">${b.segment_ko ? `<span class="seg">${drEsc(b.segment_ko)}</span>` : ''}<span class="vals">${vals}</span>${tail}</div>`;
+    }
+    function drRenderSignals() {
+        const sig = dr.data.signals || {};
+        document.getElementById('dr-signals').innerHTML = DR_SIG_ORDER.map(k => {
+            const blocks = drSigBlocks(k);
+            const label = (sig[k] && (sig[k].label || (sig[k].drillship || sig[k].harsh || {}).label)) || k;
+            const lines = blocks.length ? blocks.map(b => drSigLine(k, b)).join('') : '<div class="dr-sig-line"><span class="dr-flat">수집 전</span></div>';
+            const n = blocks.reduce((a, b) => a + (b.n_sources || 0), 0);
+            return `<div class="dr-sig ${dr.openSig === k ? 'open' : ''}" onclick="drToggleSig('${k}')"><div class="label">${drEsc(label)}</div>${lines}<div class="n">근거 ${n}건</div></div>`;
+        }).join('');
+        drRenderSigDetail();
+    }
+    function drToggleSig(k) { dr.openSig = dr.openSig === k ? null : k; drRenderSignals(); }
+    function drRenderSigDetail() {
+        const box = document.getElementById('dr-signal-detail');
+        const blocks = dr.openSig ? drSigBlocks(dr.openSig) : [];
+        if (!blocks.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const block = (title, x) => !x ? '' : `<div class="dr-row"><span class="co">${drEsc(title)}</span><span class="sub">${drEsc(x.quarter)}${x.value_text ? ' · ' + drEsc(x.value_text) : ''}</span></div>` +
+            x.sources.map(src => `<div class="dr-row"><span class="co">${drEsc(src.code)}</span><span class="v">${drEsc(Object.entries(src.detail || {}).map(([a, b]) => `${a} ${b}`).join(' · ') || '-')}</span><span class="q">${drEsc(src.quote || '')}</span></div>`).join('');
+        box.innerHTML = blocks.map(b => `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin:4px 0;">${drEsc(b.label)}${b.segment_ko ? ' · ' + drEsc(b.segment_ko) : ''} — 회사별 값·인용${b.direction === 'stale' ? ` <span class="dr-stale">오래됨 · ${drEsc(b.stale_quarter)}</span>` : ''}</div>` + block('최근', b.latest) + block('직전', b.prev)).join('');
+        box.style.display = '';
+    }
+    // 2b) 경영진 전망 한 줄 블록 (최대 6건, 더 있으면 펼침)
+    function drRenderOutlook() {
+        const box = document.getElementById('dr-outlook');
+        const items = dr.data.outlook || [];
+        if (!items.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+        box.style.display = '';
+        const line = x => `<div class="dr-row">${drTag(x.code)}<span class="sub">${drEsc(x.quarter)}</span><span class="v">${drEsc(x.horizon || '-')}</span><span class="${drCls(x.direction)}">${drArrow(x.direction)}</span><span class="sub">${drEsc(x.metric || '')}${x.value != null ? ' ' + drNum(x.value, 1) : ''}${x.segment ? ' · ' + drEsc(x.segment) : ''}${x.region ? ' · ' + drEsc(x.region) : ''}</span><span class="q">${drEsc(x.quote)}</span></div>`;
+        const head = items.slice(0, 6).map(line).join(''), rest = items.slice(6);
+        box.innerHTML = `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin-bottom:4px;">경영진 전망 (시장, 최신 분기)</div>` + head +
+            (rest.length ? `<details class="dr-fold"><summary>더 보기 ${rest.length}건</summary>${rest.map(line).join('')}</details>` : '');
+    }
+    // 2c) 체결 단가 추이: 월별 중앙값(드릴십 실선·한랭지 점선) + 개별 체결 점 + RIG FSR 분기 평균 단가(회색 점선)
+    function drRenderDayrateChart() {
+        const d = dr.data, C = drColors(), ld = d.dayrates || {};
+        if (dr.dayrateChart) { dr.dayrateChart.destroy(); dr.dayrateChart = null; }
+        const months = [...new Set([...(ld.drillship || []), ...(ld.harsh || [])].map(m => m.month))].sort();
+        const el = document.getElementById('dr-chart-dayrate');
+        if (!months.length) { el.parentNode.innerHTML = '<div class="dr-empty">체결 단가 데이터 수집 중 (뉴스·FSR 에서 단가가 있는 계약이 쌓이면 표시)</div>'; return; }
+        const idx = Object.fromEntries(months.map((m, i) => [m, i]));
+        const line = (seg, label, dash) => ({ type: 'line', label, data: months.map(m => { const x = (ld[seg] || []).find(y => y.month === m); return x ? (x.rolling3 != null ? x.rolling3 : x.median) : null; }), borderColor: C.muted, borderDash: dash, pointRadius: 0, spanGaps: true, tension: 0.2, yAxisID: 'y' });
+        const monthPts = seg => ({ type: 'scatter', label: `${seg === 'harsh' ? '한랭지' : '드릴십'} 월별 중앙값`, data: (ld[seg] || []).map(m => ({ x: idx[m.month], y: m.median, n: m.n })), backgroundColor: C.muted, pointRadius: 5, pointStyle: 'rectRot', yAxisID: 'y', xAxisID: 'x2' });
+        const pts = seg => ({ type: 'scatter', label: `${seg === 'harsh' ? '한랭지' : '드릴십'} 체결`, data: (ld[seg] || []).flatMap(m => m.points.map(p => ({ x: idx[m.month] + (Math.random() - 0.5) * 0.3, y: p.value, rig: p.rig, customer: p.customer, source: p.source }))), backgroundColor: seg === 'harsh' ? C.down : C.up, pointRadius: 4, pointStyle: seg === 'harsh' ? 'triangle' : 'circle', yAxisID: 'y', xAxisID: 'x2' });
+        const datasets = [line('drillship', '드릴십 3개월 이동 중앙값', []), line('harsh', '한랭지 3개월 이동 중앙값', [4, 3]), monthPts('drillship'), monthPts('harsh'), pts('drillship'), pts('harsh')];
+        const rigFsr = ((d.fsr || {}).RIG || {}).avg_dayrate_table || [];
+        if (rigFsr.length) {   // 분기 라벨 'Q4 2026' → 분기 중간 월에 점
+            const qm = { 'Q1': '02', 'Q2': '05', 'Q3': '08', 'Q4': '11' };
+            const rows = rigFsr.filter(r => /drillship|floater/i.test(r.segment || '') && r.value_usd_k != null).map(r => { const m = /(Q[1-4])\D*(20\d\d)/.exec(r.period || ''); return m ? { month: `${m[2]}-${qm[m[1]]}`, v: r.value_usd_k } : null; }).filter(Boolean);
+            rows.forEach(r => { if (!(r.month in idx)) { months.push(r.month); } });
+            months.sort(); months.forEach((m, i) => { idx[m] = i; });
+            datasets.forEach(ds => { if (ds.type === 'line') ds.data = months.map(m => { const x = (ld[ds.label.startsWith('한랭') ? 'harsh' : 'drillship'] || []).find(y => y.month === m); return x ? (x.rolling3 != null ? x.rolling3 : x.median) : null; }); });
+            datasets.forEach(ds => { if (ds.type === 'scatter') ds.data.forEach(p => { if (p.n != null) p.x = idx[(ld[ds.label.startsWith('한랭') ? 'harsh' : 'drillship'] || []).find(y => y.median === p.y && idx[y.month] != null && true) ? (ld[ds.label.startsWith('한랭') ? 'harsh' : 'drillship'] || []).find(y => y.median === p.y).month : months[0]]; }); });
+            datasets.push({ type: 'line', label: 'RIG FSR 평균 계약단가(드릴십)', data: months.map(m => { const r = rows.find(x => x.month === m); return r ? r.v : null; }), borderColor: C.muted, borderDash: [2, 3], pointRadius: 2, spanGaps: true, yAxisID: 'y' });
+        }
+        dr.dayrateChart = new Chart(el, { data: { labels: months, datasets }, options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: C.text, font: fzf(10, 'tab-drilling'), boxWidth: 10 } },
+                       tooltip: { callbacks: { label: c => c.raw && c.raw.rig != null ? `${c.raw.rig} / ${c.raw.customer || '-'} $${drNum(c.raw.y, 0)}K (${c.raw.source || ''})` : c.raw && c.raw.n != null ? `${c.dataset.label}: $${drNum(c.raw.y, 0)}K (${c.raw.n}건)` : `${c.dataset.label}: ${c.raw == null ? '-' : '$' + drNum(c.raw, 0) + 'K'}` } } },
+            scales: { x: { ticks: { color: C.muted, font: fzf(10, 'tab-drilling') }, grid: { display: false } }, x2: { type: 'linear', display: false, min: -0.5, max: months.length - 0.5 },
+                      y: { ticks: { color: C.muted, font: fzf(10, 'tab-drilling'), callback: v => '$' + v + 'K' }, grid: { color: C.grid } } } } });
+    }
+    // 2d) 시장 수치: 계약 리그 수·가동률 시계열 (출처별 점 색, 세그먼트 토글)
+    function drMsSeg(seg) { dr.msSeg = seg; document.querySelectorAll('#dr-ms-seg .period-btn').forEach(b => b.classList.toggle('active', b.dataset.seg === seg)); drRenderMarketSeries(); }
+    function drRenderMarketSeries() {
+        const d = dr.data, C = drColors(), ms = d.market_series || {}, seg = dr.msSeg || 'drillship';
+        (dr.msCharts || []).forEach(c => c.destroy()); dr.msCharts = [];
+        const segs = seg === 'harsh' ? ['harsh'] : ['drillship', 'floater_total'];
+        const palette = [C.up, C.down, '#2da44e', '#8250df', '#bf8700'];
+        let note = [];
+        [['dr-chart-ms-rigs', 'contracted_rigs', '계약 리그 수', v => drNum(v, 0) + '척'], ['dr-chart-ms-util', 'utilization', '가동률', v => drNum(v, 0) + '%']].forEach(([id, metric, title, fmt]) => {
+            const pts = segs.flatMap(sg => (ms[metric] || {})[sg] || []);
+            const el = document.getElementById(id); const wrap = el.parentNode;
+            if (pts.length < 2) { note.push(`${title} 수집 중(${pts.length}건)`); wrap.style.opacity = 0.5; }
+            else wrap.style.opacity = 1;
+            const srcs = [...new Set(pts.map(p => p.source_name || '?'))];
+            dr.msCharts.push(new Chart(el, { type: 'scatter', data: { datasets: srcs.map((sname, i) => ({ label: sname, data: pts.filter(p => (p.source_name || '?') === sname).map(p => ({ x: p.as_of, y: p.value, q: p.quote, u: p.url })), backgroundColor: palette[i % palette.length], pointRadius: 4, showLine: srcs.length === 1 })) },
+                options: { responsive: true, maintainAspectRatio: false, parsing: false,
+                    plugins: { title: { display: true, text: `${title} (${seg === 'harsh' ? '한랭지' : '드릴십·부유식 전체'})`, font: fzf(11, 'tab-drilling', { weight: 'bold' }), color: C.text }, legend: { labels: { color: C.muted, font: fzf(9, 'tab-drilling'), boxWidth: 10 } },
+                               tooltip: { callbacks: { label: c => `${c.dataset.label} ${c.raw.x}: ${fmt(c.raw.y)}`, afterLabel: c => (c.raw.q || '').slice(0, 120) } } },
+                    scales: { x: { type: 'category', labels: [...new Set(pts.map(p => p.as_of))].sort(), ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), maxRotation: 0, autoSkip: true }, grid: { display: false } }, y: { ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), callback: fmt }, grid: { color: C.grid } } } } }));
+        });
+        document.getElementById('dr-ms-note').textContent = note.join(' · ');
+    }
+    // 5b) 이벤트 타임라인
+    const DR_EV_KO = { award: '계약', extension: '연장', option: '옵션', termination: '해지', suspension: '중단', reactivation: '재가동', stacking: '스택', retirement: '퇴역', newbuild: '신조', tender: '입찰', ma: 'M&A', guidance: '가이던스', dayrate_change: '단가변경', other: '기타' };
+    function drEvCls(t) { return ['award', 'extension', 'option', 'reactivation'].includes(t) ? 'pos' : ['termination', 'suspension', 'stacking', 'retirement'].includes(t) ? 'neg' : ''; }
+    function drEvFilter(kind, val) { dr.evFilter[kind] = dr.evFilter[kind] === val ? null : val; dr.evShown = 20; drRenderEvents(); }
+    function drEvMore() { dr.evShown += 20; drRenderEvents(); }
+    function drRenderEvents() {
+        const all = dr.data.events || [], f = dr.evFilter || {};
+        const types = [...new Set(all.map(e => e.type))], codes = [...new Set(all.map(e => e.code).filter(Boolean))];
+        document.getElementById('dr-ev-filters').innerHTML = types.map(t => `<span class="dr-chip ${f.type === t ? 'active' : ''}" onclick="drEvFilter('type', '${t}')">${DR_EV_KO[t] || t} ${all.filter(e => e.type === t).length}</span>`).join('') +
+            codes.map(c => `<span class="dr-chip ${f.code === c ? 'active' : ''}" onclick="drEvFilter('code', '${c}')">${c}</span>`).join('');
+        const evs = all.filter(e => (!f.type || e.type === f.type) && (!f.code || e.code === f.code));
+        const tbl = document.getElementById('dr-ev');
+        if (!evs.length) { tbl.innerHTML = '<tbody><tr><td class="dr-empty">최근 60일 이벤트 없음 (06:00 수집기가 쌓습니다)</td></tr></tbody>'; document.getElementById('dr-ev-more').innerHTML = ''; return; }
+        const rows = evs.slice(0, dr.evShown).map(e => `<tr><td class="num">${drEsc(e.date)}</td><td><span class="dr-badge ${drEvCls(e.type)}">${DR_EV_KO[e.type] || e.type}</span></td>` +
+            `<td>${e.code ? drTag(e.code) + ' ' : ''}${drEsc(e.company || '-')}</td><td><b>${drEsc(e.rig || '-')}</b>${e.rig_type && e.rig_type !== 'unknown' ? `<small>${drEsc(e.rig_type)}</small>` : ''}</td>` +
+            `<td>${drEsc((dr.data.regions || []).find(r => r.key === e.region) ? dr.data.regions.find(r => r.key === e.region).label : e.region || '-')}</td><td>${drEsc(e.customer || '-')}</td>` +
+            `<td class="num">${e.start ? drEsc(e.start) : ''}${e.duration_days ? `<small>${drNum(e.duration_days, 0)}일</small>` : ''}</td><td class="num">${e.dayrate_usd_k != null ? '$' + drNum(e.dayrate_usd_k, 0) + 'K' : '-'}${e.tcv_usd_m != null ? `<small>TCV $${drNum(e.tcv_usd_m, 0)}M</small>` : ''}</td>` +
+            `<td>${e.url ? `<a href="${drEsc(e.url)}" target="_blank" rel="noopener">${drEsc(e.source_name || e.source)}</a>` : drEsc(e.source_name || e.source)}${drI(e.quote)}</td></tr>`).join('');
+        tbl.innerHTML = '<thead><tr><th>날짜</th><th>종류</th><th>회사</th><th>리그</th><th>지역</th><th>고객</th><th>시작·기간</th><th>단가</th><th>출처</th></tr></thead><tbody>' + rows + '</tbody>';
+        document.getElementById('dr-ev-more').innerHTML = evs.length > dr.evShown ? `<span class="dr-more" onclick="drEvMore()">더 보기 (${evs.length - dr.evShown}건 남음)</span>` : '';
+    }
+    // 3) 지표 추이 (접이식)
+    function drOnTrendToggle() { if (document.getElementById('dr-trend-fold').open && dr.data && !dr.trendDrawn) drRenderTrends(); }
+    function drRenderTrends() {
+        const d = dr.data, C = drColors(), sig = d.signals || {};
+        dr.charts.forEach(ch => ch.destroy()); dr.charts = [];
+        const quarters = [...new Set(Object.values(d.series).flatMap(s => s.quarters))].sort();
+        const grid = document.getElementById('dr-trend-grid');
+        grid.innerHTML = DR_SIG_ORDER.map(k => `<div class="dr-trend"><canvas id="dr-trend-${k}"></canvas></div>`).join('');
+        const marks = Object.entries(d.merger_marks || {}).map(([code, m]) => ({ code, ...m })).filter(m => quarters.includes(m.quarter));
+        const markPlugin = { id: 'drMarks', afterDraw(chart) {
+            const x = chart.scales.x, ctx = chart.ctx;
+            marks.forEach(m => { const px = x.getPixelForValue(m.quarter); if (!isFinite(px)) return;
+                ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = C.muted; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, chart.chartArea.top); ctx.lineTo(px, chart.chartArea.bottom); ctx.stroke();
+                ctx.fillStyle = C.muted; ctx.font = `${fz(9, 'tab-drilling')}px sans-serif`; ctx.fillText(m.label, px + 3, chart.chartArea.top + 9); ctx.restore(); }); } };
+        DR_SIG_ORDER.forEach(k => {
+            const blocks = drSigBlocks(k); if (!blocks.length) return;
+            const first = blocks[0];
+            const hists = blocks.map(b => { const h = {}; (b.history || []).forEach(x => { h[x.quarter] = x; }); return h; });
+            // 회사별 점 색: 그 분기 발언을 낸 회사(여러 회사면 첫 회사). 드릴십 실선, 한랭지 점선
+            const datasets = blocks.map((b, i) => {
+                const hist = hists[i];
+                const pointColors = quarters.map(q => { const h = hist[q]; const code = h ? Object.keys(h.by_code || {})[0] : null; return code ? C.series[code] : C.muted; });
+                return { label: b.segment_ko || b.label, data: quarters.map(q => hist[q] ? hist[q].value : null), borderColor: C.muted, borderDash: b.segment === 'harsh' ? [4, 3] : [],
+                         pointBackgroundColor: pointColors, pointBorderColor: pointColors, pointRadius: 4, pointStyle: b.segment === 'harsh' ? 'triangle' : 'circle', spanGaps: true, tension: 0.2 };
+            });
+            const ch = new Chart(document.getElementById(`dr-trend-${k}`), { type: 'line', plugins: [markPlugin],
+                data: { labels: quarters, datasets },
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: blocks.length > 1, labels: { color: C.muted, font: fzf(9, 'tab-drilling'), boxWidth: 10 } }, title: { display: true, text: `${first.label}${first.unit ? ' (' + first.unit + ')' : ''}`, font: fzf(11, 'tab-drilling', { weight: 'bold' }), color: C.text },
+                               tooltip: { callbacks: { label: c => { const h = hists[c.datasetIndex][c.label]; return `${c.dataset.label} ${c.raw == null ? '-' : drNum(c.raw, 1)}${first.unit} · ${Object.keys((h || {}).by_code || {}).map(x => DR_TAG[x] || x).join('/')}`; } } } },
+                    scales: { x: { ticks: { color: C.muted, font: fzf(9, 'tab-drilling'), maxRotation: 0, autoSkip: true }, grid: { display: false } }, y: { ticks: { color: C.muted, font: fzf(9, 'tab-drilling') }, grid: { color: C.grid } } } } });
+            dr.charts.push(ch);
+        });
+        dr.trendDrawn = true;
+    }
+    // 4) 지역 수요 매트릭스
+    function drRenderRegionMatrix() {
+        const rm = dr.data.region_matrix; if (!rm) return;
+        const sm = rm.summary || {};
+        document.getElementById('dr-rm-summary').innerHTML = `<span class="dr-up">상승 ${sm.up || 0}</span> · <span class="dr-down">하락 ${sm.down || 0}</span> · <span class="dr-mixed">혼재 ${sm.mixed || 0}</span>`;
+        let h = '<thead><tr><th>지역</th>' + rm.quarters.map(q => `<th style="text-align:center;">${drEsc(q)}</th>`).join('') + '<th style="text-align:center;">추세</th></tr></thead><tbody>';
+        (dr.data.regions || []).forEach(r => {
+            const row = rm.rows[r.key]; if (!row) return;
+            h += `<tr><td>${drEsc(row.label)}</td>` + rm.quarters.map(q => {
+                const c = row.cells[q]; const key = `${r.key}|${q}`;
+                const evn = c && c.events_n ? `<small class="dr-flat" title="이 분기 계약·연장·옵션 건수">${c.events_n}건</small>` : '';
+                if (!c || !c.comments.length) return `<td class="cell">${evn}</td>`;
+                const tags = [...new Set(c.comments.map(x => x.code))].map(drTag).join('');
+                return `<td class="cell ${dr.openCell === key ? 'open' : ''}" onclick="drToggleCell('${r.key}', '${q}')"><span class="dr-dot ${drCls(c.direction)}"></span>${tags}${evn}</td>`;
+            }).join('') + `<td class="trend ${drCls(row.trend)}">${drArrow(row.trend)} ${drEsc(row.trend === 'none' ? '-' : { up: '확대', down: '약세', flat: '보합', mixed: '혼재' }[row.trend] || row.trend)}</td></tr>`;
+        });
+        document.getElementById('dr-rm').innerHTML = h + '</tbody>';
+        drRenderCellDetail();
+    }
+    function drToggleCell(rkey, q) { const key = `${rkey}|${q}`; dr.openCell = dr.openCell === key ? null : key; drRenderRegionMatrix(); }
+    function drRenderCellDetail() {
+        const box = document.getElementById('dr-rm-detail');
+        if (!dr.openCell) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const [rkey, q] = dr.openCell.split('|'); const row = dr.data.region_matrix.rows[rkey]; const c = row && row.cells[q];
+        if (!c) { box.style.display = 'none'; return; }
+        box.innerHTML = `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin-bottom:4px;">${drEsc(row.label)} · ${drEsc(q)} — 경영진 발언 ${c.comments.length}건</div>` +
+            c.comments.map(x => `<div class="dr-row"><span class="co">${drEsc(x.code)}</span><span class="v ${drCls(x.direction)}">${drArrow(x.direction)} ${drEsc(x.direction || '-')}</span><span class="sub">${drEsc(x.topic || '')}</span><span class="q">${drEsc(x.quote)}</span></div>`).join('');
+        box.style.display = '';
+    }
+    // 5) 회사 실적 변수 표: "최근 (Δ)" 2줄
+    function drDeltaCell(valueHtml, delta, fmtDelta, goodWhenUp, quote) {
+        const cls = delta == null || delta === 0 ? 'dr-flat' : ((delta > 0) === goodWhenUp ? 'dr-up' : 'dr-down');
+        return `<td>${valueHtml}${drI(quote)}<small class="${cls}">${delta == null ? '' : (delta > 0 ? '+' : '') + fmtDelta(delta)}</small></td>`;
+    }
+    function drRenderCompanyTable() {
+        const d = dr.data, codes = d.tickers || [];
+        const cols = ['최신 분기', '내년 커버리지', '내후년', 'FSR 커버리지<small>내년 / 내후년 (옵션 포함)</small>', 'FSR 공백 리그', '공백 예정 리그', '레거시 재가격', '평균 일매출', '가이던스', '백로그 ($B)', '조정 EBITDA ($M)', 'FCF ($M)', '자사주 ($M)'];
+        let h = '<thead><tr><th>회사</th>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+        codes.forEach(code => {
+            const name = (d.names || {})[code] || code, it = drLatest(code), cd = (d.company_deltas || {})[code];
+            h += `<tr><td><a onclick="goStockView('us', '${code}', '${drEsc(name)}')">${code}</a><small>${drEsc(name)}</small></td>`;
+            if (!it || !cd) { h += `<td colspan="${cols.length}" style="text-align:left;color:var(--text-muted);">수집 전</td></tr>`; return; }
+            const c = it.company, M = cd.metrics;
+            const pct = (x, m) => drDeltaCell(x && x.value_pct != null ? `${drNum(x.value_pct, 0)}%<small>${x.year || ''}</small>` : '-', m.delta, v => drNum(v, 0) + 'pp', true, x && x.quote);
+            const gaps = c.gap_rigs || [];
+            const lr = c.legacy_repricing || {};
+            const fc = cd.coverage_fsr || {}, fy = Object.keys(fc).sort();
+            const fcell = y => { const x = fc[y]; return x && x.firm_pct != null ? `${drNum(x.firm_pct, 0)}%<small>옵션 포함 ${drNum(x.with_options_pct, 0)}% · ${x.marketed_rigs}척 · ${drEsc(x.report_date || '')}</small>` : '-'; };
+            const fg = cd.gap_rigs_fsr || [];
+            h += `<td>${drEsc(it.quarter)}<small>${drEsc(cd.prev_quarter ? '직전 ' + cd.prev_quarter : '')}</small></td>` +
+                 pct(c.contracted_next_year, M.coverage_next) + pct(c.contracted_year_after, M.coverage_after) +
+                 `<td>${fy.length ? fy.map(y => `<span title="${y}">${fcell(y)}</span>`).join('<small>/</small>') : '-'}</td>` +
+                 `<td>${fg.length ? `${fg.length}<span class="dr-i" onclick="drToggleQuote(this)" title="FSR 기준 공백 리그">i</span><span class="dr-quote">${fg.map(g => `${drEsc(g.rig)} (마지막 계약 ${drEsc(g.last_end)})`).join('<br>')}</span>` : (fy.length ? '0' : '-')}</td>` +
+                 drDeltaCell(gaps.length ? `${gaps.length}<span class="dr-i" onclick="drToggleQuote(this)" title="목록">i</span><span class="dr-quote">${gaps.map(g => `${drEsc(g.rig || '?')} (${drEsc(g.when || '?')})${g.quote ? ' — ' + drEsc(g.quote) : ''}`).join('<br>')}</span>` : (c.gap_rigs ? '0' : '-'), M.gap_rigs.delta, v => drNum(v, 0) + '척', false, null) +
+                 `<td>${lr.status ? drEsc(lr.status) + (lr.effective ? `<small>${drEsc(lr.effective)}</small>` : '') + drI(lr.quote) : '-'}</td>` +
+                 drDeltaCell(c.avg_dayrate && c.avg_dayrate.value != null ? '$' + drNum(c.avg_dayrate.value, 0) : '-', M.avg_dayrate.delta, v => '$' + drNum(v, 0), true, c.avg_dayrate && c.avg_dayrate.quote) +
+                 `<td>${c.guidance_change && c.guidance_change.direction ? `<span class="${drCls(c.guidance_change.direction)}">${drArrow(c.guidance_change.direction === 'raised' ? 'up' : c.guidance_change.direction === 'lowered' ? 'down' : 'flat')} ${drEsc(c.guidance_change.direction)}</span>` + drI(c.guidance_change.quote) : '-'}</td>` +
+                 drDeltaCell(drUsd(c.backlog_usd, 'B'), M.backlog_usd.delta, v => (v / 1e9).toFixed(2) + 'B', true, (c.backlog || {}).quote) +
+                 drDeltaCell(drUsd(c.adj_ebitda_usd, 'M'), M.adj_ebitda_usd.delta, v => drNum(v / 1e6, 0) + 'M', true, null) +
+                 drDeltaCell(drUsd(c.fcf_usd, 'M'), M.fcf_usd.delta, v => drNum(v / 1e6, 0) + 'M', true, (c.fcf || {}).quote) +
+                 drDeltaCell(drUsd(c.buyback_usd, 'M'), M.buyback_usd.delta, v => drNum(v / 1e6, 0) + 'M', true, (c.buyback || {}).quote) + '</tr>';
+        });
+        document.getElementById('dr-table').innerHTML = h + '</tbody>';
+    }
+    // 6) 다가오는 일정
+    function drRenderUpcoming() {
+        const u = dr.data.upcoming || { gap_rigs: [], earnings_dates: [] };
+        const gaps = (u.gap_rigs || []).map(g => `<div class="dr-row"><span class="co">${drEsc(g.code)}</span><span class="v">${drEsc(g.rig)}</span><span class="sub">${drEsc(g.when || '?')}${g.when_date ? ' (' + g.when_date.slice(0, 7) + ')' : ''} · ${drEsc(g.quarter)} 발언</span>${drI(g.quote)}</div>`).join('');
+        const dates = (u.earnings_dates || []).map(e => `<div class="dr-row"><span class="co">${drEsc(e.code)}</span><span class="v">${drEsc(e.date)}</span><span class="sub">다음 실적 발표 (${drEsc(e.name)})</span></div>`).join('');
+        document.getElementById('dr-upcoming').innerHTML =
+            `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin-bottom:4px;">공백 예정 리그</div>` + (gaps || '<div class="dr-empty">180일 안 공백 예정 리그 없음</div>') +
+            `<div class="label" style="color:var(--text-muted);font-size:var(--fs-sm);margin:8px 0 4px;">다음 실적 발표</div>` + (dates || '<div class="dr-empty">180일 안 발표 예정일 정보 없음</div>');
+    }
     function goStockView(market, code, name) {
         switchTab('stockview');
         if (!stockviewLoaded) { stockviewLoaded = true; initStockView(); }

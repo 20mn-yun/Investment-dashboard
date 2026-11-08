@@ -117,18 +117,20 @@ def _exhibits_from_index_html(cik_int, acc):
     return out
 
 
-def list_earnings_8k(code, cik10, since_days=400):
-    """최근 since_days 의 8-K(Item 2.02) 접수와 EX-99.1/99.2 첨부 → [{accession, date, exhibit, filename, url, size, description}]"""
+def list_earnings_8k(code, cik10, since_days=400, items=("2.02",)):
+    """최근 since_days 의 8-K 접수 중 Item 이 items 중 하나를 포함하는 것(기본 2.02 실적)과 EX-99.1/99.2 첨부
+    → [{accession, date, exhibit, filename, url, size, description, items}]"""
     sub = _get(uf.SEC_SUBMISSIONS_URL.format(cik=cik10), timeout=30).json()
     cik_int = int(cik10)
     rec = sub.get("filings", {}).get("recent", {})
-    forms, dates, accs, items = rec.get("form") or [], rec.get("filingDate") or [], rec.get("accessionNumber") or [], rec.get("items") or []
+    forms, dates, accs, items_list = rec.get("form") or [], rec.get("filingDate") or [], rec.get("accessionNumber") or [], rec.get("items") or []
     since = (date.today() - timedelta(days=since_days)).isoformat()
     out = []
     for i, form in enumerate(forms):
         if form != "8-K" or i >= len(dates) or dates[i] < since:
             continue
-        if "2.02" not in (items[i] if i < len(items) else ""):
+        it_str = items_list[i] if i < len(items_list) else ""
+        if not any(x in it_str for x in items):
             continue
         acc = accs[i]
         try:
@@ -137,7 +139,7 @@ def list_earnings_8k(code, cik10, since_days=400):
             print(f"[sec_filings] {code} {acc} index 읽기 실패: {type(e).__name__}", flush=True)
             continue
         for ex in exs:
-            out.append(dict(ex, accession=acc, date=dates[i], cik_int=cik_int))
+            out.append(dict(ex, accession=acc, date=dates[i], cik_int=cik_int, items=it_str))
     out.sort(key=lambda x: (x["date"], x["accession"], x["exhibit"]), reverse=True)
     return out
 

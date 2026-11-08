@@ -9,6 +9,8 @@ THRESHOLD_MB=${THRESHOLD_MB:-20}
 DASH=/Users/yun/investment_dashboard
 FILES="$DASH/app.log
 $DASH/logs/mcp_server.launchd.log
+$DASH/logs/drilling_daily.log
+$DASH/logs/drilling_daily.launchd.log
 $DASH/nightly_restart.log"
 
 size_mb() { # 정수 MB (내림)
