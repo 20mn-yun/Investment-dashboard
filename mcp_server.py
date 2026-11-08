@@ -726,8 +726,6 @@ LOG_FILES = {
     "nightly_restart": os.path.join(BASE_DIR, "nightly_restart.log"),
     "socket_monitor": os.path.join(BASE_DIR, "socket_monitor.log"),
     "refinery": os.path.join(_ULOGS, "refinery-cache.log"),
-    "stockbot": os.path.join(_ULOGS, "stockbot.log"),
-    "stockbot_error": os.path.join(_ULOGS, "stockbot_error.log"),
     "valuation_band": os.path.join(BASE_DIR, "valuation_band.log"),
     "valuation_band_err": os.path.join(BASE_DIR, "valuation_band.err"),
     "valuation_screener": os.path.join(BASE_DIR, "valuation_screener.log"),

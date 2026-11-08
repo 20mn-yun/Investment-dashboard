@@ -1,16 +1,13 @@
 #!/bin/sh
 # 로그 로테이션 (nightly_restart.sh 에서 호출). 사용: rotate_logs.sh [mv|gzip]  (인자 없으면 mv → gzip)
 #  mv   : THRESHOLD_MB(기본 20) 이상인 파일만 .1 로 옮기고 기존 .1→.2 … .5 를 밀어 올림(.6 은 삭제). 같은 폴더.
-#  gzip : .2 이상 중 아직 압축 안 된 것을 gzip (순차 실행. stockbot 400MB 는 수 분 걸릴 수 있어 재시작 뒤에 돌린다)
+#  gzip : .2 이상 중 아직 압축 안 된 것을 gzip (순차 실행. 큰 파일은 수 분 걸릴 수 있어 재시작 뒤에 돌린다)
 #  nightly_restart.log(자기 자신의 stdout)는 마지막에, 크기 조건만 같다.
 set -u
 
 THRESHOLD_MB=${THRESHOLD_MB:-20}
-HOME_DIR=${HOME:-/Users/yun}
 DASH=/Users/yun/investment_dashboard
-FILES="$HOME_DIR/Library/Logs/stockbot.log
-$HOME_DIR/Library/Logs/stockbot_error.log
-$DASH/app.log
+FILES="$DASH/app.log
 $DASH/logs/mcp_server.launchd.log
 $DASH/nightly_restart.log"
 

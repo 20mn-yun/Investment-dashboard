@@ -24,11 +24,8 @@ resolve_pid() {
     echo "--- lsof per-process top10 ---"
     lsof -nP -i 2>/dev/null | awk 'NR>1{print $1, $2}' | sort | uniq -c | sort -rn | head -10
     DASH=$(resolve_pid com.yun.dashboard)
-    BOT=$(resolve_pid com.yun.stockbot)
     echo "--- app.py(pid=${DASH:-none}) socket states ---"
     if [ -n "$DASH" ]; then lsof -nP -i -a -p "$DASH" 2>/dev/null | awk 'NR>1{print $10}' | sort | uniq -c; fi
-    echo "--- stockbot(pid=${BOT:-none}) socket states ---"
-    if [ -n "$BOT" ]; then lsof -nP -i -a -p "$BOT" 2>/dev/null | awk 'NR>1{print $10}' | sort | uniq -c; fi
     echo "--- CLOSE_WAIT total ---"
     netstat -an | grep -c CLOSE_WAIT
     EPH=$(netstat -an | awk '$4 ~ /\.(49[1-9][0-9][0-9]|5[0-9]{4}|6[0-5][0-9]{3})$/' | wc -l | tr -d ' ')
