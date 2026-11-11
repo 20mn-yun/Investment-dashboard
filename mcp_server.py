@@ -738,6 +738,7 @@ LOG_FILES = {
     "korea_export": os.path.join(BASE_DIR, "korea_export_update.log"),
     "drilling_daily": os.path.join(LOG_DIR, "drilling_daily.log"),
     "drilling_daily_launchd": os.path.join(LOG_DIR, "drilling_daily.launchd.log"),
+    "earnings_backfill": os.path.join(LOG_DIR, "earnings_backfill.log"),
 }
 for _m in ("us", "kr", "jp", "eu"):
     LOG_FILES[f"batch_{_m}"] = os.path.join(_CACHE, f"batch_top_gainers_{_m}.log")
