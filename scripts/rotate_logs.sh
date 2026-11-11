@@ -10,10 +10,10 @@ THRESHOLD_MB=${THRESHOLD_MB:-20}
 DASH=/Users/yun/investment_dashboard
 LAST="$DASH/nightly_restart.log"   # 자기 자신의 stdout 이라 맨 마지막
 
-# 대상: 대시보드 바로 아래 *.log·*.err, logs/*.log, cache/*.log, ~/Library/Logs/refinery-cache.log
+# 대상: 대시보드 바로 아래 *.log·*.err, logs/*.log·*.err, cache/*.log, ~/Library/Logs/refinery-cache.log
 # 제외: 이미 돌린 파일(.1~.5, .gz), logs/llm_calls.jsonl, nightly_restart.log(마지막에 따로 추가)
 list_files() {
-    for f in "$DASH"/*.log "$DASH"/*.err "$DASH"/logs/*.log "$DASH"/cache/*.log /Users/yun/Library/Logs/refinery-cache.log; do
+    for f in "$DASH"/*.log "$DASH"/*.err "$DASH"/logs/*.log "$DASH"/logs/*.err "$DASH"/cache/*.log /Users/yun/Library/Logs/refinery-cache.log; do
         [ -f "$f" ] || continue
         case "$f" in
             "$LAST") continue ;;
