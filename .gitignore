@@ -1,5 +1,4 @@
 cache/*
-!cache/refinery.json
 !cache/.gitkeep
 *.log
 *.log.[0-9]*

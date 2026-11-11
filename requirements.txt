@@ -1,2 +1,21 @@
+# 저장소 코드가 실제로 import 하는 외부 패키지 (2026-11-11, 맥미니 설치 버전으로 고정)
+# 설치: python3 -m pip install -r requirements.txt
+anthropic==0.84.0
+beautifulsoup4==4.14.3
 fastmcp==4.1.6
-pdfplumber
+feedparser==6.0.12
+Flask==3.1.3
+flask-cors==6.0.2
+google-auth==2.48.0
+gspread==6.2.1
+html2text==2025.4.15
+lxml==6.0.2
+numpy==1.26.4
+openpyxl==3.1.5
+pandas==2.3.3
+pdfplumber==0.11.10
+pypdf==6.20.0
+python-dotenv==1.2.2
+requests==2.32.5
+Telethon==1.43.2
+yfinance==1.2.0

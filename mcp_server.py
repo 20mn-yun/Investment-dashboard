@@ -724,7 +724,6 @@ LOG_FILES = {
     "watchdog": os.path.join(LOG_DIR, "watchdog.log"),
     "watchdog_launchd": os.path.join(LOG_DIR, "watchdog_launchd.log"),
     "nightly_restart": os.path.join(BASE_DIR, "nightly_restart.log"),
-    "socket_monitor": os.path.join(BASE_DIR, "socket_monitor.log"),
     "refinery": os.path.join(_ULOGS, "refinery-cache.log"),
     "valuation_band": os.path.join(BASE_DIR, "valuation_band.log"),
     "valuation_band_err": os.path.join(BASE_DIR, "valuation_band.err"),
@@ -742,8 +741,8 @@ LOG_FILES = {
 }
 for _m in ("us", "kr", "jp", "eu"):
     LOG_FILES[f"batch_{_m}"] = os.path.join(_CACHE, f"batch_top_gainers_{_m}.log")
-    LOG_FILES[f"batch_launchd_{_m}"] = f"/tmp/dashboard_batch_{_m}.log"
-    LOG_FILES[f"batch_launchd_err_{_m}"] = f"/tmp/dashboard_batch_{_m}.err"
+    LOG_FILES[f"batch_launchd_{_m}"] = os.path.join(LOG_DIR, f"batch_gainers_{_m}.launchd.log")
+    LOG_FILES[f"batch_launchd_err_{_m}"] = os.path.join(LOG_DIR, f"batch_gainers_{_m}.launchd.err")
 
 CACHE_GROUPS = {
     "market": ["cache/top_gainers_us.json", "cache/top_gainers_kr.json", "cache/top_gainers_jp.json", "cache/top_gainers_eu.json",

@@ -22,8 +22,8 @@
     <key>RunAtLoad</key>
     <false/>
     <key>StandardOutPath</key>
-    <string>/tmp/dashboard_batch_us.log</string>
+    <string>/Users/yun/investment_dashboard/logs/batch_gainers_us.launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/dashboard_batch_us.err</string>
+    <string>/Users/yun/investment_dashboard/logs/batch_gainers_us.launchd.err</string>
 </dict>
 </plist>

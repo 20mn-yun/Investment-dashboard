@@ -1,5 +1,6 @@
 #!/bin/sh
 # 로그 로테이션 (nightly_restart.sh 에서 호출). 사용: rotate_logs.sh [mv|gzip]  (인자 없으면 mv → gzip)
+#  대상은 아래 list_files 의 경로 패턴 전체 (고정 목록 아님)
 #  mv   : THRESHOLD_MB(기본 20) 이상인 파일만 .1 로 옮기고 기존 .1→.2 … .5 를 밀어 올림(.6 은 삭제). 같은 폴더.
 #  gzip : .2 이상 중 아직 압축 안 된 것을 gzip (순차 실행. 큰 파일은 수 분 걸릴 수 있어 재시작 뒤에 돌린다)
 #  nightly_restart.log(자기 자신의 stdout)는 마지막에, 크기 조건만 같다.
@@ -7,11 +8,22 @@ set -u
 
 THRESHOLD_MB=${THRESHOLD_MB:-20}
 DASH=/Users/yun/investment_dashboard
-FILES="$DASH/app.log
-$DASH/logs/mcp_server.launchd.log
-$DASH/logs/drilling_daily.log
-$DASH/logs/drilling_daily.launchd.log
-$DASH/nightly_restart.log"
+LAST="$DASH/nightly_restart.log"   # 자기 자신의 stdout 이라 맨 마지막
+
+# 대상: 대시보드 바로 아래 *.log·*.err, logs/*.log, cache/*.log, ~/Library/Logs/refinery-cache.log
+# 제외: 이미 돌린 파일(.1~.5, .gz), logs/llm_calls.jsonl, nightly_restart.log(마지막에 따로 추가)
+list_files() {
+    for f in "$DASH"/*.log "$DASH"/*.err "$DASH"/logs/*.log "$DASH"/cache/*.log /Users/yun/Library/Logs/refinery-cache.log; do
+        [ -f "$f" ] || continue
+        case "$f" in
+            "$LAST") continue ;;
+            *.[1-5]|*.gz|*/logs/llm_calls.jsonl) continue ;;
+        esac
+        echo "$f"
+    done
+    echo "$LAST"
+}
+FILES=$(list_files)
 
 size_mb() { # 정수 MB (내림)
     sz=$(stat -f %z "$1" 2>/dev/null || echo 0)
