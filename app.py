@@ -2872,7 +2872,7 @@ def _earnings_tracker_loop():
         state = earnings_tracker.load_state()
         today = date.today()
         last_run_str = state.get("last_run_date")
-        if today.weekday() < 5 and last_run_str != today.isoformat():
+        if today.weekday() < 5 and datetime.now().hour >= 20 and last_run_str != today.isoformat():
             print(f"[earnings_tracker] 시작 시 catch-up: last_run={last_run_str}, today={today.isoformat()}", flush=True)
             earnings_tracker.run_daily()
     except Exception as e:
