@@ -165,6 +165,8 @@ DEFAULT_CONFIG = {
     "drive_export_dir": "",
     # 이미지 정밀 전사용 비전 모델 (분류용 flash-lite와 별개). 상위 정확도 필요 시 교체 가능.
     "vision_transcribe_model": "gemini-2.5-flash",
+    # 에스컬레이션: 1차 전사가 건강 판정 불합격일 때만 이 상위 비전 모델로 1회 재전사. 비우면 에스컬레이션 안 함.
+    "vision_escalation_model": "gemini-3.1-pro-preview",
 }
 
 # 드라이브 마운트 자동 탐색은 telegram_report.drive_path() 공통 헬퍼 사용 → {드라이브 루트}/Analysis/텔레인박스
@@ -1109,7 +1111,45 @@ def _transcribe_one(image_path, model):
     return txt.strip() if txt and txt.strip() else ""
 
 
-def transcribe_item_images(item_id):
+def _record_escalation_stat(recovered):
+    """에스컬레이션 1회를 당일 버킷에 기록(escalated, esc_recovered)."""
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    with _stats_lock:
+        stats = _load_stats()
+        day = stats["days"].setdefault(
+            today, {"attempt": 0, "success": 0, "fail_check": 0, "fail_api": 0, "reasons": []})
+        day["escalated"] = day.get("escalated", 0) + 1
+        if recovered:
+            day["esc_recovered"] = day.get("esc_recovered", 0) + 1
+        _save_stats(stats)
+
+
+def _escalate_transcription(item_id, idx, path, first_txt, first_reason, esc_model):
+    """1차 전사(건강 판정 불합격)를 상위 비전 모델로 1회만 재전사한다(루프 없음).
+    채택: 상위 결과가 합격이면 상위, 둘 다 불합격이면 [판독불가] 횟수가 적은 쪽(같으면 1차).
+    반환 (채택 전사문, desc_health 문자열(끝에 ' · escalated'), 최종 합격 여부)."""
+    n0 = first_txt.count("[판독불가]")
+    try:
+        txt2 = _gemini_vision_api(_TRANSCRIBE_PROMPT, path, esc_model, timeout=300)
+    except RateLimitError:
+        txt2 = ""
+    txt2 = (txt2 or "").strip()
+    if txt2:
+        ok2, reason2 = _check_transcription_health(txt2)
+        n1 = txt2.count("[판독불가]")
+    else:
+        ok2, reason2, n1 = False, "에스컬레이션 무응답", None
+    if ok2 or (txt2 and n1 < n0):
+        text, ok, reason, pick = txt2, ok2, reason2, "상위"
+    else:
+        text, ok, reason, pick = first_txt, False, first_reason, "1차"
+    _record_escalation_stat(ok2)
+    print(f"[tg_inbox] transcribe 에스컬레이션: {item_id} img#{idx+1} 판독불가 {n0}→{'-' if n1 is None else n1} "
+          f"({esc_model}, {'회복' if ok2 else '불합격 유지'}, 채택={pick})", flush=True)
+    return text, ("ok" if ok else reason) + " · escalated", ok
+
+
+def transcribe_item_images(item_id, force=False):
     """해당 항목의 각 이미지를 정밀 전사해 item['image_desc'](이미지당 1개)에 저장.
 
     - 이미 desc가 있는 이미지는 건너뛴다(재호출 안 함).
@@ -1130,27 +1170,42 @@ def transcribe_item_images(item_id):
     if not images:
         return {"status": "skip", "reason": "no_images"}
 
-    model = (get_config().get("vision_transcribe_model") or "gemini-2.5-flash").strip()
+    cfg = get_config()
+    model = (cfg.get("vision_transcribe_model") or "gemini-2.5-flash").strip()
+    esc_model = (cfg.get("vision_escalation_model") or "").strip()
     # descs·healths 길이를 이미지 수에 맞춤
     descs = (descs + [None] * len(images))[:len(images)]
     healths = (healths + [None] * len(images))[:len(images)]
 
     changed = False
     for i, fn in enumerate(images):
+        path = os.path.join(MEDIA_DIR, fn)
         if descs[i] and str(descs[i]).strip():
-            ok_prev, _ = _check_transcription_health(str(descs[i]))
+            ok_prev, reason_prev = _check_transcription_health(str(descs[i]))
             if ok_prev:
                 continue  # 이미 정상 전사됨 (불합격/잘린 전사문은 재전사)
-        path = os.path.join(MEDIA_DIR, fn)
+            escalated_before = "escalated" in str(healths[i] or "")
+            if escalated_before and not force:
+                continue  # 재시도 상한: 에스컬레이션까지 끝난 불합격 → 수동 force 가 아니면 다시 호출하지 않음
+            if not escalated_before and esc_model:
+                # 1차 불합격 전사문이 이미 있음 → 1차를 다시 돌리지 않고 상위 모델로 1회만 재전사
+                descs[i], healths[i], _ = _escalate_transcription(item_id, i, path, str(descs[i]).strip(), reason_prev, esc_model)
+                changed = True
+                continue
+            # force 이고 이미 에스컬레이션까지 끝난 이미지 → 처음부터(1차 → 불합격 시 에스컬레이션 1회) 다시
         txt = _transcribe_one(path, model)
         if txt:
             ok, reason = _check_transcription_health(txt)
-            descs[i] = txt
-            healths[i] = "ok" if ok else reason
-            changed = True
             _record_transcribe_stat("success" if ok else "fail_check", None if ok else reason)
             tag = "ok" if ok else f"불합격({reason})"
             print(f"[tg_inbox] transcribe {tag}: {item_id} img#{i+1} ({len(txt)} chars)", flush=True)
+            if not ok and esc_model:
+                txt, health, ok = _escalate_transcription(item_id, i, path, txt, reason, esc_model)
+            else:
+                health = "ok" if ok else reason
+            descs[i] = txt
+            healths[i] = health
+            changed = True
         else:
             _record_transcribe_stat("fail_api", "API 무응답/빈응답")
             print(f"[tg_inbox] transcribe FAILED(api): {item_id} img#{i+1} ({fn}) — desc 없이 둠", flush=True)
@@ -1166,6 +1221,13 @@ def transcribe_item_images(item_id):
         target["image_desc"] = descs
         target["desc_health"] = healths
         target["desc_ts"] = datetime.now(KST).isoformat()
+        # 에스컬레이션까지 끝나고도 불합격인 이미지가 남으면 최종 처리 → 주기 배치·백필 대상에서 제외(수동 force 만 재전사)
+        final = any(d and str(d).strip() and not _check_transcription_health(str(d))[0] and "escalated" in str(h or "")
+                    for d, h in zip(descs, healths))
+        if final:
+            target["transcribe_final"] = True
+        else:
+            target.pop("transcribe_final", None)
         _save_data(data)
     done = sum(1 for d in descs if d and str(d).strip())
     return {"status": "ok", "id": item_id, "images": len(images), "transcribed": done}
@@ -1183,12 +1245,16 @@ def _needs_transcription(item):
     return False
 
 
-def _has_unhealthy_desc(item):
-    """전사문이 있지만 건강 판정에 불합격(잘림·형식붕괴)인 이미지가 하나라도 있으면 True (복구용)."""
-    for dsc in (item.get("image_desc") or []):
+def _has_unhealthy_desc(item, include_final=False):
+    """전사문이 있지만 건강 판정에 불합격(잘림·형식붕괴)인 이미지가 하나라도 있으면 True (복구용).
+    에스컬레이션까지 끝난 불합격 이미지(desc_health 에 escalated)는 include_final=True(수동 force)일 때만 센다."""
+    healths = item.get("desc_health") or []
+    for i, dsc in enumerate(item.get("image_desc") or []):
         if dsc and str(dsc).strip():
             ok, _ = _check_transcription_health(str(dsc))
             if not ok:
+                if not include_final and "escalated" in str(healths[i] if i < len(healths) else ""):
+                    continue
                 return True
     return False
 
@@ -1310,20 +1376,21 @@ def set_topic_hidden(name, enabled):
     return {"status": "ok", "name": name, "hidden": enabled}
 
 
-def backfill_transcriptions():
+def backfill_transcriptions(force=False):
     """기존 saved 항목 중 이미지가 있고 전사 안 된 것 전부에 전사 실행(수동 호출용).
 
     완료 후 export를 1회 실행. 개별 항목 실패는 건너뛴다.
+    force=True: 에스컬레이션까지 끝난 불합격(transcribe_final) 항목도 처음부터 다시 전사(수동 강제 재전사).
     """
     with _data_lock:
         data = _load_data()
         targets = [it.get("id") for it in data.get("items", [])
-                   if it.get("saved") and (_needs_transcription(it) or _has_unhealthy_desc(it))]
-    print(f"[tg_inbox] backfill start: {len(targets)}건", flush=True)
+                   if it.get("saved") and (_needs_transcription(it) or _has_unhealthy_desc(it, include_final=force))]
+    print(f"[tg_inbox] backfill start: {len(targets)}건{' (force)' if force else ''}", flush=True)
     done = 0
     for iid in targets:
         try:
-            r = transcribe_item_images(iid)
+            r = transcribe_item_images(iid, force=force)
             if isinstance(r, dict) and r.get("status") == "ok":
                 done += 1
             print(f"[tg_inbox] backfill {iid}: {r}", flush=True)
@@ -1369,9 +1436,12 @@ def _maybe_daily_transcribe_alert():
         freq[r] = freq.get(r, 0) + 1
     top = sorted(freq.items(), key=lambda x: -x[1])[:5]
     reason_line = ", ".join(f"{k}×{v}" for k, v in top) if top else "사유 기록 없음"
+    esc, esc_rec = day.get("escalated", 0), day.get("esc_recovered", 0)
     msg = (
         f"[전사 감시] {today} 이미지 전사 {attempt}건 중 실패 {fails}건 "
-        f"(불합격 {day.get('fail_check',0)} · API실패 {day.get('fail_api',0)}, 실패율 {ratio*100:.0f}%)"
+        f"(불합격 {day.get('fail_check',0)}"
+        + (f" (에스컬레이션 {esc}건, 그 후 회복 {esc_rec})" if esc else "")
+        + f" · API실패 {day.get('fail_api',0)}, 실패율 {ratio*100:.0f}%)"
         + (f" · 연속 API실패 {api_run}건" if api_run >= 3 else "")
         + f"\n사유: {reason_line}"
     )
@@ -1385,8 +1455,52 @@ def _maybe_daily_transcribe_alert():
 
 # ===== (B) 주간 표본 검사 리포트 =====
 
-def send_weekly_transcribe_sample():
-    """최근 7일 전사된 저장 항목의 이미지 중 무작위 3장을 [원본+전사문]으로 텔레그램 발송."""
+def _send_targeted_transcribe_sample(targets):
+    """지정 이미지만 [원본+전사문]으로 발송(에스컬레이션 검증용). targets: ["항목id#이미지번호(1-base)"], "#N" 생략 시 전사된 이미지 전부.
+    무작위·7일 창 미적용, last_weekly_sample 스탬프 미기록(정기 주간 표본과 독립)."""
+    with _data_lock:
+        data = _load_data()
+        by_id = {it.get("id"): it for it in data.get("items", [])}
+        picks, missing = [], []
+        for tgt in targets:
+            iid, _, num = str(tgt).strip().partition("#")
+            it = by_id.get(iid)
+            if it is None:
+                missing.append(f"{tgt}(항목 없음)")
+                continue
+            descs = it.get("image_desc") or []
+            imgs = it.get("images") or []
+            idxs = [int(num) - 1] if num.strip().isdigit() else list(range(len(imgs)))
+            for i in idxs:
+                d = descs[i] if 0 <= i < len(descs) else None
+                if 0 <= i < len(imgs) and d and str(d).strip():
+                    picks.append((iid, i + 1, it.get("channel_title") or it.get("channel") or "",
+                                  it.get("date"), os.path.basename(imgs[i]), str(d)))
+                else:
+                    missing.append(f"{iid}#{i + 1}(전사문 없음)")
+    n = len(picks)
+    sent = 0
+    for idx, (iid, k, ch, dt, base, desc) in enumerate(picks, 1):
+        caption = f"[에스컬레이션 검증 {idx}/{n}] {ch} · {_fmt_dt(dt)}"
+        path = os.path.join(MEDIA_DIR, base)
+        photo_ok = _tg_send_photo(path, caption) if os.path.exists(path) else False
+        if not photo_ok:
+            _tg_send_text(caption + ("  (원본 이미지 없음)" if not os.path.exists(path) else "  (이미지 첨부 실패)"))
+        text_ok = _tg_send_text(f"[전사문 {idx}/{n}] {ch}\n\n{desc}")
+        sent += 1
+        print(f"[tg_inbox] 지정 표본 발송 {idx}/{n}: {iid} img#{k} 사진={'ok' if photo_ok else '실패'} 전사문={'ok' if text_ok else '실패'} ({len(desc)}자)", flush=True)
+    if picks:
+        _tg_send_text("전사문이 이미지와 다르면 알려주세요.")
+    if missing:
+        print(f"[tg_inbox] 지정 표본: 찾지 못함 {missing}", flush=True)
+    return {"status": "ok" if picks else "empty", "samples": sent, "missing": missing}
+
+
+def send_weekly_transcribe_sample(targets=None):
+    """최근 7일 전사된 저장 항목의 이미지 중 무작위 3장을 [원본+전사문]으로 텔레그램 발송.
+    targets(["항목id#이미지번호"])가 주어지면 그 이미지들만 지정 발송(_send_targeted_transcribe_sample)."""
+    if targets:
+        return _send_targeted_transcribe_sample(targets)
     import random
     now = datetime.now(KST)
     cutoff = now - timedelta(days=7)

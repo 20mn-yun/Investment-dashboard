@@ -3371,13 +3371,14 @@ def post_tg_inbox_export():
 @app.route("/api/tg-inbox/transcribe-backfill", methods=["POST"])
 def post_tg_inbox_transcribe_backfill():
     """저장 항목 중 이미지가 있고 미전사인 것 전부를 백그라운드로 정밀 전사(완료 후 자동 export)."""
+    force = bool((request.get_json(silent=True) or {}).get("force"))   # 수동 강제: 에스컬레이션까지 끝난 불합격도 다시
     data = tg_inbox._load_data()
     targets = [it for it in data.get("items", [])
                if it.get("saved") and (tg_inbox._needs_transcription(it)
-                                        or tg_inbox._has_unhealthy_desc(it))]
+                                        or tg_inbox._has_unhealthy_desc(it, include_final=force))]
     n = len(targets)
-    threading.Thread(target=tg_inbox.backfill_transcriptions, daemon=True).start()
-    return jsonify({"status": "started", "targets": n})
+    threading.Thread(target=tg_inbox.backfill_transcriptions, kwargs={"force": force}, daemon=True).start()
+    return jsonify({"status": "started", "targets": n, "force": force})
 
 
 @app.route("/api/tg-inbox/channels/hidden", methods=["POST"])
@@ -3402,8 +3403,10 @@ def post_tg_inbox_auto_save():
 
 @app.route("/api/tg-inbox/transcribe-sample", methods=["POST"])
 def post_tg_inbox_transcribe_sample():
-    """주간 전사 표본 검사 리포트를 즉시 발송(테스트·수동 점검용)."""
-    result = tg_inbox.send_weekly_transcribe_sample()
+    """주간 전사 표본 검사 리포트를 즉시 발송(테스트·수동 점검용).
+    body {"targets": ["항목id#이미지번호", ...]} 가 있으면 그 이미지들만 지정 발송(body 없으면 기존 무작위 표본)."""
+    targets = (request.get_json(silent=True) or {}).get("targets") or None
+    result = tg_inbox.send_weekly_transcribe_sample(targets=targets)
     return jsonify(result)
 
 
