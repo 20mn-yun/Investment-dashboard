@@ -3652,6 +3652,64 @@ def stop_dart_download(job_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/dart-report/original/toc", methods=["GET"])
+def dart_original_toc_api():
+    """DART 정기보고서 원문 목차 (MCP get_filing_toc). rcept_no 없으면 최근 400일 정기보고서 중 최신. text 는 넣지 않는다."""
+    import dart_original
+    code = (request.args.get("code") or "").strip()
+    rcept_no = (request.args.get("rcept_no") or "").strip()
+    report_nm = rcept_dt = None
+    try:
+        if rcept_no:
+            if not dart_original.valid_rcept_no(rcept_no):
+                return jsonify({"error": "bad_request", "message": "rcept_no 는 14자리 숫자"}), 400
+        else:
+            if not re.fullmatch(r"\d{6}", code):
+                return jsonify({"error": "bad_request", "message": "code 는 한국 6자리 종목코드"}), 400
+            corp_code = earnings_tracker.get_corp_code(code)
+            if not corp_code:
+                return jsonify({"error": "bad_request", "message": f"corp_code 를 찾을 수 없음: {code}"}), 400
+            latest = dart_original.latest_periodic(corp_code)
+            if not latest:
+                return jsonify({"error": "fetch_failed", "message": "최근 400일 정기보고서 없음(또는 목록 조회 실패)"}), 502
+            rcept_no, report_nm, rcept_dt = latest["rcept_no"], latest.get("report_nm"), latest.get("rcept_dt")
+        secs, cached, err = dart_original.load_sections(rcept_no)
+    except dart_report.DartPausedError as e:
+        return jsonify({"error": "dart_paused", "message": str(e)[:200]}), 503
+    if err:
+        return jsonify({"error": "fetch_failed", "message": err}), 502
+    return jsonify({"ok": True, "rcept_no": rcept_no, "report_nm": report_nm, "rcept_dt": rcept_dt, "cached": bool(cached), "count": len(secs),
+                    "sections": [{"idx": s["idx"], "level": s["level"], "title": s["title"], "chars": s["chars"], "tables": s["tables"]} for s in secs]})
+
+
+@app.route("/api/dart-report/original/section", methods=["GET"])
+def dart_original_section_api():
+    """원문 절 하나의 본문 (MCP get_filing_section). max_chars 1000~40000, 남으면 next_offset."""
+    import dart_original
+    rcept_no = (request.args.get("rcept_no") or "").strip()
+    if not dart_original.valid_rcept_no(rcept_no):
+        return jsonify({"error": "bad_request", "message": "rcept_no 는 14자리 숫자"}), 400
+    try:
+        idx = int(request.args.get("idx", ""))
+        offset = max(0, int(request.args.get("offset", "0") or 0))
+        max_chars = max(1000, min(40000, int(request.args.get("max_chars", "40000") or 40000)))
+    except ValueError:
+        return jsonify({"error": "bad_request", "message": "idx·offset·max_chars 는 정수"}), 400
+    try:
+        secs, _cached, err = dart_original.load_sections(rcept_no)
+    except dart_report.DartPausedError as e:
+        return jsonify({"error": "dart_paused", "message": str(e)[:200]}), 503
+    if err:
+        return jsonify({"error": "fetch_failed", "message": err}), 502
+    if not (0 <= idx < len(secs)):
+        return jsonify({"error": "bad_request", "message": f"idx 범위 밖 (0~{len(secs) - 1})"}), 400
+    s = secs[idx]
+    text = s["text"][offset:offset + max_chars]
+    end = offset + len(text)
+    return jsonify({"ok": True, "rcept_no": rcept_no, "idx": idx, "title": s["title"], "level": s["level"], "chars": s["chars"], "offset": offset,
+                    "text": text, "next_offset": end if end < s["chars"] else None})
+
+
 @app.route("/api/sec-report/download", methods=["POST"])
 def start_sec_download():
     import sec_report

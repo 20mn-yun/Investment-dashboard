@@ -749,7 +749,8 @@ CACHE_GROUPS = {
     "market": ["cache/top_gainers_us.json", "cache/top_gainers_kr.json", "cache/top_gainers_jp.json", "cache/top_gainers_eu.json",
                "cache/market_map_us.json", "cache/market_map_jp.json", "cache/live_scheduler.log"],
     "stock": ["cache/kr_financials/", "cache/us_financials/", "cache/us_disclosures/", "cache/concept_maps/", "cache/reports/", "cache/calls/",
-              "cache/peers/", "cache/earnings_extract/", "cache/forward_estimates/", "cache/us_bands/", "cache/valuation_bands.json", "stock_notes/"],
+              "cache/peers/", "cache/earnings_extract/", "cache/forward_estimates/", "cache/us_bands/", "cache/valuation_bands.json", "stock_notes/",
+              "cache/dart_original/"],
     "daily": ["cache/refinery.json", "cache/sector_leaders.json", "cache/stock_leaders.json", "cache/indicators_history.json", "cache/disparity.json",
               "cache/consensus_snapshots/", "cache/analyst_actions/", "cache/briefs/", "cache/yahoo_backoff.json", "cache/tg_inbox.json"],
     "llm": ["cache/_ai_state.json", "logs/llm_calls.jsonl"],
@@ -1198,6 +1199,45 @@ def get_drilling_events(days: int = 30, type: str | None = None, code: str | Non
         p["hint"] = "응답 상한으로 최근 것만 남김. days 를 줄이거나 type/code 로 거를 것"
         return True
     return _fit(out, _shrink)
+
+
+@mcp.tool
+def get_filing_toc(code: str, rcept_no: str = "") -> dict:
+    """DART 정기보고서(분기·반기·사업) 원문 목차. rcept_no 를 비우면 최근 정기보고서. 처음 조회하는 보고서는
+    DART 에서 원문을 받아 저장하므로 수 초 걸린다. 같은 제목이 연결/별도로 두 번 나오므로 절은 idx 로 지정할 것.
+    rcept_no 는 get_disclosures 의 정기공시 항목에도 있다."""
+    require_allowed_email()
+    c = _code("KR", code)
+    if not c:
+        return {"ok": False, "error": "bad_code", "message": "code 는 한국 6자리 종목코드 (DART 원문은 한국 전용)"}
+    r = (rcept_no or "").strip()
+    if r and not re.fullmatch(r"\d{14}", r):
+        return {"ok": False, "error": "bad_request", "message": "rcept_no 는 14자리 숫자"}
+    params = {"code": c}
+    if r:
+        params["rcept_no"] = r
+    d, err = _api("/api/dart-report/original/toc", params, timeout=60)
+    if err:
+        return err
+    return d
+
+
+@mcp.tool
+def get_filing_section(rcept_no: str, idx: int, offset: int = 0) -> dict:
+    """원문 절 하나의 본문. 표는 '[표]' 아래 줄마다 칸을 ' | ' 로 구분(병합 칸이 있는 줄은 칸 수가 줄어듦).
+    숫자·단위는 원문 그대로. 길면 next_offset 으로 이어 읽는다."""
+    require_allowed_email()
+    r = (rcept_no or "").strip()
+    if not re.fullmatch(r"\d{14}", r):
+        return {"ok": False, "error": "bad_request", "message": "rcept_no 는 14자리 숫자"}
+    try:
+        i, o = int(idx), max(0, int(offset or 0))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad_request", "message": "idx·offset 은 정수"}
+    d, err = _api("/api/dart-report/original/section", {"rcept_no": r, "idx": i, "offset": o, "max_chars": 40000}, timeout=60)
+    if err:
+        return err
+    return d
 
 
 if __name__ == "__main__":
