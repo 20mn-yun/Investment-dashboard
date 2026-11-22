@@ -38,6 +38,18 @@ def nfc(s):
     return unicodedata.normalize("NFC", s or "")
 
 
+def slug(rel):
+    """gbrain 이 경로에서 만드는 슬러그와 같은 규칙: 소문자, 괄호 등 제거(. _ - 유지), 공백 → '-' (155페이지 대조로 확인). [[링크]] 표기 전용"""
+    p = nfc(rel).lower()
+    p = re.sub(r"[^\w./\s-]", "", p)
+    p = re.sub(r"\s+", "-", p)
+    return re.sub(r"-{2,}", "-", p)
+
+
+def link(rel):
+    return f"[[{slug(rel)}]]"
+
+
 def _load_json(path, default=None):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -128,7 +140,7 @@ def export(out, dry):
             with open(brief_path, "r", encoding="utf-8") as f:
                 brief = f.read()
             w.write("briefs", f"sources/briefs/{kw}.md", _fm(f"{name} 브리프", aliases) + brief)
-            links.append(f"[[sources/briefs/{kw}]]")
+            links.append(link(f"sources/briefs/{kw}"))
 
         # 3) 리포트
         state = _load_json(stock_reports._state_path(market, code))
@@ -139,7 +151,7 @@ def export(out, dry):
                 md = stock_reports._render_summary_md(name, code, items, summaries)
                 md = re.sub(r"^- 갱신: .*$", f"- 갱신: {state.get('updated_at') or '-'}", md, count=1, flags=re.M)   # 멱등: 현재 시각 대신 저장본 갱신 시각
                 w.write("reports", f"sources/reports/{kw}.md", _fm(f"{name} 리포트 요약", aliases) + md)
-                links.append(f"[[sources/reports/{kw}]]")
+                links.append(link(f"sources/reports/{kw}"))
                 for it in items:
                     s = summaries.get(str(it.get("message_id"))) or {}
                     if s.get("status") in ("duplicate", "irrelevant"):
@@ -175,7 +187,7 @@ def export(out, dry):
                     call_links.append(q)
                     d = str(summ.get("at") or "")[:10]
                     if re.match(r"\d{4}-\d{2}-\d{2}$", d):
-                        timeline.append((d, f"컨콜 — {q} 요약 [[sources/calls/{kw}/{q}]]"))
+                        timeline.append((d, f"컨콜 — {q} 요약 {link(f'sources/calls/{kw}/{q}')}"))
                 except Exception as e:
                     failures.append(f"US:{code} call {q} {type(e).__name__}: {str(e)[:60]}")
 
@@ -186,14 +198,14 @@ def export(out, dry):
             body = f"# {corp} · {title}\n\n{nfc(it['summary']).strip()}\n\nrcept_no: {no}\n"
             w.write("dart", f"sources/dart/{kw}/{dt}_{no}.md", _fm(f"{corp} · {title}", aliases) + body)
             if re.match(r"\d{8}$", dt):
-                timeline.append((f"{dt[:4]}-{dt[4:6]}-{dt[6:]}", f"공시 — {title} [[sources/dart/{kw}/{dt}_{no}]]"))
+                timeline.append((f"{dt[:4]}-{dt[4:6]}-{dt[6:]}", f"공시 — {title} {link(f'sources/dart/{kw}/{dt}_{no}')}"))
 
         # 5) 나의 판단
         judge = "(없음)"
         if (market, code) in notes:
             note = stock_notes.get_note(market, code, name)
             w.write("analysis", f"analysis/{kw}.md", _fm(f"{name} 나의 판단", aliases) + stock_notes.render_markdown(note))
-            links.append(f"[[analysis/{kw}]]")
+            links.append(link(f"analysis/{kw}"))
             judge = "\n\n".join(f"### {stock_notes.FIELD_LABELS[k]}\n\n{(note['fields'].get(k) or '').strip() or '(비어 있음)'}" for k in stock_notes.FIELD_KEYS)
             for h in note.get("history") or []:
                 d = str(h.get("at") or "")[:10]
@@ -202,7 +214,7 @@ def export(out, dry):
                     timeline.append((d, f"판단 — {h.get('label') or h.get('field')}: {after}"))
 
         # 6) 종목 한 장
-        see = " · ".join(links + ([("컨콜 " + " · ".join(f"[[sources/calls/{kw}/{q}]]" for q in sorted(call_links, reverse=True)))] if call_links else []))
+        see = " · ".join(links + ([("컨콜 " + " · ".join(link(f"sources/calls/{kw}/{q}") for q in sorted(call_links, reverse=True)))] if call_links else []))
         timeline.sort(key=lambda x: (x[0], x[1]), reverse=True)
         lines = [f"# {name} ({market}:{code})", "", _brief_overview(brief) if brief else "> 브리프 없음", "", "## 나의 판단", "", judge, "",
                  "## See Also", "", f"- {see}" if see else "- (없음)", "", "---", "", "## Timeline", ""]
