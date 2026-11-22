@@ -708,6 +708,7 @@ def save_note(market: str, code: str, field: str, text: str, date_memo: str = ""
 
 # ====================================================================== 운영 진단 (읽기 전용)
 import subprocess  # noqa: E402
+import threading  # noqa: E402
 
 _HOME = os.path.expanduser("~")
 _CACHE = os.path.join(BASE_DIR, "cache")
@@ -1115,6 +1116,160 @@ def launchd_status() -> dict:
     return {"ok": True, "server_time": datetime.now(KST).isoformat(timespec="seconds"), "running": sum(1 for a in agents if isinstance(a["pid"], int)),
             "count": len(agents), "agents": agents, "plist_count": len(plist_labels), "not_loaded": not_loaded,
             "nonzero_exit": [a["label"] for a in agents if a["last_exit_status"] not in (0, None)]}
+
+
+# ---------- gbrain 지식창고 읽기 (brain_search · brain_get, 읽기 전용) ----------
+GBRAIN_HOME_DIR = "/Users/yun"
+BRAIN_DIR = "/Users/yun/investment_brain"
+BRAIN_MAX = 40_000
+_gbrain_lock = threading.Lock()       # PGLite 는 한 프로세스만 DB 를 연다 → 이 서버 안의 동시 호출은 직렬화
+_BRAIN_SLUG_RE = re.compile(r"^[\w가-힣.\-/:]{1,255}$")
+_GBRAIN_BUSY = "gbrain 서버(Claude Code 세션)가 DB 를 점유 중 — 잠시 후 재시도"
+
+
+def _gbrain(*args, timeout=25):
+    """gbrain CLI 1회 (cwd=~/investment_brain). 반환 (stdout, None) 또는 (None, 마스킹된 오류 300자)."""
+    exe = os.environ.get("GBRAIN_BIN") or "/Users/yun/.bun/bin/gbrain"
+    env = dict(os.environ)
+    env["HOME"] = GBRAIN_HOME_DIR
+    env["PATH"] = "/Users/yun/.bun/bin:" + env.get("PATH", "")
+    with _gbrain_lock:
+        try:
+            p = subprocess.run([exe, *args], cwd=BRAIN_DIR, capture_output=True, text=True, timeout=timeout, env=env)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return None, f"{type(e).__name__}"
+    if p.returncode != 0:
+        err = "\n".join(l for l in (p.stderr or p.stdout or "").splitlines() if not l.startswith("[models]")).strip()
+        err = _mask(err)[:300] or f"exit {p.returncode}"
+        if re.search(r"lock|locked|live_serve|pglite_busy|already open", err, re.I):
+            err = f"{_GBRAIN_BUSY}: {err}"
+        return None, err
+    return p.stdout, None
+
+
+def _brain_busy(err):
+    return bool(err) and err.startswith(_GBRAIN_BUSY)
+
+
+def _brain_slug(rel):
+    """brain_export.slug 와 같은 규칙 (gbrain 이 경로에서 만드는 슬러그)"""
+    import unicodedata
+    p = unicodedata.normalize("NFC", rel).lower()
+    p = re.sub(r"[^\w./\s-]", "", p)
+    p = re.sub(r"\s+", "-", p)
+    return re.sub(r"-{2,}", "-", p)
+
+
+def _brain_files():
+    """{slug: 절대경로} — DB 점유 중일 때 마크다운을 직접 읽는 대체 경로용"""
+    out = {}
+    for root, dirs, files in os.walk(BRAIN_DIR):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for f in files:
+            if f.endswith(".md"):
+                full = os.path.join(root, f)
+                out[_brain_slug(os.path.relpath(full, BRAIN_DIR)[:-3])] = full
+    return out
+
+
+def _brain_file_search(query, limit):
+    """대체 검색: 마크다운 파일에서 질의 단어(공백 구분)가 모두 든 파일을 출현 수 순으로. 점수 = 출현 수 / 최댓값"""
+    terms = [t.lower() for t in query.split() if t.strip()]
+    hits = []
+    for slug, path in _brain_files().items():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            continue
+        low = text.lower()
+        if not terms or not all(t in low for t in terms):
+            continue
+        n = sum(low.count(t) for t in terms)
+        i = low.find(terms[0])
+        m = re.search(r'^title:\s*"?(.*?)"?\s*$', text, re.M)
+        hits.append({"slug": slug, "title": m.group(1) if m else slug, "n": n,
+                     "snippet": re.sub(r"\s+", " ", text[max(0, i - 120):i + 280]).strip()})
+    hits.sort(key=lambda h: (-h["n"], h["slug"]))
+    top = hits[:limit]
+    mx = max([h["n"] for h in top] or [1])
+    return [{"slug": h["slug"], "title": h["title"], "score": round(h["n"] / mx, 3), "snippet": h["snippet"]} for h in top]
+
+
+def _parse_json_out(raw):
+    i = min([x for x in (raw.find("["), raw.find("{")) if x != -1], default=-1)
+    if i < 0:
+        raise ValueError("JSON 없음")
+    return json.loads(raw[i:])
+
+
+@mcp.tool
+def brain_search(query: str, limit: int = 8) -> dict:
+    """개인 투자 지식창고(gbrain) 검색. 종목·관련 기업·리포트 요약·컨콜·공시·나의 판단 페이지를 키워드로 찾는다. 결과의 slug 를 brain_get 에 넘기면 본문"""
+    require_allowed_email()
+    q = (query or "").strip()
+    if not q or len(q) > 200:
+        return {"ok": False, "error": "bad_request", "message": "query 는 1~200자"}
+    try:
+        n = max(1, min(20, int(limit)))
+    except (TypeError, ValueError):
+        n = 8
+    now = datetime.now(KST).isoformat(timespec="seconds")
+    raw, err = _gbrain("search", q, "--json", "--limit", str(n))
+    engine = "gbrain"
+    if err is None:
+        try:
+            d = _parse_json_out(raw)
+            rows = d if isinstance(d, list) else (d.get("results") or [])
+            results = [{"slug": r.get("slug"), "title": r.get("title"), "score": r.get("score"),
+                        "snippet": re.sub(r"\s+", " ", str(r.get("chunk_text") or ""))[:400]} for r in rows[:n]]
+        except (ValueError, AttributeError) as e:
+            return {"ok": False, "error": "bad_response", "message": f"gbrain 출력 해석 실패: {type(e).__name__}", "server_time": now}
+    elif _brain_busy(err):
+        engine = "file_fallback"           # DB 를 다른 gbrain serve 가 점유 → 같은 마크다운을 직접 검색
+        results = _brain_file_search(q, n)
+    else:
+        return {"ok": False, "error": "gbrain_failed", "message": err, "server_time": now}
+    out = {"ok": True, "query": q, "engine": engine, "count": len(results), "results": results, "server_time": now}
+    if engine == "file_fallback":
+        out["note"] = "gbrain DB 가 Claude Code 세션에 점유돼 마크다운 파일을 직접 검색함(키워드 일치·출현 수 순)"
+    while len(json.dumps(out, ensure_ascii=False)) > BRAIN_MAX and out["results"]:
+        out["results"] = out["results"][:-1]
+        out["count"] = len(out["results"])
+        out["hint"] = f"응답 {BRAIN_MAX // 1000}KB 상한으로 결과를 줄였음"
+    return out
+
+
+@mcp.tool
+def brain_get(slug: str, offset: int = 0) -> dict:
+    """지식창고 페이지 본문(마크다운). slug 는 brain_search 결과 또는 companies/<종목>, analysis/<종목>, sources/calls/<종목>/<분기> 꼴"""
+    require_allowed_email()
+    s = (slug or "").strip()
+    if not _BRAIN_SLUG_RE.match(s) or ".." in s or s.startswith("/"):
+        return {"ok": False, "error": "bad_slug", "message": "slug 는 영문·한글·숫자·. - / : _ 만, '..' 와 절대경로 금지"}
+    try:
+        off = max(0, int(offset or 0))
+    except (TypeError, ValueError):
+        off = 0
+    now = datetime.now(KST).isoformat(timespec="seconds")
+    s = _brain_slug(s)                     # gbrain 슬러그는 소문자·괄호 제거·공백→- (예 companies/NVIDIA_NVDA → companies/nvidia_nvda)
+    raw, err = _gbrain("get", s)
+    engine = "gbrain"
+    if err is not None:
+        if not _brain_busy(err):
+            code = "not_found" if re.search(r"not.?found|page_not_found", err, re.I) else "gbrain_failed"
+            return {"ok": False, "error": code, "message": err, "slug": s, "server_time": now}
+        path = _brain_files().get(_brain_slug(s))          # DB 점유 → 같은 마크다운을 직접 읽음
+        if not path:
+            return {"ok": False, "error": "not_found", "message": f"페이지 없음: {s}", "slug": s, "server_time": now}
+        with open(path, "r", encoding="utf-8") as f:
+            raw = f.read()
+        engine = "file_fallback"
+    text = "\n".join(l for l in raw.splitlines() if not l.startswith("[models]"))
+    chunk = text[off:off + BRAIN_MAX]
+    end = off + len(chunk)
+    return {"ok": True, "slug": s, "engine": engine, "chars": len(text), "offset": off, "text": chunk,
+            "next_offset": end if end < len(text) else None, "server_time": now}
 
 
 @mcp.tool
