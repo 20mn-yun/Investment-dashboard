@@ -22,6 +22,7 @@ import kr_financials
 import us_financials
 import stock_profile
 import stock_notes
+import market_views
 import stock_reports
 import ai_budget
 import earnings_calls
@@ -2276,6 +2277,34 @@ def stock_notes_memo_delete():
 def stock_notes_list():
     items = stock_notes.list_notes()
     return jsonify({"count": len(items), "items": items})
+
+
+# ===== 주식시황 정리 (market_views) =====
+@app.route("/api/market-views", methods=["GET"])
+def market_views_overview_api():
+    return jsonify(market_views.overview())
+
+
+@app.route("/api/market-views/item", methods=["GET"])
+def market_views_item_api():
+    it = market_views.get(request.args.get("id", ""))
+    if not it:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"item": it})
+
+
+@app.route("/api/market-views", methods=["POST"])
+def market_views_save_api():
+    try:
+        it = market_views.save(request.get_json(silent=True))
+    except ValueError as e:
+        return jsonify({"error": "bad_request", "message": str(e)}), 400
+    return jsonify({"ok": True, "item": it})
+
+
+@app.route("/api/market-views", methods=["DELETE"])
+def market_views_delete_api():
+    return jsonify({"ok": True, "removed": market_views.delete(request.args.get("id", ""))})
 
 
 @app.route("/api/stock/analyst-actions", methods=["GET"])

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Investment Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
     <style>
         :root {
             --bg: #ffffff;
@@ -1481,6 +1483,35 @@
         }
 
         /* ===== 정유 탭 ===== */
+        /* ===== 주식시황 정리 탭 ===== */
+        #tab-mview .mv-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        #tab-mview .mv-note { color: var(--text-muted); font-size: var(--fs-sm); }
+        #tab-mview .mv-btn { margin-left: auto; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 12px; font-size: var(--fs-md); cursor: pointer; }
+        #tab-mview .mv-btn:hover { border-color: var(--accent); color: var(--accent); }
+        #tab-mview .mv-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; min-width: 0; }
+        #tab-mview .mv-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        #tab-mview .mv-src { font-size: var(--fs-lg); font-weight: bold; color: var(--text); }
+        #tab-mview .mv-meta { color: var(--text-muted); font-size: var(--fs-sm); }
+        #tab-mview .mv-sel { margin-left: auto; font-size: var(--fs-sm); background: var(--bg-panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; max-width: 100%; }
+        #tab-mview .mv-sub { color: var(--text-muted); font-size: var(--fs-sm); font-weight: bold; margin: 12px 0 6px; }
+        #tab-mview .mv-one { border-left: 3px solid var(--accent); background: var(--bg-panel); padding: 8px 12px; border-radius: 4px; font-size: var(--fs-base); font-weight: bold; color: var(--text); white-space: pre-wrap; }
+        #tab-mview .mv-empty { color: var(--text-muted); font-size: var(--fs-md); }
+        #tab-mview .mv-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        #tab-mview table.mv-table { border-collapse: collapse; width: 100%; font-size: var(--fs-md); }
+        #tab-mview table.mv-table th, #tab-mview table.mv-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; color: var(--text); }
+        #tab-mview table.mv-table th { background: var(--bg-panel); color: var(--text-muted); font-weight: normal; white-space: nowrap; }
+        #tab-mview table.mv-table td.mv-c-name, #tab-mview table.mv-table td.mv-c-level { white-space: nowrap; }
+        #tab-mview table.mv-table td.mv-c-comment { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+        #tab-mview .mv-md { overflow-x: auto; font-size: var(--fs-md); color: var(--text); line-height: 1.6; }
+        #tab-mview .mv-md.mv-plain { white-space: pre-wrap; }
+        #tab-mview .mv-md h1, #tab-mview .mv-md h2, #tab-mview .mv-md h3 { font-size: var(--fs-base); font-weight: bold; margin: 12px 0 6px; }
+        #tab-mview .mv-md table { border-collapse: collapse; }
+        #tab-mview .mv-md th, #tab-mview .mv-md td { border: 1px solid var(--border); padding: 4px 8px; }
+        #tab-mview .mv-md th { background: var(--bg-panel); }
+        #tab-mview .mv-md p, #tab-mview .mv-md ul, #tab-mview .mv-md ol { margin: 4px 0; }
+        #tab-mview details.mv-fold { margin-top: 12px; }
+        #tab-mview details.mv-fold summary { cursor: pointer; color: var(--accent); font-size: var(--fs-sm); }
+        @media (max-width: 600px) { #tab-mview .mv-sel { margin-left: 0; } }
         /* ===== 시추 업황 탭 ===== */
         #tab-drilling .dr-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
         #tab-drilling .dr-headline { font-size: var(--fs-lg); font-weight: bold; line-height: 1.35; flex: 1 1 60%; min-width: 0; }
@@ -1925,6 +1956,7 @@
             <div class="tab active" data-tab="inbox" onclick="switchTab('inbox')">텔레 인박스</div>
             <div class="tab" data-tab="indicators" onclick="switchTab('indicators')">주요 지표</div>
             <div class="tab" data-tab="market" onclick="switchTab('market')">글로벌 마켓</div>
+            <div class="tab" data-tab="mview" onclick="switchTab('mview')">주식시황 정리</div>
             <div class="tab" data-tab="dart" onclick="switchTab('dart')">DART 공시</div>
         </div>
     </div>
@@ -2153,6 +2185,12 @@
         </div>
     </div>
 
+</div>
+
+<!-- 주식시황 정리 탭 -->
+<div class="tab-content" id="tab-mview">
+    <div class="mv-head"><span class="mv-note">Cowork 대화에서 정리한 시황을 보여 줍니다</span><button class="mv-btn" onclick="loadMview()">새로고침</button></div>
+    <div id="mv-body"><div class="loading">불러오는 중...</div></div>
 </div>
 
 <!-- 차트 모달 -->
@@ -3170,6 +3208,57 @@
     let leadersLoaded = false;
     let stocksLoaded = false;
     let stockviewLoaded = false;
+    // ===== 주식시황 정리 탭 =====
+    function mvEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function mvMd(text) {
+        if (window.marked && window.DOMPurify) return `<div class="mv-md">${DOMPurify.sanitize(marked.parse(String(text || ''), { gfm: true, breaks: false }))}</div>`;
+        return `<div class="mv-md mv-plain">${mvEsc(text)}</div>`;
+    }
+    async function loadMview() {
+        const body = document.getElementById('mv-body');
+        try {
+            const res = await fetch(API_BASE + '/api/market-views');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const d = await res.json();
+            body.innerHTML = (d.sources || []).map(s => `<div class="mv-card" id="mv-card-${mvEsc(s.key)}"></div>`).join('');
+            (d.sources || []).forEach(s => mvRenderCard(s, s.latest));
+        } catch (e) {
+            body.innerHTML = `<div class="mv-empty">불러오지 못했습니다 <button class="mv-btn" onclick="loadMview()">다시 시도</button></div>`;
+        }
+    }
+    function mvRenderCard(src, item) {
+        const card = document.getElementById('mv-card-' + src.key);
+        if (!card) return;
+        const hist = src.history || [];
+        if (!item) { card.innerHTML = `<div class="mv-top"><span class="mv-src">${mvEsc(src.label)}</span></div><div class="mv-empty">아직 올린 정리가 없습니다</div>`; return; }
+        const sel = hist.length >= 2 ? `<select class="mv-sel" onchange="mvPick('${mvEsc(src.key)}', this.value)">` +
+            hist.map(h => `<option value="${mvEsc(h.id)}"${h.id === item.id ? ' selected' : ''}>${mvEsc(String(h.date || '').slice(5))} ${mvEsc(h.program || '')}</option>`).join('') + '</select>' : '';
+        const rows = (item.comments || []).map(c => `<tr><td class="mv-c-name">${mvEsc(c.name)}</td><td class="mv-c-level">${mvEsc(c.level)}</td><td class="mv-c-comment">${mvEsc(c.comment)}</td></tr>`).join('');
+        card.innerHTML = `<div class="mv-top"><span class="mv-src">${mvEsc(src.label)}</span><span class="mv-meta">${mvEsc(item.date)} · ${mvEsc(item.program || '')}</span>${sel}</div>` +
+            `<div class="mv-sub">압축요약</div>` +
+            `<div class="mv-sub">한 줄 요약</div><div class="mv-one">${mvEsc(item.one_line)}</div>` +
+            `<div class="mv-sub">매수계획</div>${item.buy_plan ? mvMd(item.buy_plan) : '<div class="mv-empty">(없음)</div>'}` +
+            `<div class="mv-sub">종목 및 지수별 발언</div>` + (rows ? `<div class="mv-table-wrap"><table class="mv-table"><thead><tr><th>대상</th><th>현재</th><th>발언</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="mv-empty">(없음)</div>') +
+            `<details class="mv-fold"><summary>정리 전문 보기</summary><div class="mv-full"></div></details>`;
+        const det = card.querySelector('details.mv-fold');
+        det.addEventListener('toggle', () => {
+            if (det.open && !det.dataset.rendered) { det.querySelector('.mv-full').innerHTML = mvMd(item.full_md); det.dataset.rendered = '1'; }
+        });
+        card._mvSrc = src;
+    }
+    async function mvPick(key, id) {
+        const card = document.getElementById('mv-card-' + key);
+        if (!card || !card._mvSrc) return;
+        try {
+            const res = await fetch(API_BASE + '/api/market-views/item?id=' + encodeURIComponent(id));
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const d = await res.json();
+            mvRenderCard(card._mvSrc, d.item);
+        } catch (e) {
+            card.insertAdjacentHTML('beforeend', `<div class="mv-empty">불러오지 못했습니다 <button class="mv-btn" onclick="mvPick('${mvEsc(key)}', '${mvEsc(id)}')">다시 시도</button></div>`);
+        }
+    }
+
     function switchTab(tabName, programmatic) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -3178,6 +3267,7 @@
         });
         document.getElementById('tab-' + tabName).classList.add('active');
         fsShowPct(document.getElementById('tab-' + tabName)); fsApplyCharts(document.getElementById('tab-' + tabName));
+        if (tabName === 'mview') loadMview();
         if (tabName === 'calendar') {
             if (!calLoaded) { calLoaded = true; initCalendar(); }
             else { loadCalWatchlist(); loadCalendar(); }

@@ -77,6 +77,7 @@ cache/kr_financials/
 
 # 나의 판단 원본 (개인 기록, public repo: 절대 커밋 금지)
 stock_notes/
+market_views/
 
 # 미국 종목 재무 3표·공시 목록 캐시 (조회 시 생성)
 cache/us_financials/

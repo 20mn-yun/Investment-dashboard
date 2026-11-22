@@ -23,7 +23,7 @@ GET_URLS = [
     "/healthz", "/api/sector-leaders", "/api/stock-leaders",
     "/api/dart/daily", "/api/dart/daily?days=3", "/api/dart/dates",
     "/api/dart/monitor/config", "/api/dart/monitor/status", "/api/dart/monitor/log",
-    "/api/dart/daily/resummarize",
+    "/api/dart/daily/resummarize", "/api/market-views",
 ]
 
 

@@ -706,6 +706,65 @@ def save_note(market: str, code: str, field: str, text: str, date_memo: str = ""
     return out
 
 
+# ---------------------------------------------------------------- ⑩ 주식시황 정리
+MV_SOURCE_KO = {"알상무": "alsangmu", "안물라": "anmulla", "윤지호": "yoonjiho"}
+
+
+@mcp.tool
+def save_market_view(source: str, date: str, program: str, one_line: str, buy_plan: str, comments: list[dict], full_md: str) -> dict:
+    """주식시황 정리 저장. source 는 alsangmu|anmulla|yoonjiho (한글 알상무/안물라/윤지호도 허용), date 는 방송일 YYYY-MM-DD,
+    program 은 방송명(예: 지표추적자). one_line=한 줄 요약, buy_plan=매수계획(마크다운), comments=[{name, level, comment}] 종목·지수별 발언,
+    full_md=정리 전문(마크다운). 같은 source·date·program 이면 덮어쓴다."""
+    require_allowed_email()
+    src = (source or "").strip()
+    src = MV_SOURCE_KO.get(src, src.lower())
+    body = {"source": src, "date": (date or "").strip(), "program": program or "", "one_line": one_line or "", "buy_plan": buy_plan or "",
+            "comments": comments or [], "full_md": full_md or ""}
+    d, err = _api("/api/market-views", timeout=30, method="POST", body=body)
+    if err:
+        return err
+    it = d.get("item") or {}
+    log.info("save_market_view id=%s bytes=%d", it.get("id"), len(full_md or ""))
+    return {"ok": True, "id": it.get("id"), "source": it.get("source"), "date": it.get("date"), "program": it.get("program"),
+            "saved_at": it.get("saved_at"), "bytes": len(full_md or "")}
+
+
+@mcp.tool
+def get_market_views(source: str = "", id: str = "") -> dict:
+    """주식시황 정리 읽기. id 를 주면 그 항목 전체(full_md 포함). 없으면 출처별 최신 정리(full_md 제외)와 지난 방송 목록. source(alsangmu|anmulla|yoonjiho, 한글 허용)로 한 출처만."""
+    require_allowed_email()
+    if (id or "").strip():
+        d, err = _api("/api/market-views/item", {"id": id.strip()}, timeout=15)
+        if err:
+            return err
+        return {"ok": True, "item": d.get("item")}
+    d, err = _api("/api/market-views", timeout=15)
+    if err:
+        return err
+    src = (source or "").strip()
+    src = MV_SOURCE_KO.get(src, src.lower())
+    out = []
+    for s in d.get("sources") or []:
+        if src and s.get("key") != src:
+            continue
+        latest = dict(s["latest"]) if s.get("latest") else None
+        if latest:
+            latest.pop("full_md", None)
+        out.append({"key": s.get("key"), "label": s.get("label"), "latest": latest, "history": s.get("history") or []})
+    return {"ok": True, "sources": out}
+
+
+@mcp.tool
+def delete_market_view(id: str) -> dict:
+    """주식시황 정리 1건 삭제. id 는 get_market_views 결과의 id (예 alsangmu_2026-11-22_지표추적자)."""
+    require_allowed_email()
+    d, err = _api("/api/market-views", {"id": (id or "").strip()}, timeout=15, method="DELETE")
+    if err:
+        return err
+    log.info("delete_market_view id=%s removed=%s", (id or "").strip(), d.get("removed"))
+    return {"ok": True, "id": (id or "").strip(), "removed": bool(d.get("removed"))}
+
+
 # ====================================================================== 운영 진단 (읽기 전용)
 import subprocess  # noqa: E402
 import threading  # noqa: E402
@@ -754,7 +813,8 @@ CACHE_GROUPS = {
               "cache/peers/", "cache/earnings_extract/", "cache/forward_estimates/", "cache/us_bands/", "cache/valuation_bands.json", "stock_notes/",
               "cache/dart_original/"],
     "daily": ["cache/refinery.json", "cache/sector_leaders.json", "cache/stock_leaders.json", "cache/indicators_history.json", "cache/disparity.json",
-              "cache/consensus_snapshots/", "cache/analyst_actions/", "cache/briefs/", "cache/yahoo_backoff.json", "cache/tg_inbox.json"],
+              "cache/consensus_snapshots/", "cache/analyst_actions/", "cache/briefs/", "cache/yahoo_backoff.json", "cache/tg_inbox.json",
+              "market_views/"],
     "llm": ["cache/_ai_state.json", "logs/llm_calls.jsonl"],
 }
 _STAMP_KEYS = ("as_of", "data_as_of", "updated_at", "cache_updated_at", "date", "computed_at")
