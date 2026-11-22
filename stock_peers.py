@@ -15,7 +15,7 @@ import re
 import threading
 import time
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import ai_budget
 import watchlist as watchlist_store
@@ -483,6 +483,39 @@ def status(market, code, name, corp_code, fx):
             "ai": {"used": ai_budget.used("peers"), "limit": ai_budget.DEFAULT_LIMITS["peers"]}}
 
 
+SUGGEST_REFRESH_DAYS = 30
+
+
+def targets(market, code):
+    """미리 받기·브레인 대상 관련 기업 = 확정(confirmed) + AI 제안(suggested), 거절(rejected) 제외, (market, code) 중복 제거.
+    반환 [{market, code, name, relation, source, status}] — source: 확정은 저장된 source(ai|user, 없으면 user), 제안은 ai_suggested."""
+    st = load(market, code)
+    rejected = set(st.get("rejected") or [])          # "MARKET:CODE" 문자열 목록
+    out, seen = [], set()
+    for status, items in (("confirmed", st.get("confirmed") or []), ("suggested", st.get("suggested") or [])):
+        for c in items:
+            k = (c.get("market"), c.get("code"))
+            if not k[0] or not k[1] or _key(*k) in rejected or k in seen:
+                continue
+            seen.add(k)
+            out.append({"market": k[0], "code": k[1], "name": c.get("name") or "", "relation": c.get("relation"),
+                        "source": (c.get("source") or "user") if status == "confirmed" else "ai_suggested", "status": status})
+    return out
+
+
+def _needs_suggest(st):
+    """제안 목록이 비었고 AI 를 부른 적이 없거나 30일 넘었으면 True"""
+    if st.get("suggested"):
+        return False
+    at = st.get("ai_called_at")
+    if not at:
+        return True
+    try:
+        return datetime.fromisoformat(str(at)[:19]) < datetime.now() - timedelta(days=SUGGEST_REFRESH_DAYS)
+    except ValueError:
+        return True
+
+
 def prefetch_confirmed(market, code, name="", fx=None, seen=None):
     """05:30 미리 받기: 확정된 관련 기업의 재무 저장본·증권사 리포트·최근 2개 분기 컨콜 요약(미국)·종목 브리프 갱신.
     seen: 이미 처리한 (market, code) 집합 — 여러 워치리스트 종목에 같은 관련 기업이 확정돼 있어도 한 번만. 반환 결과 문자열 목록.
@@ -494,7 +527,14 @@ def prefetch_confirmed(market, code, name="", fx=None, seen=None):
     import stock_brief
     seen = set() if seen is None else seen
     out = []
-    for c in load(market, code)["confirmed"]:
+    st = load(market, code)
+    if _needs_suggest(st):                 # 제안이 비었고 30일 넘음 → AI 제안 1회 (peers 한도 안에서). 관련 기업의 관련 기업은 돌지 않음
+        try:
+            sg = suggest(market, code, name, force=True)
+            out.append(f"제안 {sg.get('status')} {len(sg.get('suggested') or [])}건")
+        except Exception as e:
+            out.append(f"제안 실패({type(e).__name__})")
+    for c in targets(market, code):       # 확정 + AI 제안(거절 제외)
         r = resolve(c["market"], c["code"])
         if not r:
             continue

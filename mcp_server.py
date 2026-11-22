@@ -739,6 +739,7 @@ LOG_FILES = {
     "korea_export": os.path.join(BASE_DIR, "korea_export_update.log"),
     "drilling_daily": os.path.join(LOG_DIR, "drilling_daily.log"),
     "drilling_daily_launchd": os.path.join(LOG_DIR, "drilling_daily.launchd.log"),
+    "brain_sync": os.path.join(LOG_DIR, "brain_sync.log"),
     "earnings_backfill": os.path.join(LOG_DIR, "earnings_backfill.log"),
 }
 for _m in ("us", "kr", "jp", "eu"):

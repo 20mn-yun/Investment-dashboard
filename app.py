@@ -3041,6 +3041,14 @@ def _krfin_prefetch_run(reason):
                 + (f", 섹션 실패 {len(b['failed_sections'])}" if b.get("failed_sections") else "")
         except Exception as e:
             results[f"brief:{it['market']}_{it['code']}"] = f"실패({type(e).__name__}: {str(e)[:80]})"
+    try:   # 브레인 동기화: 내보내기 → gbrain import → 임베딩 → ~/investment_brain 커밋·푸시 (실패해도 배치는 계속)
+        import brain_sync
+        bs = brain_sync.run()
+        results["brain:sync"] = ("ok " if bs.get("ok") else "실패(일부 단계) ") + (bs.get("summary") or "")   # ok/실패( 표식은 _prefetch_result_ok 기준
+    except ImportError as e:
+        print(f"[brain_sync] 건너뜀(ImportError: {e})", flush=True)
+    except Exception as e:
+        results["brain:sync"] = f"실패({type(e).__name__}: {str(e)[:80]})"
     try:   # 시추 업황 overview 1회 (KPI 파일 → overview.json)
         drilling_tracker.overview()
     except Exception as e:

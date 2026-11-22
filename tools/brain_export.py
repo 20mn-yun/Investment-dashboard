@@ -1,6 +1,6 @@
 """대시보드가 만든 종목 자료를 gbrain 지식창고(~/investment_brain)용 마크다운으로 내보낸다 (brain export v1).
 
-대상 = watchlist.load_watchlist() 전부 + 그 종목들에 확정된 관련 기업(stock_peers confirmed). 변환은 기존 함수만 호출한다(기존 모듈 수정 없음):
+대상 = watchlist.load_watchlist() 전부 + 그 종목들의 관련 기업(stock_peers.targets: 확정 + AI 제안, 거절 제외). 변환은 기존 함수만 호출한다(기존 모듈 수정 없음):
   sources/briefs/<kw>.md            ← cache/briefs/<MARKET>_<code>.md 그대로
   sources/calls/<kw>/<Q>.md         ← earnings_calls._summary_md (+ _compare_md 를 '## 직전 분기 비교' 로)   (미국만)
   sources/reports/<kw>.md           ← stock_reports._render_summary_md
@@ -117,13 +117,26 @@ def export(out, dry):
         if (i["market"], i["code"]) not in seen_t:
             seen_t.add((i["market"], i["code"]))
             targets.append(dict(i, role="watchlist"))
-    for i in wl:   # 확정된 관련 기업 (워치리스트와 겹치면 한 번만)
+    rel_out, rel_in = {}, {}          # 관계 그래프: (워치리스트) → [(관련 기업, 관계, 상태)] / 역방향
+    for i in wl:   # 관련 기업 = 확정 + AI 제안(거절 제외), stock_peers.targets 와 같은 규칙. 워치리스트와 겹치면 한 번만
         try:
-            for c in stock_peers.load(i["market"], i["code"]).get("confirmed") or []:
+            for c in stock_peers.targets(i["market"], i["code"]):
                 r = stock_peers.resolve(c.get("market"), c.get("code"))
-                if r and (r[0], r[1]) not in seen_t:
-                    seen_t.add((r[0], r[1]))
+                if not r:
+                    continue
+                pk = (r[0], r[1])
+                lab = (c.get("relation") or "관계 미지정", "확정" if c.get("status") == "confirmed" else "AI 제안")
+                rel_out.setdefault((i["market"], i["code"]), []).append((pk, *lab))
+                rel_in.setdefault(pk, []).append(((i["market"], i["code"]), *lab))
+                if pk not in seen_t:
+                    seen_t.add(pk)
                     targets.append({"market": r[0], "code": r[1], "name": r[2], "role": "peer"})
+        except Exception:
+            pass
+    kw_of = {}
+    for t in targets:
+        try:
+            kw_of[(t["market"], t["code"])] = nfc(telegram_report.stock_folder_keyword(t["market"], t["code"], nfc(t.get("name") or t["code"])))
         except Exception:
             pass
     notes = {(n["market"], n["code"]) for n in stock_notes.list_notes()}
@@ -234,7 +247,13 @@ def export(out, dry):
         see = " · ".join(links + ([("컨콜 " + " · ".join(link(f"sources/calls/{kw}/{q}") for q in sorted(call_links, reverse=True)))] if call_links else []))
         timeline.sort(key=lambda x: (x[0], x[1]), reverse=True)
         lines = [f"# {name} ({market}:{code})", "", _brief_overview(brief) if brief else "> 브리프 없음", "", "## 나의 판단", "", judge, "",
-                 "## See Also", "", f"- {see}" if see else "- (없음)", "", "---", "", "## Timeline", ""]
+                 "## See Also", "", f"- {see}" if see else "- (없음)"]
+        def _rel_line(title, rows):
+            parts = [f"{link('companies/' + kw_of[k])} ({r} · {st})" for k, r, st in rows if k in kw_of]
+            return [f"- {title}: " + " · ".join(parts)] if parts else []
+        lines += _rel_line("관련 기업", rel_out.get((market, code), []))
+        lines += _rel_line("이 종목을 관련 기업으로 둔 종목", rel_in.get((market, code), []))
+        lines += ["", "---", "", "## Timeline", ""]
         lines += [f"- **{d}** | {t}" for d, t in timeline] or ["- (없음)"]
         w.write("companies", f"companies/{kw}.md", _fm(name, [code] + ([item["name_kr"]] if item.get("name_kr") else [])) + "\n".join(lines))
     return w, failures, round(time.time() - t0, 2)
