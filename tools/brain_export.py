@@ -1,6 +1,6 @@
 """대시보드가 만든 종목 자료를 gbrain 지식창고(~/investment_brain)용 마크다운으로 내보낸다 (brain export v1).
 
-대상 = watchlist.load_watchlist() 전부. 변환은 기존 함수만 호출한다(기존 모듈 수정 없음):
+대상 = watchlist.load_watchlist() 전부 + 그 종목들에 확정된 관련 기업(stock_peers confirmed). 변환은 기존 함수만 호출한다(기존 모듈 수정 없음):
   sources/briefs/<kw>.md            ← cache/briefs/<MARKET>_<code>.md 그대로
   sources/calls/<kw>/<Q>.md         ← earnings_calls._summary_md (+ _compare_md 를 '## 직전 분기 비교' 로)   (미국만)
   sources/reports/<kw>.md           ← stock_reports._render_summary_md
@@ -26,6 +26,7 @@ os.chdir(DASH)
 
 import earnings_calls      # noqa: E402
 import stock_notes         # noqa: E402
+import stock_peers         # noqa: E402
 import stock_reports       # noqa: E402
 import telegram_report     # noqa: E402
 import watchlist           # noqa: E402
@@ -111,9 +112,23 @@ def export(out, dry):
     t0 = time.time()
     w = Writer(out, dry)
     wl = watchlist.load_watchlist()
+    targets, seen_t = [], set()
+    for i in wl:
+        if (i["market"], i["code"]) not in seen_t:
+            seen_t.add((i["market"], i["code"]))
+            targets.append(dict(i, role="watchlist"))
+    for i in wl:   # 확정된 관련 기업 (워치리스트와 겹치면 한 번만)
+        try:
+            for c in stock_peers.load(i["market"], i["code"]).get("confirmed") or []:
+                r = stock_peers.resolve(c.get("market"), c.get("code"))
+                if r and (r[0], r[1]) not in seen_t:
+                    seen_t.add((r[0], r[1]))
+                    targets.append({"market": r[0], "code": r[1], "name": r[2], "role": "peer"})
+        except Exception:
+            pass
     notes = {(n["market"], n["code"]) for n in stock_notes.list_notes()}
     hist = (_load_json(DART_HISTORY, {}) or {}).get("days") or {}
-    kr_codes = {i["code"] for i in wl if i["market"] == "KR"}
+    kr_codes = {i["code"] for i in targets if i["market"] == "KR"}   # 공시: 워치리스트 KR + 관련 기업 KR
     dart_by_code = {}
     seen_rcept = set()
     for day in sorted(hist):
@@ -123,7 +138,9 @@ def export(out, dry):
                 seen_rcept.add(no)
                 dart_by_code.setdefault(code, []).append(it)
     failures = []
-    for item in wl:
+    w.counts["targets_watchlist"] = sum(1 for t in targets if t["role"] == "watchlist")
+    w.counts["targets_peer"] = sum(1 for t in targets if t["role"] == "peer")
+    for item in targets:
         market, code, name = item["market"], item["code"], nfc(item.get("name") or item["code"])
         try:
             kw = nfc(telegram_report.stock_folder_keyword(market, code, name))

@@ -3025,10 +3025,11 @@ def _krfin_prefetch_run(reason):
                                              + (f" ({rj.get('error')})" if rj.get("error") else ""))
         except Exception as e:
             results[f"reports:US_{code}"] = f"실패({type(e).__name__})"
-    # 관련 기업(확정)의 재무 저장본·최근 컨콜 요약 (한도 안에서)
+    # 관련 기업(확정)의 재무·리포트·컨콜 2분기·브리프 (한도 안에서). 워치리스트 브리프(아래)보다 먼저 돌아야 그 '관련 기업' 섹션에 반영됨
+    peer_seen = {(i["market"], i["code"]) for i in items}   # 워치리스트 종목은 위에서 이미 처리 → 관련 기업으로 다시 돌지 않음
     for it in items:
         try:
-            got = stock_peers.prefetch_confirmed(it["market"], it["code"], it.get("name", ""))
+            got = stock_peers.prefetch_confirmed(it["market"], it["code"], it.get("name", ""), usdkrw_rate(), peer_seen)
             if got:
                 results[f"peers:{it['market']}:{it['code']}"] = ", ".join(got)
         except Exception as e:

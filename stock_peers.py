@@ -483,17 +483,25 @@ def status(market, code, name, corp_code, fx):
             "ai": {"used": ai_budget.used("peers"), "limit": ai_budget.DEFAULT_LIMITS["peers"]}}
 
 
-def prefetch_confirmed(market, code, name=""):
-    """05:30 미리 받기: 확정된 관련 기업의 재무 저장본과 최근 컨콜 요약(미국) 갱신. 반환 결과 문자열 목록"""
+def prefetch_confirmed(market, code, name="", fx=None, seen=None):
+    """05:30 미리 받기: 확정된 관련 기업의 재무 저장본·증권사 리포트·최근 2개 분기 컨콜 요약(미국)·종목 브리프 갱신.
+    seen: 이미 처리한 (market, code) 집합 — 여러 워치리스트 종목에 같은 관련 기업이 확정돼 있어도 한 번만. 반환 결과 문자열 목록.
+    AI 한도(reports·reports_us·call_summary)는 각 함수가 지키므로 여기서 따로 제한하지 않는다(못 받은 건 다음날 이어짐)."""
     import kr_financials
     import us_financials
     import earnings_calls
+    import stock_reports
+    import stock_brief
+    seen = set() if seen is None else seen
     out = []
     for c in load(market, code)["confirmed"]:
         r = resolve(c["market"], c["code"])
         if not r:
             continue
         m, cc, nm, corp = r
+        if (m, cc) in seen:
+            continue
+        seen.add((m, cc))
         try:
             if m == "KR":
                 if corp and kr_financials.needs_fetch(cc):
@@ -503,8 +511,18 @@ def prefetch_confirmed(market, code, name=""):
                 if us_financials.needs_fetch(cc):
                     us_financials.fetch_blocking(cc, entity=nm)
                     out.append(f"{cc} 재무")
-                calls = earnings_calls.ensure_recent(cc, nm, 1, True)
+                calls = earnings_calls.ensure_recent(cc, nm, 2, True)
                 out.append(f"{cc} 컨콜 " + " ".join(f"{x['quarter']}:{x.get('transcript')}/{x.get('summary', '-')}" for x in calls))
         except Exception as e:
             out.append(f"{cc} 실패({type(e).__name__})")
+        try:   # 증권사 리포트: 검색·받기·AI 정리 (워치리스트와 같은 호출)
+            rj = stock_reports.run_blocking(m, cc, nm)
+            out.append(f"{cc} 리포트 신규 {rj.get('new', 0)}/AI {rj.get('ai_done', 0)}" + (f" ({rj.get('error')})" if rj.get("error") else ""))
+        except Exception as e:
+            out.append(f"{cc} 리포트 실패({type(e).__name__})")
+        try:   # 종목 브리프 (LLM 호출 없음)
+            b = stock_brief.build_and_write(m, cc, nm, corp, fx)
+            out.append(f"{cc} 브리프 " + ("ok" if b.get("ok") else f"실패({b.get('error')})"))
+        except Exception as e:
+            out.append(f"{cc} 브리프 실패({type(e).__name__})")
     return out
