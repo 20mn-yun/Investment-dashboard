@@ -25,6 +25,18 @@ _CELL_TAGS = {"TD", "TH", "TU", "TE"}
 _SECTION_RE = re.compile(r"^SECTION-(\d)$")
 
 
+_STRAY_LT = re.compile(rb"<(?!/?[A-Za-z][A-Za-z0-9-]*[\s/>]|\?xml|!)")
+_STRAY_AMP = re.compile(rb"&(?!#\d+;|#x[0-9A-Fa-f]+;|[A-Za-z][A-Za-z0-9]*;)")
+
+
+def _parse_xml(raw):
+    """DART 원본은 본문에 '<법률 제20991호…>' 같은 맨 '<'·'&' 가 섞여 엄격한 XML 이 아니다.
+    recover 모드만 쓰면 그 뒤 구조(SECTION·TITLE·TABLE)가 한 덩어리 글로 뭉개지므로, 태그가 아닌 '<'·'&' 를 먼저 이스케이프한다."""
+    fixed = _STRAY_AMP.sub(b"&amp;", _STRAY_LT.sub(b"&lt;", raw))
+    parser = etree.XMLParser(recover=True, huge_tree=True, resolve_entities=False, no_network=True)
+    return etree.fromstring(fixed, parser)
+
+
 def _clean(s):
     return _WS.sub(" ", s or "").strip()
 
@@ -40,8 +52,7 @@ def _table_lines(tbl):
 
 def parse_blocks(raw):
     """원본 바이트 → [(kind, level, text)] 문서 순서. kind = title|p|table"""
-    parser = etree.XMLParser(recover=True, huge_tree=True, resolve_entities=False, no_network=True)
-    root = etree.fromstring(raw, parser)
+    root = _parse_xml(raw)
     blocks = []
 
     def depth_of(el):
@@ -66,7 +77,7 @@ def parse_blocks(raw):
                     first = next((x for x in par if isinstance(x.tag, str) and x.tag == "TITLE"), None)
                     d = depth_of(ch) or 1
                     blocks.append(("title", d if first is ch else d + 1, t))
-            elif tag == "TABLE":
+            elif tag == "TABLE" and ch.find(".//TABLE") is None:
                 lines = _table_lines(ch)
                 if lines:
                     blocks.append(("table", 0, "\n".join(lines)))
@@ -74,7 +85,10 @@ def parse_blocks(raw):
                 t = _clean("".join(ch.itertext()))
                 if t:
                     blocks.append(("p", 0, t))
-            else:
+            else:   # 표 안에 표가 든 바깥 표 포함: 칸에 직접 쓴 글은 문단으로, 안쪽은 계속 내려간다
+                t = _clean(ch.text)
+                if t and tag in _CELL_TAGS:
+                    blocks.append(("p", 0, t))
                 walk(ch)
 
     walk(root)
