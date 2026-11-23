@@ -1070,7 +1070,7 @@ def pdf_path_for(market, code, name):
     return None
 
 
-def purge_local_pdfs(days=30, dry_run=False):
+def purge_local_pdfs(days=180, dry_run=False):
     """cache/reports/*/pdf/<mid>.pdf 중 mtime 이 days 일 넘고, 그 종목 state.json 의 같은 message_id 항목에 drive 경로가 있고
     그 경로가 실제 존재하는 것만 지운다. 아직 AI 정리가 남은 것(요약 없음·ai_pending·OCR 재시도 남음)은 건너뛴다(summarize_one 이 로컬 파일을 읽음).
     지운 항목은 item["local_purged"]=오늘 (item["pdf"] 표시는 유지 → 다시 받지 않고, 파일 API 는 Drive 경로로 폴백).

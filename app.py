@@ -3169,10 +3169,10 @@ def _peers_prefetch_run(reason, only=None):
             print(f"[brain_sync] 건너뜀(ImportError: {e})", flush=True)
         except Exception as e:
             results["brain:sync"] = f"실패({type(e).__name__}: {str(e)[:80]})"
-        try:   # 리포트 PDF 로컬 사본 30일 정리 (Drive 사본이 확인된 것만)
+        try:   # 리포트 PDF 로컬 사본 180일(6개월) 정리 (Drive 사본이 확인된 것만)
             pr = stock_reports.purge_local_pdfs()
             results["pdf:purge"] = (f"ok 정리 {pr['deleted']}건 {pr['bytes_freed'] / 2**20:.0f}MB "
-                                    f"(Drive 없음 {pr['skipped_no_drive']}, 30일 안 {pr['skipped_recent']}, 정리 대기 {pr['skipped_pending']})")
+                                    f"(Drive 없음 {pr['skipped_no_drive']}, 180일 안 {pr['skipped_recent']}, 정리 대기 {pr['skipped_pending']})")
             purge_note = f", PDF 정리 {pr['deleted']}건 {pr['bytes_freed'] / 2**20:.0f}MB"
         except Exception as e:
             results["pdf:purge"] = f"실패({type(e).__name__}: {str(e)[:80]})"
