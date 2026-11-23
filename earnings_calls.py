@@ -284,7 +284,7 @@ def _check_summary(summ):
     return out
 
 
-def summarize(code, quarter, name="", limit=None, force=False):
+def summarize(code, quarter, name="", limit=None, force=False, budget_suffix=""):
     """요약 1건 (한도 kind='call_summary'). 반환 {status: ok|cached|no_transcript|ai_limit|ai_error, ...}"""
     import us_financials
     if not force:
@@ -294,7 +294,7 @@ def summarize(code, quarter, name="", limit=None, force=False):
     st, d = transcript_state(code, quarter)
     if st != "ok":
         return {"status": "no_transcript"}
-    allowed, n = ai_budget.take("call_summary", limit=limit)
+    allowed, n = ai_budget.take("call_summary" + (budget_suffix or ""), limit=limit)
     if not allowed:
         return {"status": "ai_limit", "used": n}
     user_text, meta = _summary_input(d["transcript"])
@@ -1011,14 +1011,14 @@ def latest_guidance(code):
     return None
 
 
-def ensure_recent(code, name="", n=2, summarize_too=True, summary_limit=None):
+def ensure_recent(code, name="", n=2, summarize_too=True, summary_limit=None, budget_suffix=""):
     """최근 n개 분기 녹취록 받기(+요약). 05:30 미리 받기와 화면 첫 열기에서 쓴다. AV 한도 넘으면 waiting 으로 두고 끝."""
     out = []
     for q in list(reversed(quarters(code)))[:n]:
         r = fetch_transcript(code, q["quarter"])
         row = {"quarter": q["quarter"], "transcript": r.get("status")}
         if r.get("status") == "ok" and summarize_too:
-            s = summarize(code, q["quarter"], name, limit=summary_limit)
+            s = summarize(code, q["quarter"], name, limit=summary_limit, budget_suffix=budget_suffix)
             row["summary"] = s.get("status")
         out.append(row)
         if r.get("status") == "waiting":

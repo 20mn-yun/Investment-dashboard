@@ -2368,8 +2368,12 @@ def stock_reports_file_api():
         return jsonify({"error": "bad_request", "message": "name 은 pdf 파일 이름만 허용"}), 400
     pdf_dir = os.path.realpath(os.path.join(stock_reports._dir(market, code), "pdf"))
     path = os.path.realpath(os.path.join(pdf_dir, name))
-    if os.path.dirname(path) != pdf_dir or not os.path.isfile(path):
+    if os.path.dirname(path) != pdf_dir:
         return jsonify({"error": "not_found", "message": "파일 없음"}), 404
+    if not os.path.isfile(path):   # 로컬 사본이 정리됐으면(local_purged) 같은 message_id 의 Drive 사본으로
+        path = stock_reports.pdf_path_for(market, code, name)
+        if not path:
+            return jsonify({"error": "not_found", "message": "파일 없음"}), 404
     return send_file(path, mimetype="application/pdf", as_attachment=False, download_name=name, conditional=True)
 
 
@@ -3054,15 +3058,8 @@ def _krfin_prefetch_run(reason):
                                              + (f" ({rj.get('error')})" if rj.get("error") else ""))
         except Exception as e:
             results[f"reports:US_{code}"] = f"실패({type(e).__name__})"
-    # 관련 기업(확정)의 재무·리포트·컨콜 2분기·브리프 (한도 안에서). 워치리스트 브리프(아래)보다 먼저 돌아야 그 '관련 기업' 섹션에 반영됨
-    peer_seen = {(i["market"], i["code"]) for i in items}   # 워치리스트 종목은 위에서 이미 처리 → 관련 기업으로 다시 돌지 않음
+    # 관련 기업(확정)의 재무·리포트·컨콜은 전날 23:00 별도 배치(_peers_prefetch_run)에서 받는다 → 아래 브리프의 '관련 기업' 섹션에 반영됨
     for it in items:
-        try:
-            got = stock_peers.prefetch_confirmed(it["market"], it["code"], it.get("name", ""), usdkrw_rate(), peer_seen)
-            if got:
-                results[f"peers:{it['market']}:{it['code']}"] = ", ".join(got)
-        except Exception as e:
-            results[f"peers:{it['market']}:{it['code']}"] = f"실패({type(e).__name__})"
         try:   # 종목 브리프: 재무·리포트·컨콜·공시·판단·관련기업이 모두 갱신된 뒤 마크다운 한 장 (LLM 호출 없음)
             corp = (cmap.get(it["code"]) or {}).get("corp_code") if it["market"] == "KR" else None
             b = stock_brief.build_and_write(it["market"], it["code"], it.get("name", ""), corp, usdkrw_rate())
@@ -3125,6 +3122,87 @@ def _krfin_prefetch_loop():
 
 
 threading.Thread(target=_krfin_prefetch_loop, daemon=True).start()
+
+
+# ---------- 관련 기업 미리 받기: 매일 23:00 별도 배치 (05:30 배치에서 분리) ----------
+_PEERS_PREFETCH_HOUR, _PEERS_PREFETCH_MIN = 23, 0
+
+
+def _peers_prefetch_state():
+    """05:30 배치와 같은 상태 파일(kr_financials_prefetch.json)의 'peers' 키"""
+    return _krfin_prefetch_state().get("peers") or {}
+
+
+def _peers_prefetch_save(**kw):
+    st = _krfin_prefetch_state()
+    peers = st.get("peers") or {}
+    peers.update(kw)
+    st["peers"] = peers
+    watchlist_store.atomic_write_json(_KRFIN_PREFETCH_STATE, st)
+
+
+def _peers_prefetch_run(reason, only=None):
+    """워치리스트 종목마다 확정 관련 기업의 재무·리포트·컨콜 2분기·브리프 (AI 는 *_peer 한도) → brain_sync → 리포트 PDF 로컬 사본 정리.
+    only=[(market, code)] 이면 그 워치리스트 종목만(시험용) — 이때는 brain_sync·PDF 정리를 하지 않는다."""
+    _peers_prefetch_save(last_start=datetime.now().isoformat(timespec="seconds"), last_reason=reason)
+    items = watchlist_store.load_watchlist()
+    peer_seen = {(i["market"], i["code"]) for i in items}   # 워치리스트 종목은 05:30 배치가 처리 → 관련 기업으로 다시 돌지 않음
+    if only:
+        items = [i for i in items if (i["market"], i["code"]) in set(only)]
+    fx = usdkrw_rate()
+    results = {}
+    t0 = time.time()
+    for it in items:
+        try:
+            got = stock_peers.prefetch_confirmed(it["market"], it["code"], it.get("name", ""), fx, peer_seen)
+            if got:
+                results[f"peers:{it['market']}:{it['code']}"] = ", ".join(got)
+        except Exception as e:
+            results[f"peers:{it['market']}:{it['code']}"] = f"실패({type(e).__name__})"
+    purge_note = ""
+    if not only:
+        try:   # 브레인 동기화 (관련 기업 브리프 반영)
+            import brain_sync
+            bs = brain_sync.run(reason="peers")
+            results["brain:sync"] = ("ok " if bs.get("ok") else "실패(일부 단계) ") + (bs.get("summary") or "")
+        except ImportError as e:
+            print(f"[brain_sync] 건너뜀(ImportError: {e})", flush=True)
+        except Exception as e:
+            results["brain:sync"] = f"실패({type(e).__name__}: {str(e)[:80]})"
+        try:   # 리포트 PDF 로컬 사본 30일 정리 (Drive 사본이 확인된 것만)
+            pr = stock_reports.purge_local_pdfs()
+            results["pdf:purge"] = (f"ok 정리 {pr['deleted']}건 {pr['bytes_freed'] / 2**20:.0f}MB "
+                                    f"(Drive 없음 {pr['skipped_no_drive']}, 30일 안 {pr['skipped_recent']}, 정리 대기 {pr['skipped_pending']})")
+            purge_note = f", PDF 정리 {pr['deleted']}건 {pr['bytes_freed'] / 2**20:.0f}MB"
+        except Exception as e:
+            results["pdf:purge"] = f"실패({type(e).__name__}: {str(e)[:80]})"
+            purge_note = ", PDF 정리 실패"
+    _peers_prefetch_save(last_run_date=date.today().isoformat(), last_run_at=datetime.now().isoformat(timespec="seconds"),
+                         last_results=results)
+    print(f"[peers] 미리 받기 완료({reason}): {len(items)}종목 {time.time() - t0:.0f}s "
+          f"실패 {sum(1 for k, v in results.items() if not _prefetch_result_ok(v, k))}건{purge_note}", flush=True)
+    return results
+
+
+def _peers_prefetch_loop():
+    """매일 23:00 관련 기업 미리 받기. catch-up 없음(낮에 재시작돼도 장시간 배치가 돌지 않게)."""
+    time.sleep(90)
+    while True:
+        try:
+            now = datetime.now()
+            target = now.replace(hour=_PEERS_PREFETCH_HOUR, minute=_PEERS_PREFETCH_MIN, second=0, microsecond=0)
+            if now >= target:
+                target += timedelta(days=1)
+            _peers_prefetch_save(next_run=target.isoformat(timespec="seconds"))
+            print(f"[peers] 미리 받기 다음 실행: {target}", flush=True)
+            time.sleep((target - now).total_seconds())
+            _peers_prefetch_run("daily")
+        except Exception as e:
+            print(f"[peers] 미리 받기 에러: {type(e).__name__}: {e}", flush=True)
+            time.sleep(3600)
+
+
+threading.Thread(target=_peers_prefetch_loop, daemon=True).start()
 
 
 def _krfin_prefetch_new():

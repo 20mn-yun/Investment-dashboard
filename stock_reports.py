@@ -339,9 +339,10 @@ AI_SYSTEM = """당신은 한국 증권사 리포트를 구조화하는 분석 �
  "목표주가이력": [{"날짜": "YYYY-MM-DD", "목표주가": 0, "투자의견": ""}]}"""
 
 
-def _ai_allowed(market="KR"):
-    """일일 한도 확인 + 카운터 증가. 한국 reports(300) / 미국 reports_us(80) 별도. 반환 (허용 여부, 오늘 호출 수)"""
-    return ai_budget.take("reports_us" if market == "US" else "reports")
+def _ai_allowed(market="KR", suffix=""):
+    """일일 한도 확인 + 카운터 증가. 한국 reports(300) / 미국 reports_us(80) 별도. 반환 (허용 여부, 오늘 호출 수)
+    suffix="_peer" 이면 관련 기업 배치 전용 한도(reports_peer / reports_us_peer)."""
+    return ai_budget.take(("reports_us" if market == "US" else "reports") + (suffix or ""))
 
 
 def _parse_json(text):
@@ -565,7 +566,7 @@ def ocr_pdf(pdf_path):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
-def summarize_one(market, code, name, item, pdf_path, price=None, annual_rev=None, prev=None):
+def summarize_one(market, code, name, item, pdf_path, price=None, annual_rev=None, prev=None, budget_suffix=""):
     """PDF 1건 → AI 정리 결과(dict). AI 를 부르지 않은 경우 status 에 이유. prev 는 같은 건의 이전 레코드(OCR 재시도 횟수용)."""
     import us_financials
     base = {"message_id": item["message_id"], "channel": item["channel"], "date": item.get("date"), "filename": item.get("filename"),
@@ -591,7 +592,7 @@ def summarize_one(market, code, name, item, pdf_path, price=None, annual_rev=Non
                         ocr_error=oerr or f"ocr_short:{len(otext)}", ocr_seconds=osec)
         text, n_chars = otext, len(otext)
         base.update(text_source="ocr", ocr_seconds=osec, ocr_tries=tries + 1, ocr_last=_now(), chars=n_chars)
-    allowed, n = _ai_allowed(market)
+    allowed, n = _ai_allowed(market, budget_suffix)
     if not allowed:
         return dict(base, status="ai_limit", ai_pending=True)
     user = (f"종목: {name} ({code})\n파일명: {item.get('filename')}\n텔레그램 게시: {item.get('date')}\n"
@@ -860,7 +861,7 @@ def _current_price(market, code):
         return None
 
 
-def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
+def run_job(market, code, name, job, ai_limit=None, refresh_search=True, budget_suffix=""):
     try:
         job.update(stage="searching")
         with _state_lock:
@@ -948,9 +949,12 @@ def run_job(market, code, name, job, ai_limit=None, refresh_search=True):
             pend = pend[:ai_limit]
         job.update(stage="summarizing", done=0, total=len(pend))
         for n, it in enumerate(pend, 1):
-            res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price, annual_rev, summaries.get(str(it["message_id"])))
+            res = summarize_one(market, code, name, it, os.path.join(_BD, it["pdf"]), price, annual_rev, summaries.get(str(it["message_id"])),
+                                budget_suffix=budget_suffix)
             summaries[str(it["message_id"])] = res
             job["ai_done"] = job.get("ai_done", 0) + (1 if res.get("status") == "ok" else 0)
+            if res.get("status") == "ai_limit":
+                job["ai_limited"] = job.get("ai_limited", 0) + 1
             if res.get("status") == "ok" and res.get("broker"):
                 rename_if_broker_found(market, code, name, it, res["broker"])      # '미확인' → 증권사 이름으로 (4-D)
             _save_json(_sum_path(market, code), summaries)
@@ -990,7 +994,7 @@ def resummarize(market, code, name="", limit=3):
     return out
 
 
-def start_job(market, code, name, ai_limit=None, refresh_search=True):
+def start_job(market, code, name, ai_limit=None, refresh_search=True, budget_suffix=""):
     k = key_of(market, code)
     with _jobs_guard:
         job = _jobs.get(k)
@@ -998,13 +1002,13 @@ def start_job(market, code, name, ai_limit=None, refresh_search=True):
             return job
         job = {"stage": "queued", "done": 0, "total": 0, "error": None, "started_at": _now(), "finished_at": None}
         _jobs[k] = job
-        threading.Thread(target=run_job, args=(market, code, name, job, ai_limit, refresh_search), daemon=True).start()
+        threading.Thread(target=run_job, args=(market, code, name, job, ai_limit, refresh_search, budget_suffix), daemon=True).start()
         return job
 
 
-def run_blocking(market, code, name, ai_limit=None):
-    """미리 받기용: 작업을 돌리고 끝날 때까지 기다린다"""
-    job = start_job(market, code, name, ai_limit)
+def run_blocking(market, code, name, ai_limit=None, budget_suffix=""):
+    """미리 받기용: 작업을 돌리고 끝날 때까지 기다린다. budget_suffix="_peer" 이면 관련 기업 전용 AI 한도"""
+    job = start_job(market, code, name, ai_limit, budget_suffix=budget_suffix)
     while job["stage"] not in ("done", "failed"):
         time.sleep(1)
     return job
@@ -1049,3 +1053,70 @@ def status(market, code, name="", start=True, ai_limit=None):
         "ai_daily": {"counter_date": ai_budget.snapshot()["date"], "counter_value": ai_budget.used("reports"), "limit": AI_DAILY_LIMIT},
         **telegram_report.drive_folder_status(prefix=stock_root(market, code, name)),   # skipped_folders / recovered_folders (당일)
     }
+
+
+# ---------- 로컬 PDF 사본 정리 (Drive 사본이 확인된 것만) ----------
+def pdf_path_for(market, code, name):
+    """파일 제공용 경로: 로컬 cache/reports/<MARKET>_<code>/pdf/<name> 이 있으면 그것, 없으면(로컬 사본 정리됨)
+    state 의 같은 message_id 항목에 drive 경로가 있고 실제 존재하면 그 Drive 경로. 둘 다 없으면 None."""
+    local = os.path.join(_dir(market, code), "pdf", name)
+    if os.path.isfile(local):
+        return local
+    mid = os.path.splitext(name)[0]
+    st = _load_json(_state_path(market, code), None) or {}
+    for it in (st.get("items") or {}).values():
+        if str(it.get("message_id")) == mid and it.get("drive") and os.path.isfile(it["drive"]):
+            return it["drive"]
+    return None
+
+
+def purge_local_pdfs(days=30, dry_run=False):
+    """cache/reports/*/pdf/<mid>.pdf 중 mtime 이 days 일 넘고, 그 종목 state.json 의 같은 message_id 항목에 drive 경로가 있고
+    그 경로가 실제 존재하는 것만 지운다. 아직 AI 정리가 남은 것(요약 없음·ai_pending·OCR 재시도 남음)은 건너뛴다(summarize_one 이 로컬 파일을 읽음).
+    지운 항목은 item["local_purged"]=오늘 (item["pdf"] 표시는 유지 → 다시 받지 않고, 파일 API 는 Drive 경로로 폴백).
+    반환 {deleted, bytes_freed, skipped_no_drive, skipped_recent, skipped_pending, dry_run}"""
+    import glob
+    cutoff = time.time() - days * 86400
+    today = date.today().isoformat()
+    out = {"deleted": 0, "bytes_freed": 0, "skipped_no_drive": 0, "skipped_recent": 0, "skipped_pending": 0, "dry_run": bool(dry_run)}
+    for d in sorted(glob.glob(os.path.join(CACHE_DIR, "*", ""))):
+        mk = os.path.basename(d.rstrip("/"))
+        if "_" not in mk:
+            continue
+        market, code = mk.split("_", 1)
+        pdfs = sorted(glob.glob(os.path.join(d, "pdf", "*.pdf")))
+        if not pdfs:
+            continue
+        with _state_lock:
+            st = _load_json(_state_path(market, code), None) or {}
+            summaries = _load_json(_sum_path(market, code), {})
+            items = {str(it.get("message_id")): it for it in (st.get("items") or {}).values()}
+            changed = False
+            for p in pdfs:
+                if os.path.getmtime(p) > cutoff:
+                    out["skipped_recent"] += 1
+                    continue
+                mid = os.path.splitext(os.path.basename(p))[0]
+                it = items.get(mid)
+                dp = (it or {}).get("drive")
+                if not it or not dp or not os.path.exists(dp):
+                    out["skipped_no_drive"] += 1
+                    continue
+                s = summaries.get(mid)
+                if s is None or s.get("ai_pending") or (s.get("status") == "no_text" and int(s.get("ocr_tries") or 0) < OCR_MAX_TRIES):
+                    out["skipped_pending"] += 1
+                    continue
+                size = os.path.getsize(p)
+                if not dry_run:
+                    try:
+                        os.remove(p)
+                    except OSError as e:
+                        print(f"[stock_reports] PDF 정리 실패 {mk}/{mid}: {type(e).__name__}", flush=True)
+                        continue
+                    it["local_purged"] = today
+                    changed = True
+                out["deleted"] += 1
+                out["bytes_freed"] += size
+            if changed:
+                _save_json(_state_path(market, code), st)
+    return out

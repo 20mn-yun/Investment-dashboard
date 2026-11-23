@@ -551,13 +551,15 @@ def prefetch_confirmed(market, code, name="", fx=None, seen=None):
                 if us_financials.needs_fetch(cc):
                     us_financials.fetch_blocking(cc, entity=nm)
                     out.append(f"{cc} 재무")
-                calls = earnings_calls.ensure_recent(cc, nm, 2, True)
-                out.append(f"{cc} 컨콜 " + " ".join(f"{x['quarter']}:{x.get('transcript')}/{x.get('summary', '-')}" for x in calls))
+                calls = earnings_calls.ensure_recent(cc, nm, 2, True, budget_suffix="_peer")
+                out.append(f"{cc} 컨콜 " + " ".join(f"{x['quarter']}:{x.get('transcript')}/{x.get('summary', '-')}" for x in calls)
+                           + (" (call_summary_peer 한도)" if any(x.get("summary") == "ai_limit" for x in calls) else ""))
         except Exception as e:
             out.append(f"{cc} 실패({type(e).__name__})")
         try:   # 증권사 리포트: 검색·받기·AI 정리 (워치리스트와 같은 호출)
-            rj = stock_reports.run_blocking(m, cc, nm)
-            out.append(f"{cc} 리포트 신규 {rj.get('new', 0)}/AI {rj.get('ai_done', 0)}" + (f" ({rj.get('error')})" if rj.get("error") else ""))
+            rj = stock_reports.run_blocking(m, cc, nm, budget_suffix="_peer")
+            out.append(f"{cc} 리포트 신규 {rj.get('new', 0)}/AI {rj.get('ai_done', 0)}" + (f" ({rj.get('error')})" if rj.get("error") else "")
+                       + (f" (reports{'_us' if m == 'US' else ''}_peer 한도 {rj['ai_limited']}건 대기)" if rj.get("ai_limited") else ""))
         except Exception as e:
             out.append(f"{cc} 리포트 실패({type(e).__name__})")
         try:   # 종목 브리프 (LLM 호출 없음)

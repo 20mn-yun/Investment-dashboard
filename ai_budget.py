@@ -31,6 +31,9 @@ DEFAULT_LIMITS = {
     "drilling_kpi": 20,      # 시추 업황 탭: 컨콜·8-K 에서 시장/회사 KPI 추출 (drilling_tracker.extract_kpis, Sonnet)
     "drilling_news": 40,     # 시추 업황 탭 B: 뉴스·8-K(7.01/8.01) 기사 1건 → 이벤트·시장 수치 추출 (drilling_daily, Sonnet)
     "drilling_fsr": 6,       # 시추 업황 탭 B: Fleet Status Report PDF 1건 → 리그 표 추출 (drilling_daily, Sonnet)
+    "reports_peer": 120,     # 관련 기업 23:00 배치의 한국 리포트 정리 (워치리스트 reports 와 별도 한도)
+    "reports_us_peer": 40,   # 관련 기업 23:00 배치의 미국 리포트 정리 (워치리스트 reports_us 와 별도 한도)
+    "call_summary_peer": 10, # 관련 기업 23:00 배치의 컨콜 요약 (워치리스트 call_summary 와 별도 한도)
 }
 
 _lock = threading.Lock()
