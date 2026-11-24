@@ -19,3 +19,4 @@ python-dotenv==1.2.2
 requests==2.32.5
 Telethon==1.43.2
 yfinance==1.2.0
+youtube-transcript-api==1.2.5

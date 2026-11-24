@@ -1456,6 +1456,21 @@ def get_filing_section(rcept_no: str, idx: int, offset: int = 0) -> dict:
     return d
 
 
+@mcp.tool
+def get_youtube_transcript(url: str, offset: int = 0) -> dict:
+    """유튜브 영상의 자막(스크립트) 본문. 문단 앞 [mm:ss] 는 영상 시각. 긴 영상은 next_offset 이 null 이 될 때까지 이어 읽을 것(결론은 끝부분에 있는 경우가 많다). 자막이 없는 영상은 no_transcript."""
+    require_allowed_email()
+    try:
+        o = max(0, int(offset or 0))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad_request", "message": "offset 은 정수"}
+    d, err = _api("/api/youtube/transcript", {"url": (url or "").strip(), "offset": o, "max_chars": 40000}, timeout=60)
+    if err:
+        return err
+    log.info("youtube transcript: video_id=%s offset=%d chars=%d", d.get("video_id"), o, len(d.get("text") or ""))
+    return d
+
+
 if __name__ == "__main__":
     log.info(
         "MCP 서버 시작: fastmcp=%s base_url=%s callback=%s%s mcp=%s%s",

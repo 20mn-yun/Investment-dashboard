@@ -3826,6 +3826,52 @@ def dart_original_section_api():
                     "text": text, "next_offset": end if end < s["chars"] else None})
 
 
+@app.route("/api/youtube/transcript", methods=["GET"])
+def youtube_transcript_api():
+    """유튜브 자막 본문 (MCP get_youtube_transcript). max_chars 1000~40000, 남으면 next_offset(한도 안 마지막 줄바꿈에서 자름)."""
+    import youtube_transcript
+    try:
+        offset = max(0, int(request.args.get("offset", "0") or 0))
+        max_chars = max(1000, min(40000, int(request.args.get("max_chars", "40000") or 40000)))
+    except ValueError:
+        return jsonify({"error": "bad_request", "message": "offset·max_chars 는 정수"}), 400
+    data, cached, err = youtube_transcript.get(request.args.get("url", ""))
+    if err:
+        return jsonify({"error": err[0], "message": err[1]}), youtube_transcript.ERR_STATUS.get(err[0], 502)
+    text, next_offset = youtube_transcript.slice_text(data["text"], offset, max_chars)
+    out = {"ok": True, "video_id": data["video_id"], "title": data["title"], "channel": data["channel"]}
+    if data.get("published"):
+        out["published"] = data["published"]
+    out.update({"language": data["language"], "is_generated": data["is_generated"], "duration_sec": data["duration_sec"],
+                "total_chars": len(data["text"]), "offset": offset, "text": text, "next_offset": next_offset, "cached": cached})
+    return jsonify(out)
+
+
+@app.route("/youtube-transcript", methods=["GET"])
+def youtube_transcript_page():
+    """url 없으면 주소 입력 페이지(휴대폰용), 있으면 text/plain 전문(제목·채널·길이 뒤 빈 줄, 본문)."""
+    import youtube_transcript
+    url = (request.args.get("url") or "").strip()
+    if not url:
+        html = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>유튜브 자막</title><style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;margin:0;padding:20px;font-size:18px;background:#fff;color:#1f2937}
+h1{font-size:22px;margin:0 0 14px}form{display:flex;flex-direction:column;gap:12px}
+input{font-size:18px;padding:14px;border:1px solid #d0d7de;border-radius:10px;width:100%;box-sizing:border-box}
+button{font-size:18px;padding:14px;border:0;border-radius:10px;background:#0969da;color:#fff}p{color:#57606a;font-size:15px}
+</style></head><body><h1>유튜브 자막 읽기</h1><form method="get" action="/youtube-transcript">
+<input name="url" type="url" inputmode="url" placeholder="https://youtu.be/... 또는 영상 주소" autofocus required>
+<button type="submit">자막 보기</button></form><p>watch?v=, youtu.be/, /live/, /shorts/ 주소를 넣으세요. 자막 전문이 글자로 열립니다.</p></body></html>"""
+        return Response(html, content_type="text/html; charset=utf-8")
+    data, _cached, err = youtube_transcript.get(url)
+    if err:
+        return Response(f"자막을 가져오지 못했습니다 ({err[0]})\n{err[1]}\n", status=youtube_transcript.ERR_STATUS.get(err[0], 502),
+                        content_type="text/plain; charset=utf-8")
+    line2 = " · ".join(x for x in (data["channel"], youtube_transcript.duration_text(data["duration_sec"]), data.get("published") or "") if x)
+    body = f"{data['title'] or data['video_id']}\n{line2}\n\n{data['text']}\n"
+    return Response(body, content_type="text/plain; charset=utf-8")
+
+
 @app.route("/api/sec-report/download", methods=["POST"])
 def start_sec_download():
     import sec_report
